@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/nocturne-ecb69020-9b9b-49b6-a215-3fa839fb9424/styles.css">
+  <script src="_ds/nocturne-ecb69020-9b9b-49b6-a215-3fa839fb9424/_ds_bundle.js"></script>
+  <style>
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    body { margin: 0; text-wrap: pretty; }
+    a { color: var(--color-accent); }
+    a:hover { color: var(--color-accent-300); }
+    @keyframes cuss-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    @media (max-width: 900px) {
+      .cuss-hero-grid { grid-template-columns: 1fr !important; }
+      .cuss-feature { grid-template-columns: 1fr !important; }
+      .cuss-stats-grid { grid-template-columns: repeat(2,1fr) !important; }
+      .cuss-steps { grid-template-columns: 1fr !important; }
+      .cuss-cards { grid-template-columns: 1fr !important; }
+    }
+  </style>
+</helmet>
+
+<div style="--leading:28px; --half:14px; --edge:clamp(20px,5vw,72px); --color-warn:oklch(0.74 0.15 55); background:
+    radial-gradient(1200px 720px at 82% -160px, color-mix(in srgb, var(--color-accent-900) 75%, transparent), transparent 60%),
+    radial-gradient(1100px 800px at -10% 100%, color-mix(in srgb, black 30%, transparent), transparent 55%),
+    var(--color-bg); color: var(--color-text); font-family: var(--font-body); min-height: 100vh;">
+
+  <nav style="display:flex; align-items:center; gap:var(--space-4); padding: var(--space-3) var(--edge);">
+    <span style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:18px; margin-right:auto;">Cussator</span>
+    <a href="#demo" style="text-decoration:none; font-size:14px;">Демо</a>
+    <a href="#features" style="text-decoration:none; font-size:14px;">Фичи</a>
+    <a href="#how" style="text-decoration:none; font-size:14px;">Как это работает</a>
+    <a href="#reviews" style="text-decoration:none; font-size:14px;">Отзывы</a>
+    <a href="#start"><button type="button" class="btn btn-primary">Начать раунд</button></a>
+  </nav>
+
+  <div style="max-width:1200px; margin:0 auto; padding: 0 var(--edge);">
+
+    <section id="demo" class="cuss-hero-grid" style="display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: clamp(32px,5vw,80px); align-items:center; padding: calc(3 * var(--leading)) 0 calc(2.5 * var(--leading));">
+      <div>
+        <h1 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:clamp(40px,5.6vw,72px); line-height:1.08; letter-spacing:-0.015em; margin:0 0 0 -0.05em;">
+          <span style="display:block;">Каждое слово — это риск.</span>
+          <span style="display:block;">Каждый раунд — это счёт.</span>
+        </h1>
+        <p style="font-size:17px; line-height:var(--leading); max-width:52ch; margin: calc(1.5 * var(--leading)) 0 0; color:var(--color-text);">
+          Cussator — live-дебаты один на один с AI-оппонентом, в формате, близком к MUN. Точные формулировки усиливают позицию в реальном времени; расплывчатые и слова-паразиты — ослабляют её на глазах, и AI использует слабость немедленно.
+        </p>
+        <div style="display:flex; gap:var(--space-3); flex-wrap:wrap; margin-top:var(--leading);">
+          <a href="#start"><button type="button" class="btn btn-primary">Начать бесплатный раунд</button></a>
+          <a href="#how"><button type="button" class="btn btn-ghost">Как это работает</button></a>
+        </div>
+      </div>
+
+      <div style="background:var(--color-surface); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-3); min-width:0;">
+        <div style="display:flex; align-items:center; gap:var(--space-2);">
+          <span style="width:7px; height:7px; border-radius:50%; background:var(--color-accent); animation: cuss-pulse 1.6s ease-in-out infinite;"></span>
+          <span class="tag tag-outline">LIVE ROUND</span>
+          <span style="margin-left:auto; font-size:11px; color:color-mix(in srgb, var(--color-text) 55%, transparent); font-feature-settings:'tnum' 1;">00:42</span>
+        </div>
+        <p style="margin:0; font-size:12px; font-style:italic; color:color-mix(in srgb, var(--color-text) 60%, transparent);">
+          Motion: "This House believes nuclear power is the fastest path to decarbonization."
+        </p>
+        <div>
+          <p style="margin:0 0 4px; font-size:11px; letter-spacing:0.04em; text-transform:uppercase; color:color-mix(in srgb, var(--color-text) 55%, transparent);">Ты — Prop 1</p>
+          <p style="margin:0; font-size:16px; line-height:1.5;">
+            <sc-for list="{{ tokens }}" as="token" hint-placeholder-count="16"><span style="{{ token.style }}">{{ token.text }} </span></sc-for>
+          </p>
+        </div>
+        <sc-if value="{{ showAi }}">
+          <div style="background:color-mix(in srgb, var(--color-warn) 14%, var(--color-surface)); border-radius:var(--radius-md); padding:var(--space-3);">
+            <p style="margin:0 0 4px; font-size:11px; letter-spacing:0.04em; text-transform:uppercase; color:var(--color-warn);">AI-оппонент перехватывает</p>
+            <p style="margin:0; font-size:14px; line-height:1.5;">«Kind of the best» — это не тезис, а пожатие плечами. Назови альтернативу, которую ты отвергаешь.</p>
+          </div>
+        </sc-if>
+        <sc-if value="{{ showJudge }}">
+          <div style="display:flex; flex-direction:column; gap:6px; padding-top:var(--space-2); border-top:1px solid var(--color-divider);">
+            <p style="margin:0 0 2px; font-size:11px; letter-spacing:0.04em; text-transform:uppercase; color:color-mix(in srgb, var(--color-text) 55%, transparent);">Судья</p>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:12px; width:64px; flex:none;">Логика</span>
+              <div style="flex:1; height:6px; border-radius:99px; background:var(--color-neutral-800); overflow:hidden;"><div style="height:100%; width:{{ judgeLogic }}%; background:var(--color-accent);"></div></div>
+              <span style="font-size:11px; width:28px; text-align:right; font-feature-settings:'tnum' 1;">{{ judgeLogic }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:12px; width:64px; flex:none;">Точность</span>
+              <div style="flex:1; height:6px; border-radius:99px; background:var(--color-neutral-800); overflow:hidden;"><div style="height:100%; width:{{ judgePrecision }}%; background:var(--color-warn);"></div></div>
+              <span style="font-size:11px; width:28px; text-align:right; font-feature-settings:'tnum' 1;">{{ judgePrecision }}</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:12px; width:64px; flex:none;">Подача</span>
+              <div style="flex:1; height:6px; border-radius:99px; background:var(--color-neutral-800); overflow:hidden;"><div style="height:100%; width:{{ judgeDelivery }}%; background:var(--color-accent);"></div></div>
+              <span style="font-size:11px; width:28px; text-align:right; font-feature-settings:'tnum' 1;">{{ judgeDelivery }}</span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </section>
+  </div>
+
+  <section style="background: radial-gradient(900px 420px at 85% -40%, color-mix(in srgb, var(--color-section-glow) 70%, transparent), transparent 64%), var(--color-section); padding: calc(2.2 * var(--leading)) 0;">
+    <div style="max-width:1200px; margin:0 auto; padding:0 var(--edge);">
+      <div class="cuss-stats-grid" style="display:grid; grid-template-columns:repeat(4,auto); justify-content:space-between; gap: calc(1.2 * var(--leading)) var(--leading);">
+        <div>
+          <p style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:clamp(32px,3.2vw,46px); margin:0; line-height:1.2;">1 200+</p>
+          <p style="font-size:12px; letter-spacing:0.05em; text-transform:uppercase; color:color-mix(in srgb, var(--color-text) 64%, transparent); margin:6px 0 0;">MUN-делегатов в раундах</p>
+        </div>
+        <div>
+          <p style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:clamp(32px,3.2vw,46px); margin:0; line-height:1.2;">40 мс</p>
+          <p style="font-size:12px; letter-spacing:0.05em; text-transform:uppercase; color:color-mix(in srgb, var(--color-text) 64%, transparent); margin:6px 0 0;">задержка живой подсветки</p>
+        </div>
+        <div>
+          <p style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:clamp(32px,3.2vw,46px); margin:0; line-height:1.2;">3</p>
+          <p style="font-size:12px; letter-spacing:0.05em; text-transform:uppercase; color:color-mix(in srgb, var(--color-text) 64%, transparent); margin:6px 0 0;">критерия судейства</p>
+        </div>
+        <div>
+          <p style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:clamp(32px,3.2vw,46px); margin:0; line-height:1.2;">−86%</p>
+          <p style="font-size:12px; letter-spacing:0.05em; text-transform:uppercase; color:color-mix(in srgb, var(--color-text) 64%, transparent); margin:6px 0 0;">слов-паразитов ко 2 раунду</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div style="max-width:1200px; margin:0 auto; padding:0 var(--edge);">
+
+    <section id="features" style="padding: calc(3 * var(--leading)) 0 calc(2 * var(--leading));">
+      <span style="position:relative; display:block; font-size:13px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-accent); margin:0 0 calc(var(--leading) - var(--half));">Что делает Cussator</span>
+
+      <div class="cuss-feature" style="display:grid; grid-template-columns:minmax(64px,140px) minmax(0,360px) minmax(0,1fr); gap:var(--leading) clamp(24px,4vw,64px); align-items:baseline; padding:calc(1.4 * var(--leading)) 0; border-top:1px solid transparent; background: linear-gradient(to right, transparent, var(--color-neutral-800) 48px calc(100% - 48px), transparent) no-repeat top / 100% 1px;">
+        <p style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:15px; color:var(--color-accent); margin:0; font-feature-settings:'tnum' 1;">01</p>
+        <h2 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:24px; margin:0; letter-spacing:-0.01em;">Word Economy</h2>
+        <p style="font-size:15.5px; line-height:var(--leading); margin:0; color:color-mix(in srgb, var(--color-text) 78%, transparent); max-width:52ch;">У каждого слова есть цена. Точные термины и чёткие тезисы усиливают позицию live; хеджи вроде «kind of» и «basically» ослабляют её сразу, у всех на виду.</p>
+      </div>
+
+      <div class="cuss-feature" style="display:grid; grid-template-columns:minmax(64px,140px) minmax(0,360px) minmax(0,1fr); gap:var(--leading) clamp(24px,4vw,64px); align-items:baseline; padding:calc(1.4 * var(--leading)) 0; background: linear-gradient(to right, transparent, var(--color-neutral-800) 48px calc(100% - 48px), transparent) no-repeat top / 100% 1px;">
+        <p style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:15px; color:var(--color-accent); margin:0; font-feature-settings:'tnum' 1;">02</p>
+        <h2 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:24px; margin:0; letter-spacing:-0.01em;">Live Interruption</h2>
+        <p style="font-size:15.5px; line-height:var(--leading); margin:0; color:color-mix(in srgb, var(--color-text) 78%, transparent); max-width:52ch;">AI-оппонент не ждёт итогов раунда. Заметив расплывчатую формулировку, он прерывает речь и обращает её против тебя — как в живых дебатах.</p>
+      </div>
+
+      <div class="cuss-feature" style="display:grid; grid-template-columns:minmax(64px,140px) minmax(0,360px) minmax(0,1fr); gap:var(--leading) clamp(24px,4vw,64px); align-items:baseline; padding:calc(1.4 * var(--leading)) 0; background: linear-gradient(to right, transparent, var(--color-neutral-800) 48px calc(100% - 48px), transparent) no-repeat top / 100% 1px;">
+        <p style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:15px; color:var(--color-accent); margin:0; font-feature-settings:'tnum' 1;">03</p>
+        <h2 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:24px; margin:0; letter-spacing:-0.01em;">Vocabulary Scars</h2>
+        <div style="max-width:52ch;">
+          <p style="font-size:15.5px; line-height:var(--leading); margin:0 0 var(--space-3); color:color-mix(in srgb, var(--color-text) 78%, transparent);">Слабые формулировки не исчезают после раунда — они остаются в профиле, пока ты не закроешь их точной речью в следующих раундах.</p>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <span class="tag" style="background:color-mix(in srgb, var(--color-warn) 22%, var(--color-surface)); color:var(--color-warn);">kind of ×3</span>
+            <span class="tag" style="background:color-mix(in srgb, var(--color-warn) 22%, var(--color-surface)); color:var(--color-warn);">basically ×2</span>
+            <span class="tag" style="background:color-mix(in srgb, var(--color-warn) 22%, var(--color-surface)); color:var(--color-warn);">sort of ×1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="cuss-feature" style="display:grid; grid-template-columns:minmax(64px,140px) minmax(0,360px) minmax(0,1fr); gap:var(--leading) clamp(24px,4vw,64px); align-items:baseline; padding:calc(1.4 * var(--leading)) 0; background: linear-gradient(to right, transparent, var(--color-neutral-800) 48px calc(100% - 48px), transparent) no-repeat top / 100% 1px;">
+        <p style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:15px; color:var(--color-accent); margin:0; font-feature-settings:'tnum' 1;">04</p>
+        <h2 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:24px; margin:0; letter-spacing:-0.01em;">AI-судья</h2>
+        <p style="font-size:15.5px; line-height:var(--leading); margin:0; color:color-mix(in srgb, var(--color-text) 78%, transparent); max-width:52ch;">После раунда отдельный AI оценивает выступление по трём критериям — Логика, Точность, Подача — и даёт разбор, а не просто число.</p>
+      </div>
+    </section>
+
+    <section id="how" style="padding: calc(2.5 * var(--leading)) 0 calc(3 * var(--leading));">
+      <span style="position:relative; display:block; font-size:13px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-accent); margin:0 0 calc(var(--leading) - var(--half));">Как это работает</span>
+      <div class="cuss-steps" style="display:grid; grid-template-columns:repeat(4,1fr); gap: clamp(20px,3vw,32px);">
+        <div>
+          <p style="font-family:var(--font-heading); font-size:15px; color:var(--color-accent); margin:0 0 8px; font-feature-settings:'tnum' 1;">01</p>
+          <h3 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:17px; margin:0 0 6px;">Выбери резолюцию</h3>
+          <p style="font-size:14px; line-height:1.5; margin:0; color:color-mix(in srgb, var(--color-text) 78%, transparent);">Мотивы в формате MUN — от климата до торговых пошлин.</p>
+        </div>
+        <div>
+          <p style="font-family:var(--font-heading); font-size:15px; color:var(--color-accent); margin:0 0 8px; font-feature-settings:'tnum' 1;">02</p>
+          <h3 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:17px; margin:0 0 6px;">Спорь вживую</h3>
+          <p style="font-size:14px; line-height:1.5; margin:0; color:color-mix(in srgb, var(--color-text) 78%, transparent);">Текстом или голосом, один на один с AI-оппонентом.</p>
+        </div>
+        <div>
+          <p style="font-family:var(--font-heading); font-size:15px; color:var(--color-accent); margin:0 0 8px; font-feature-settings:'tnum' 1;">03</p>
+          <h3 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:17px; margin:0 0 6px;">Смотри сигналы в моменте</h3>
+          <p style="font-size:14px; line-height:1.5; margin:0; color:color-mix(in srgb, var(--color-text) 78%, transparent);">Слова подсвечиваются по ходу речи, а не в отчёте после.</p>
+        </div>
+        <div>
+          <p style="font-family:var(--font-heading); font-size:15px; color:var(--color-accent); margin:0 0 8px; font-feature-settings:'tnum' 1;">04</p>
+          <h3 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:17px; margin:0 0 6px;">Получи разбор судьи</h3>
+          <p style="font-size:14px; line-height:1.5; margin:0; color:color-mix(in srgb, var(--color-text) 78%, transparent);">Логика, Точность, Подача — и обновлённые Vocabulary Scars.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="reviews" style="padding: calc(2 * var(--leading)) 0 calc(3 * var(--leading));">
+      <span style="position:relative; display:block; font-size:13px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-accent); margin:0 0 calc(var(--leading) - var(--half));">Отзывы</span>
+      <div class="cuss-cards" style="display:grid; grid-template-columns:repeat(3,1fr); gap:var(--space-4);">
+        <div class="card elev-sm">
+          <p class="card-kicker">Делегат MUN, старшая школа</p>
+          <p class="card-body">«Первый раз готовился к MUN не по бумажке, а вживую — AI ловил мои "kind of" быстрее, чем я успевал это заметить.»</p>
+          <p class="card-meta">Дилан</p>
+        </div>
+        <div class="card elev-sm">
+          <p class="card-kicker">Студентка, ESL</p>
+          <p class="card-body">«Я не носитель языка, и мне было страшно спорить вслух. Здесь ошибка — не стыд, а сигнал: учишься за раунд, не за семестр.»</p>
+          <p class="card-meta">Мин Джи</p>
+        </div>
+        <div class="card elev-sm">
+          <p class="card-kicker">Тренер дебат-клуба</p>
+          <p class="card-body">«Судья Cussator жёстче любого коуча — именно поэтому после него не страшно выйти на настоящий Model UN.»</p>
+          <p class="card-meta">Артём</p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="hr">
+
+    <section id="start" style="padding: calc(2.5 * var(--leading)) 0 calc(2 * var(--leading));">
+      <h3 style="font-family:var(--font-heading); font-weight:var(--font-heading-weight); font-size:24px; margin:0;">Готов рискнуть словом?</h3>
+      <p style="font-size:15.5px; line-height:var(--leading); margin: calc(var(--leading) - 1cap) 0 0; max-width:58ch; color:color-mix(in srgb, var(--color-text) 78%, transparent);">Первый раунд — бесплатно. Или подпишись на рассылку: узнаешь первым, когда откроется бета голосовых дебатов.</p>
+      <div style="display:flex; gap:var(--space-3); align-items:stretch; max-width:480px; margin-top:var(--leading);">
+        <input class="input" style="flex:1;" type="email" placeholder="you@example.com" aria-label="Email address">
+        <button type="button" class="btn btn-primary" style="min-height:36px;">Резервировать место</button>
+      </div>
+    </section>
+
+    <footer style="padding: calc(1.6 * var(--leading)) 0; font-size:13px; color:color-mix(in srgb, var(--color-text) 55%, transparent);">Cussator — AI-дебаты для тех, кто взвешивает каждое слово.</footer>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { revealed: 0, showAi: false, showJudge: false, judgeLogic: 0, judgePrecision: 0, judgeDelivery: 0 };
+
+  componentDidMount() {
+    this.tokens = [
+      { t: 'I', s: 'n' }, { t: 'believe', s: 'n' }, { t: 'nuclear', s: 's' }, { t: 'power', s: 's' },
+      { t: 'is', s: 'n' }, { t: 'kind', s: 'w' }, { t: 'of', s: 'w' }, { t: 'the', s: 'n' },
+      { t: 'best', s: 'w' }, { t: 'option', s: 'n' }, { t: 'for', s: 'n' }, { t: 'decarbonizing', s: 's' },
+      { t: 'the', s: 'n' }, { t: 'grid', s: 's' }, { t: 'by', s: 'n' }, { t: '2035.', s: 's' }
+    ];
+    this.startLoop();
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this._timer);
+  }
+
+  startLoop() {
+    this._i = 0;
+    this.setState({ revealed: 0, showAi: false, showJudge: false, judgeLogic: 0, judgePrecision: 0, judgeDelivery: 0 });
+    this.tick();
+  }
+
+  tick() {
+    this._i++;
+    this.setState({ revealed: this._i });
+    if (this._i < this.tokens.length) {
+      this._timer = setTimeout(() => this.tick(), 160);
+    } else {
+      this._timer = setTimeout(() => this.revealAi(), 1000);
+    }
+  }
+
+  revealAi() {
+    this.setState({ showAi: true });
+    this._timer = setTimeout(() => this.revealJudge(), 1900);
+  }
+
+  revealJudge() {
+    this.setState({ showJudge: true });
+    this._timer = setTimeout(() => this.animateJudge(0), 300);
+  }
+
+  animateJudge(step) {
+    const targets = { logic: 78, precision: 52, delivery: 81 };
+    const n = 14;
+    const p = Math.min(step, n) / n;
+    this.setState({
+      judgeLogic: Math.round(targets.logic * p),
+      judgePrecision: Math.round(targets.precision * p),
+      judgeDelivery: Math.round(targets.delivery * p)
+    });
+    if (step < n) {
+      this._timer = setTimeout(() => this.animateJudge(step + 1), 40);
+    } else {
+      this._timer = setTimeout(() => this.startLoop(), 3400);
+    }
+  }
+
+  renderVals() {
+    const good = 'oklch(0.75 0.13 150)';
+    const warn = 'oklch(0.74 0.15 55)';
+    const tokens = (this.tokens || []).map((tok, idx) => {
+      const shown = idx < this.state.revealed;
+      const color = tok.s === 's' ? good : tok.s === 'w' ? warn : 'var(--color-text)';
+      return {
+        text: tok.t,
+        style: {
+          color: shown ? color : 'transparent',
+          fontWeight: tok.s === 'n' ? 400 : 600,
+          textDecoration: tok.s === 'w' ? 'underline wavy ' + warn : 'none',
+          transition: 'color 0.25s ease'
+        }
+      };
+    });
+    return {
+      tokens,
+      showAi: this.state.showAi,
+      showJudge: this.state.showJudge,
+      judgeLogic: this.state.judgeLogic,
+      judgePrecision: this.state.judgePrecision,
+      judgeDelivery: this.state.judgeDelivery
+    };
+  }
+}
+
+</script>
+</body>
+</html>

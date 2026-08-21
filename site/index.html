@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cussator — AI debates where every word counts</title>
+<meta name="description" content="Cussator — live one-on-one debates against an AI opponent, in a format close to MUN. Precise phrasing strengthens your position; filler words weaken it in real time.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="cuss-page">
+
+  <nav class="nav cuss-nav" style="padding: var(--space-3) var(--edge);">
+    <span class="nav-brand">Cussator</span>
+    <a href="#demo">Demo</a>
+    <a href="#features">Features</a>
+    <a href="#how">How it works</a>
+    <a href="#reviews">Reviews</a>
+    <button type="button" class="btn btn-primary" id="cuss-start-nav">Start round</button>
+  </nav>
+
+  <div class="cuss-wrap">
+
+    <section id="demo" class="cuss-hero-grid">
+      <div class="cuss-hero-copy">
+        <h1>
+          <span>Every word is a risk.</span>
+          <span>Every round keeps score.</span>
+        </h1>
+        <p>
+          Cussator is live one-on-one debate against an AI opponent, in a format close to MUN. Precise phrasing strengthens your position in real time; vague language and filler words weaken it instantly — and the AI exploits the weakness right away.
+        </p>
+        <div class="cuss-hero-actions">
+          <button type="button" class="btn btn-primary" id="cuss-start-hero">Start a free round</button>
+          <a href="#how"><button type="button" class="btn btn-ghost">How it works</button></a>
+        </div>
+      </div>
+
+      <div class="cuss-demo">
+        <div class="cuss-demo-head">
+          <span class="cuss-live-dot"></span>
+          <span class="tag tag-outline">LIVE ROUND</span>
+          <span class="cuss-demo-timer" id="cuss-timer">00:00</span>
+        </div>
+        <p class="cuss-demo-motion">
+          Motion: &laquo;This House believes nuclear power is the fastest path to decarbonization.&raquo;
+        </p>
+        <div>
+          <p class="cuss-demo-label">You are Prop 1</p>
+          <p class="cuss-demo-speech" id="cuss-speech"></p>
+        </div>
+        <div class="cuss-ai-card" id="cuss-ai-card">
+          <p class="cuss-ai-label">AI opponent interrupts</p>
+          <p class="cuss-ai-body">&laquo;Kind of the best&raquo; isn't a claim, it's a shrug. Name the alternative you're rejecting.</p>
+        </div>
+        <div class="cuss-judge" id="cuss-judge">
+          <p class="cuss-judge-label">Judge</p>
+          <div class="cuss-judge-row">
+            <span>Logic</span>
+            <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-bar-logic"></div></div>
+            <span class="cuss-judge-val" id="cuss-val-logic">0</span>
+          </div>
+          <div class="cuss-judge-row">
+            <span>Precision</span>
+            <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-bar-precision"></div></div>
+            <span class="cuss-judge-val" id="cuss-val-precision">0</span>
+          </div>
+          <div class="cuss-judge-row">
+            <span>Delivery</span>
+            <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-bar-delivery"></div></div>
+            <span class="cuss-judge-val" id="cuss-val-delivery">0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="cuss-stats">
+    <div class="cuss-wrap">
+      <div class="cuss-stats-grid">
+        <div>
+          <p class="cuss-stat-num">1,200+</p>
+          <p class="cuss-stat-label">MUN delegates in rounds</p>
+        </div>
+        <div>
+          <p class="cuss-stat-num">40ms</p>
+          <p class="cuss-stat-label">live highlight latency</p>
+        </div>
+        <div>
+          <p class="cuss-stat-num">3</p>
+          <p class="cuss-stat-label">judging criteria</p>
+        </div>
+        <div>
+          <p class="cuss-stat-num">−86%</p>
+          <p class="cuss-stat-label">filler words by round 2</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="cuss-wrap">
+
+    <section id="features" style="padding: calc(3 * var(--leading)) 0 calc(2 * var(--leading));">
+      <span class="cuss-eyebrow">What Cussator does</span>
+
+      <div class="cuss-feature">
+        <p class="cuss-feature-num">01</p>
+        <h2>Word Economy</h2>
+        <p class="cuss-feature-body">Every word has a price. Precise terms and clear claims strengthen your position live; hedges like &laquo;kind of&raquo; and &laquo;basically&raquo; weaken it instantly, in full view.</p>
+      </div>
+
+      <div class="cuss-feature">
+        <p class="cuss-feature-num">02</p>
+        <h2>Live Interruption</h2>
+        <p class="cuss-feature-body">The AI opponent doesn't wait for the round to end. The moment it spots a vague claim, it interrupts and turns it against you — just like live debate.</p>
+      </div>
+
+      <div class="cuss-feature">
+        <p class="cuss-feature-num">03</p>
+        <h2>Vocabulary Scars</h2>
+        <div class="cuss-scars">
+          <p>Weak phrasing doesn't disappear after the round — it stays on your profile until you close it out with precise language in later rounds.</p>
+          <div class="cuss-scars-tags">
+            <span class="tag">kind of ×3</span>
+            <span class="tag">basically ×2</span>
+            <span class="tag">sort of ×1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="cuss-feature">
+        <p class="cuss-feature-num">04</p>
+        <h2>AI Judge</h2>
+        <p class="cuss-feature-body">After the round, a separate AI scores your performance on three criteria — Logic, Precision, Delivery — and gives you a breakdown, not just a number.</p>
+      </div>
+    </section>
+
+    <section id="how" style="padding: calc(2.5 * var(--leading)) 0 calc(3 * var(--leading));">
+      <span class="cuss-eyebrow">How it works</span>
+      <div class="cuss-steps">
+        <div>
+          <p class="cuss-step-num">01</p>
+          <h3>Choose a resolution</h3>
+          <p>MUN-style motions — from climate to trade tariffs.</p>
+        </div>
+        <div>
+          <p class="cuss-step-num">02</p>
+          <h3>Argue live</h3>
+          <p>By text or voice, one on one with an AI opponent.</p>
+        </div>
+        <div>
+          <p class="cuss-step-num">03</p>
+          <h3>Watch the signals in real time</h3>
+          <p>Words get highlighted as you speak, not in a report afterward.</p>
+        </div>
+        <div>
+          <p class="cuss-step-num">04</p>
+          <h3>Get the judge's breakdown</h3>
+          <p>Logic, Precision, Delivery — plus updated Vocabulary Scars.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="reviews" style="padding: calc(2 * var(--leading)) 0 calc(3 * var(--leading));">
+      <span class="cuss-eyebrow">Reviews</span>
+      <div class="cuss-cards">
+        <div class="card elev-sm">
+          <p class="card-kicker">MUN delegate, high school</p>
+          <p class="card-body">&laquo;First time I prepped for MUN live instead of off a script — the AI caught my "kind of" faster than I noticed it myself.&raquo;</p>
+          <p class="card-meta">Dylan</p>
+        </div>
+        <div class="card elev-sm">
+          <p class="card-kicker">Student, ESL</p>
+          <p class="card-body">&laquo;I'm not a native speaker, and speaking up used to scare me. Here a mistake isn't shame, it's a signal — you learn in a round, not a semester.&raquo;</p>
+          <p class="card-meta">Min Ji</p>
+        </div>
+        <div class="card elev-sm">
+          <p class="card-kicker">Debate club coach</p>
+          <p class="card-body">&laquo;Cussator's judge is tougher than any coach — which is exactly why stepping into a real Model UN afterward isn't scary.&raquo;</p>
+          <p class="card-meta">Artem</p>
+        </div>
+      </div>
+    </section>
+
+    <hr class="hr">
+
+    <section id="start" style="padding: calc(2.5 * var(--leading)) 0 calc(2 * var(--leading));">
+      <h3>Ready to risk a word?</h3>
+      <p style="font-size:15.5px; line-height:var(--leading); margin: calc(var(--leading) - 1cap) 0 0; max-width:58ch; color:color-mix(in srgb, var(--color-text) 78%, transparent);">Your first round is free. Or subscribe to the newsletter — be the first to know when the voice-debate beta opens.</p>
+      <form class="cuss-signup" id="cuss-signup-form">
+        <input class="input" type="email" placeholder="you@example.com" aria-label="Email address" required>
+        <button type="submit" class="btn btn-primary">Reserve a spot</button>
+      </form>
+    </section>
+
+    <footer class="cuss-footer">Cussator — AI debates for people who weigh every word.</footer>
+  </div>
+</div>
+
+<div class="cuss-arena" id="cuss-arena" aria-hidden="true">
+  <div class="cuss-arena-inner">
+    <div class="cuss-arena-head">
+      <div class="cuss-arena-head-info">
+        <span class="cuss-live-dot"></span>
+        <span class="tag tag-outline">LIVE ROUND</span>
+        <span class="cuss-arena-motion">Motion: &laquo;<span id="cuss-arena-motion-text">This House believes nuclear power is the fastest path to decarbonization.</span>&raquo;</span>
+      </div>
+      <button type="button" class="btn btn-icon" id="cuss-arena-close" aria-label="Close round">✕</button>
+    </div>
+
+    <div class="cuss-arena-health">
+      <div class="cuss-judge-row">
+        <span style="width:auto;">Your position — Prop 1</span>
+        <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-health-fill" style="width:100%"></div></div>
+        <span class="cuss-judge-val" id="cuss-health-val">100</span>
+      </div>
+      <div class="cuss-judge-row">
+        <span style="width:auto;">AI opponent</span>
+        <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-ai-health-fill" style="width:100%"></div></div>
+        <span class="cuss-judge-val" id="cuss-ai-health-val">100</span>
+      </div>
+    </div>
+
+    <div class="cuss-arena-transcript" id="cuss-arena-transcript">
+      <p class="cuss-arena-empty">Your turn. Make the case for the resolution — precise phrasing strengthens your position, filler words weaken it instantly.</p>
+    </div>
+
+    <div class="cuss-ai-card cuss-arena-typing" id="cuss-arena-typing" hidden>
+      <p class="cuss-ai-label">AI opponent is typing…</p>
+    </div>
+
+    <div class="cuss-judge" id="cuss-arena-judge">
+      <p class="cuss-judge-label">Judge</p>
+      <div class="cuss-judge-row">
+        <span>Logic</span>
+        <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-logic-fill"></div></div>
+        <span class="cuss-judge-val" id="cuss-judge-logic-val">0</span>
+      </div>
+      <div class="cuss-judge-row">
+        <span>Precision</span>
+        <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-judge-precision-fill"></div></div>
+        <span class="cuss-judge-val" id="cuss-judge-precision-val">0</span>
+      </div>
+      <div class="cuss-judge-row">
+        <span>Delivery</span>
+        <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-delivery-fill"></div></div>
+        <span class="cuss-judge-val" id="cuss-judge-delivery-val">0</span>
+      </div>
+    </div>
+
+    <form class="cuss-arena-form" id="cuss-arena-form">
+      <div class="cuss-highlight-wrap">
+        <div class="cuss-highlight-layer" id="cuss-arena-highlight" aria-hidden="true"></div>
+        <textarea class="cuss-highlight-input" id="cuss-arena-input" rows="3" placeholder="Your argument..." required></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" id="cuss-arena-submit">Send</button>
+    </form>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
