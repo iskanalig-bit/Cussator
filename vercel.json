@@ -3,8 +3,8 @@
     { "src": "site/index.html", "use": "@vercel/static" },
     { "src": "site/styles.css", "use": "@vercel/static" },
     { "src": "site/script.js", "use": "@vercel/static" },
-    { "src": "api/respond.py", "use": "@vercel/python" },
-    { "src": "api/support-chat.py", "use": "@vercel/python" }
+    { "src": "api/respond.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } },
+    { "src": "api/support-chat.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } }
   ],
   "routes": [
     { "src": "/api/respond", "dest": "/api/respond.py" },

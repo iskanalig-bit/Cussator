@@ -1,9 +1,16 @@
 """Vercel serverless function — POST /api/support-chat (RAG support bot)."""
 
 import json
+import sys
 from http.server import BaseHTTPRequestHandler
+from pathlib import Path
 
-from _common import support_reply
+# Vercel's Python runtime loads this file via importlib.util.spec_from_file_location
+# rather than a normal interpreter invocation, so the sibling directory isn't on
+# sys.path automatically the way it would be for `python support-chat.py` — add it
+# explicitly rather than relying on that assumption.
+sys.path.insert(0, str(Path(__file__).parent))
+from _common import support_reply  # noqa: E402
 
 
 class handler(BaseHTTPRequestHandler):
