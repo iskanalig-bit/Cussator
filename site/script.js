@@ -123,9 +123,14 @@
     startLoop();
   }
 
+  // Leaves ' unescaped on purpose: its output only ever lands in element
+  // innerHTML as text content (never inside a quoted attribute), where a
+  // bare apostrophe is inert — and escaping it to &#39; used to break
+  // matching for every filler entry that contains one ("y'all", "ain't",
+  // "i don't know"), since the classifier regex runs on this escaped string.
   function escapeHtml(str) {
-    return str.replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    return str.replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
 
@@ -152,6 +157,49 @@
   ];
   // Light filler tier — common but milder verbal habits, -5 Credibility each.
   var FILLER_WORDS_LIGHT = ['actually', 'honestly', 'literally', 'well', 'so'];
+
+  // Stronger-alternative suggestions for the post-round recap, grouped by
+  // the underlying weak-speech pattern rather than written one by one —
+  // every FILLER_WORDS / FILLER_WORDS_LIGHT entry belongs to exactly one
+  // group below, so every filler the player actually used has a suggestion.
+  var FILLER_ALTERNATIVE_GROUPS = [
+    { words: ['kind of', 'kinda', 'sort of', 'sorta', 'kind of like', 'sort of like', 'somewhat',
+        'more or less', 'pretty much', 'in a way', 'in some way', 'basically', 'whatever'],
+      alternatives: ['specifically', 'precisely'] },
+    { words: ['i think', 'i guess', 'i feel like', 'i would say', 'i suppose', 'i would guess', 'imo'],
+      alternatives: ['I would argue', 'the evidence suggests'] },
+    { words: ['maybe', 'probably', 'possibly'],
+      alternatives: ['likely', 'the data indicates'] },
+    { words: ['like', 'um', 'uh', 'umm', 'uhh', 'erm', 'hmm', 'so yeah', 'okay so', 'anyway',
+        'anyways', 'well', 'so', 'i mean'],
+      alternatives: ['(cut it, lead with the claim)', 'therefore'] },
+    { words: ['or something', 'or whatever', 'and stuff', 'and things', 'stuff like that',
+        'whatnot', 'and whatnot', 'or anything', 'and everything', 'just saying',
+        'not gonna lie', 'sum'],
+      alternatives: ['for example', 'specifically'] },
+    { words: ['you know', 'you know what i mean', 'like i said', 'as i said'],
+      alternatives: ['to be clear', 'specifically'] },
+    { words: ['to be honest', 'honestly speaking', 'tbh', 'honestly'],
+      alternatives: ['in fact', 'clearly'] },
+    { words: ['actually'],
+      alternatives: ['in fact', 'notably'] },
+    { words: ['literally', 'like literally', 'super literally'],
+      alternatives: ['precisely', '(cut it)'] },
+    { words: ['i dunno', "i don't know", 'dunno', 'idk'],
+      alternatives: ["I'm not certain, but", 'further evidence would clarify'] },
+    { words: ['tryna', 'finna', 'gonna', 'wanna', 'gotta', "ain't", "y'all", 'yall', 'pmo',
+        'trna', 'dat', 'typa', 'ima', 'lwk', 'js', 'ts', 'lowkey', 'highkey'],
+      alternatives: ['(use the formal phrasing)', 'trying to / going to'] },
+    { words: ['at the end of the day', 'technically speaking'],
+      alternatives: ['ultimately', 'in practice'] },
+    { words: ['if that makes sense'],
+      alternatives: ['(cut it, trust your claim)', 'specifically'] }
+  ];
+  var FILLER_ALTERNATIVES = {};
+  FILLER_ALTERNATIVE_GROUPS.forEach(function (group) {
+    group.words.forEach(function (w) { FILLER_ALTERNATIVES[w] = group.alternatives; });
+  });
+
   // Curse / profanity — general-purpose swearing only, no slurs. -25 Credibility each.
   var CURSE_WORDS = [
     'damn', 'hell', 'crap', 'ass', 'asshole', 'bastard', 'bitch', 'bullshit', 'shit',
@@ -355,14 +403,18 @@
   // every inflected form — a matched word not found verbatim in the lookup
   // gets one suffix stripped and is looked up again.
   var CLASSIFIER_SUFFIXES = ['ly', 'es', 'ed', 's', 'd'];
-  function lookupKind(matched) {
+  // Returns both the tier and the canonical dictionary entry that matched
+  // (with any inflectional suffix stripped) — the base is what the
+  // post-round filler recap looks up in FILLER_ALTERNATIVES, since the
+  // surface form in the player's text ("kinda") may differ from the key.
+  function lookupEntry(matched) {
     var lower = matched.toLowerCase();
-    if (CLASSIFIER_LOOKUP[lower]) return CLASSIFIER_LOOKUP[lower];
+    if (CLASSIFIER_LOOKUP[lower]) return { kind: CLASSIFIER_LOOKUP[lower], base: lower };
     for (var i = 0; i < CLASSIFIER_SUFFIXES.length; i++) {
       var suf = CLASSIFIER_SUFFIXES[i];
       if (lower.length > suf.length && lower.slice(-suf.length) === suf) {
         var base = lower.slice(0, -suf.length);
-        if (CLASSIFIER_LOOKUP[base]) return CLASSIFIER_LOOKUP[base];
+        if (CLASSIFIER_LOOKUP[base]) return { kind: CLASSIFIER_LOOKUP[base], base: base };
       }
     }
     return null;
@@ -378,13 +430,15 @@
 
   function classifyText(text) {
     var counts = { curse: 0, filler: 0, fillerLight: 0, connective: 0, vocab: 0 };
+    var fillerWordsUsed = [];
     var html = escapeHtml(text);
 
     html = html.replace(CLASSIFIER_REGEX, function (m) {
-      var kind = lookupKind(m);
-      if (!kind) return m;
-      counts[kind]++;
-      return '<span class="' + CLASSIFIER_CLASS[kind] + '">' + m + '</span>';
+      var entry = lookupEntry(m);
+      if (!entry) return m;
+      counts[entry.kind]++;
+      if (entry.kind === 'filler' || entry.kind === 'fillerLight') fillerWordsUsed.push(entry.base);
+      return '<span class="' + CLASSIFIER_CLASS[entry.kind] + '">' + m + '</span>';
     });
 
     var words = text.split(/\s+/).filter(Boolean);
@@ -400,7 +454,8 @@
       curseCount: counts.curse,
       connectiveCount: counts.connective,
       vocabCount: counts.vocab,
-      wordCount: words.length
+      wordCount: words.length,
+      fillerWordsUsed: fillerWordsUsed
     };
   }
 
@@ -453,6 +508,7 @@
     var gameoverTitle = document.getElementById('cuss-gameover-title');
     var gameoverSub = document.getElementById('cuss-gameover-sub');
     var gameoverRestartBtn = document.getElementById('cuss-gameover-restart');
+    var recapEl = document.getElementById('cuss-recap');
     var stanceSelectEl = document.getElementById('cuss-stance-select');
     var stanceMotionText = document.getElementById('cuss-stance-motion-text');
     var stanceAffirmBtn = document.getElementById('cuss-stance-affirm');
@@ -468,6 +524,7 @@
     var aiHealth = 100;
     var history = [];
     var roundStats = { filler: 0, curse: 0, connective: 0, vocab: 0, words: 0, solid: 0, neutral: 0, bad: 0 };
+    var roundFillerWords = {};
     var judgeAnimTimer = null;
     var roundOver = false;
     var stanceTimer = null;
@@ -480,6 +537,8 @@
 
       history = [];
       roundStats = { filler: 0, curse: 0, connective: 0, vocab: 0, words: 0, solid: 0, neutral: 0, bad: 0 };
+      roundFillerWords = {};
+      recapEl.innerHTML = '';
       if (judgeAnimTimer) { clearTimeout(judgeAnimTimer); judgeAnimTimer = null; }
       if (stanceTimer) { clearTimeout(stanceTimer); stanceTimer = null; }
 
@@ -567,7 +626,56 @@
       gameoverSub.textContent = playerWon
         ? "The AI opponent's position collapsed under the pressure of your argument."
         : "Your position collapsed under the pressure of the AI opponent's argument.";
+      renderFillerRecap();
       gameoverEl.hidden = false;
+    }
+
+    // Post-round takeaway: the player's own filler words from this round
+    // only (never the AI's), ranked by how often each came up, capped at 5
+    // so it stays a quick read rather than a full report.
+    function renderFillerRecap() {
+      var entries = Object.keys(roundFillerWords)
+        .map(function (w) { return { word: w, count: roundFillerWords[w] }; })
+        .sort(function (a, b) { return b.count - a.count; })
+        .slice(0, 5);
+
+      recapEl.innerHTML = '';
+
+      if (!entries.length) {
+        var clean = document.createElement('p');
+        clean.className = 'cuss-recap-clean';
+        clean.textContent = 'No filler words this round — clean delivery.';
+        recapEl.appendChild(clean);
+        return;
+      }
+
+      var heading = document.createElement('p');
+      heading.className = 'cuss-recap-heading';
+      heading.textContent = 'Words to upgrade next round';
+      recapEl.appendChild(heading);
+
+      entries.forEach(function (entry) {
+        var alternatives = FILLER_ALTERNATIVES[entry.word] || ['specifically', 'precisely'];
+        var row = document.createElement('div');
+        row.className = 'cuss-recap-row';
+
+        var from = document.createElement('span');
+        from.className = 'cuss-recap-from';
+        from.textContent = '"' + entry.word + '"' + (entry.count > 1 ? ' ×' + entry.count : '');
+
+        var arrow = document.createElement('span');
+        arrow.className = 'cuss-recap-arrow';
+        arrow.textContent = '→';
+
+        var to = document.createElement('span');
+        to.className = 'cuss-recap-to';
+        to.textContent = alternatives.join(' / ');
+
+        row.appendChild(from);
+        row.appendChild(arrow);
+        row.appendChild(to);
+        recapEl.appendChild(row);
+      });
     }
 
     // Applies the AI-judged per-turn verdict on top of the word-level delta
@@ -783,6 +891,9 @@
       roundStats.connective += analysis.connectiveCount;
       roundStats.vocab += analysis.vocabCount;
       roundStats.words += analysis.wordCount;
+      analysis.fillerWordsUsed.forEach(function (w) {
+        roundFillerWords[w] = (roundFillerWords[w] || 0) + 1;
+      });
 
       history.push({ role: 'user', content: text });
       textarea.value = '';

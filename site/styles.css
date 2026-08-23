@@ -621,6 +621,23 @@ html { scroll-behavior: smooth; }
 .cuss-gameover-title.is-lose { color: oklch(0.63 0.22 25); }
 .cuss-gameover-sub { margin: 0; max-width: 42ch; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
 
+/* Post-round filler-word recap — the player's own words from that round
+   only, each paired with a stronger alternative. */
+.cuss-recap { display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 46ch; }
+.cuss-recap:empty { display: none; }
+.cuss-recap-heading {
+  margin: 0; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.cuss-recap-clean { margin: 0; font-size: 14px; color: color-mix(in srgb, var(--color-text) 75%, transparent); }
+.cuss-recap-row {
+  display: flex; align-items: baseline; justify-content: center; gap: 10px; flex-wrap: wrap;
+  font-size: 14.5px;
+}
+.cuss-recap-from { color: var(--color-warn); font-weight: 600; }
+.cuss-recap-arrow { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
+.cuss-recap-to { color: oklch(0.75 0.13 150); font-weight: 600; }
+
 @media (max-width: 640px) {
   .cuss-arena-inner { padding: var(--space-3); }
   .cuss-arena-form { flex-direction: column; align-items: stretch; }
