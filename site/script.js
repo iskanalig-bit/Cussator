@@ -200,6 +200,66 @@
     group.words.forEach(function (w) { FILLER_ALTERNATIVES[w] = group.alternatives; });
   });
 
+  // Vocabulary Scars — a persistent, cross-round tally of the same
+  // fillerWordsUsed data classifyText() already produces per argument (see
+  // the post-round recap). No separate detection logic: every submitted
+  // argument's filler hits get folded into this running total in
+  // localStorage, so the Scars page is just a different view over numbers
+  // that were already being computed.
+  var VOCAB_SCARS_KEY = 'cussatorVocabScars';
+
+  function loadVocabScars() {
+    try {
+      var raw = localStorage.getItem(VOCAB_SCARS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function recordFillerWords(words) {
+    if (!words.length) return;
+    try {
+      var scars = loadVocabScars();
+      words.forEach(function (w) { scars[w] = (scars[w] || 0) + 1; });
+      localStorage.setItem(VOCAB_SCARS_KEY, JSON.stringify(scars));
+    } catch (e) {
+      // localStorage unavailable (private mode, quota, etc.) — the current
+      // round's recap still works from in-memory state either way.
+    }
+  }
+
+  // Per-round total filler-word count, oldest first — a second, smaller
+  // localStorage log alongside the Scars word tally above. This is what
+  // powers both the round-end "vs your last 3 rounds" trend and the
+  // homepage's real per-player improvement stat, so a round's total only
+  // needs summing once (see endRound()) rather than re-deriving it from
+  // the word tally, which doesn't preserve per-round boundaries.
+  var ROUND_HISTORY_KEY = 'cussatorRoundFillerHistory';
+  var ROUND_HISTORY_MAX = 50;
+
+  function loadRoundHistory() {
+    try {
+      var raw = localStorage.getItem(ROUND_HISTORY_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function recordRoundFillerCount(count) {
+    try {
+      var history = loadRoundHistory();
+      history.push(count);
+      if (history.length > ROUND_HISTORY_MAX) history = history.slice(history.length - ROUND_HISTORY_MAX);
+      localStorage.setItem(ROUND_HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {
+      // localStorage unavailable — this round just won't contribute to the
+      // trend or the homepage stat; nothing else depends on it.
+    }
+  }
+
   // Curse / profanity — general-purpose swearing only, no slurs. -25 Credibility each.
   var CURSE_WORDS = [
     'damn', 'hell', 'crap', 'ass', 'asshole', 'bastard', 'bitch', 'bullshit', 'shit',
@@ -463,6 +523,24 @@
     return Math.max(min, Math.min(max, v));
   }
 
+  // Word Economy's "token" budget is a plain word count, not a BPE/subword
+  // tokenizer — real subword tokenization is reserved for the future
+  // AI-vs-AI Research Mode, not human rounds. A whitespace-delimited chunk
+  // counts as one token if it contains at least one letter or digit, so:
+  // contractions ("don't") and hyphenated compounds ("well-known") are
+  // already single chunks and count as 1; multi-digit numbers ("2035")
+  // count as 1 regardless of length; a chunk that's pure punctuation (a
+  // stray "--" or "..." typed on its own) contains no letter/digit and
+  // doesn't consume budget.
+  function countWordTokens(text) {
+    var chunks = text.split(/\s+/).filter(Boolean);
+    var count = 0;
+    for (var i = 0; i < chunks.length; i++) {
+      if (/[\p{L}\p{N}]/u.test(chunks[i])) count++;
+    }
+    return count;
+  }
+
   var MOTIONS = [
     'This House believes that artificial intelligence should be regulated as strictly as nuclear technology.',
     'This House would abolish the veto power in the UN Security Council.',
@@ -484,6 +562,19 @@
     var arena = document.getElementById('cuss-arena');
     var form = document.getElementById('cuss-arena-form');
     if (!arena || !form) return;
+
+    // Per-turn countdown — ticks only while it's actually the player's turn
+    // (textarea enabled), pausing during the AI's response, the stance-select
+    // screen, and after the round ends. Purely a visible pressure cue: it
+    // doesn't auto-submit or penalize on timeout, just holds at 00:00.
+    var TURN_DURATION_SECONDS = 60;
+
+    // Word Economy budget — a fixed per-round pool of "tokens" (see
+    // countWordTokens: 1 token = 1 word, not a real subword tokenizer).
+    // Spent cumulatively across every argument submitted this round;
+    // running out ends the round through the same Credibility-loss path
+    // as any other auto-loss (see checkTokenBudget()).
+    var TOKEN_POOL_SIZE = 1000;
 
     var openBtns = [document.getElementById('cuss-start-hero')];
     var closeBtn = document.getElementById('cuss-arena-close');
@@ -509,6 +600,7 @@
     var gameoverSub = document.getElementById('cuss-gameover-sub');
     var gameoverRestartBtn = document.getElementById('cuss-gameover-restart');
     var recapEl = document.getElementById('cuss-recap');
+    var trendEl = document.getElementById('cuss-trend');
     var stanceSelectEl = document.getElementById('cuss-stance-select');
     var stanceMotionText = document.getElementById('cuss-stance-motion-text');
     var stanceAffirmBtn = document.getElementById('cuss-stance-affirm');
@@ -518,6 +610,17 @@
     var stanceConfirmAiEl = document.getElementById('cuss-stance-confirm-ai');
     var healthLabelEl = document.getElementById('cuss-health-label');
     var aiHealthLabelEl = document.getElementById('cuss-ai-health-label');
+    var turnTimerEl = document.getElementById('cuss-arena-timer');
+    var arenaSideEl = document.getElementById('cuss-arena-side');
+    var tokenValEl = document.getElementById('cuss-token-val');
+    var tokenBudgetEl = document.getElementById('cuss-token-budget');
+    var difficultyBtns = Array.prototype.slice.call(document.querySelectorAll('.cuss-difficulty-btn'));
+
+    // Cost of one Simplify action, deducted from the same Word Economy pool
+    // as everything else (see checkTokenBudget()) — comprehension help isn't
+    // free, it's just another way to spend the pool. Unavailable entirely in
+    // Chair mode, since that difficulty is opt-in hard mode.
+    var SIMPLIFY_COST = 25;
 
     var MOTION = motionTextEl ? motionTextEl.textContent : '';
     var health = 100;
@@ -529,6 +632,60 @@
     var roundOver = false;
     var stanceTimer = null;
     var playerSide = null;
+    var difficulty = 'delegate';
+    var turnTimer = null;
+    var turnSecondsLeft = TURN_DURATION_SECONDS;
+    var tokensUsed = 0;
+
+    function formatTurnTime(s) {
+      var m = Math.floor(s / 60);
+      var r = s % 60;
+      return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+    }
+
+    function updateTurnTimerDisplay() {
+      if (!turnTimerEl) return;
+      turnTimerEl.textContent = formatTurnTime(turnSecondsLeft);
+      turnTimerEl.classList.toggle('is-warn', turnSecondsLeft > 0 && turnSecondsLeft <= 10);
+    }
+
+    function stopTurnTimer() {
+      if (turnTimer) { clearInterval(turnTimer); turnTimer = null; }
+    }
+
+    function startTurnTimer() {
+      stopTurnTimer();
+      turnSecondsLeft = TURN_DURATION_SECONDS;
+      updateTurnTimerDisplay();
+      turnTimer = setInterval(function () {
+        turnSecondsLeft = Math.max(0, turnSecondsLeft - 1);
+        updateTurnTimerDisplay();
+        if (turnSecondsLeft === 0) stopTurnTimer();
+      }, 1000);
+    }
+
+    function updateTokenDisplay(remaining) {
+      if (!tokenValEl) return;
+      tokenValEl.textContent = remaining;
+      if (tokenBudgetEl) tokenBudgetEl.classList.toggle('is-critical', remaining <= TOKEN_POOL_SIZE * 0.1);
+    }
+
+    // Recomputes remaining budget live — tokensUsed (already-submitted
+    // arguments this round) plus whatever's currently typed but not sent
+    // yet, so the number ticks down as the player types, same as the
+    // filler/vocab highlighter. Running out reuses the existing
+    // Credibility-loss path instead of a separate end state: zeroing
+    // health and running the normal game-over check.
+    function checkTokenBudget() {
+      if (roundOver) return;
+      var draftCount = countWordTokens(textarea.value);
+      var remaining = TOKEN_POOL_SIZE - tokensUsed - draftCount;
+      updateTokenDisplay(Math.max(0, remaining));
+      if (remaining <= 0) {
+        setHealth(0);
+        checkGameOver();
+      }
+    }
 
     function resetRound() {
       MOTION = pickMotion();
@@ -539,8 +696,15 @@
       roundStats = { filler: 0, curse: 0, connective: 0, vocab: 0, words: 0, solid: 0, neutral: 0, bad: 0 };
       roundFillerWords = {};
       recapEl.innerHTML = '';
+      trendEl.innerHTML = '';
       if (judgeAnimTimer) { clearTimeout(judgeAnimTimer); judgeAnimTimer = null; }
       if (stanceTimer) { clearTimeout(stanceTimer); stanceTimer = null; }
+      stopTurnTimer();
+      turnSecondsLeft = TURN_DURATION_SECONDS;
+      updateTurnTimerDisplay();
+      tokensUsed = 0;
+      if (tokenBudgetEl) tokenBudgetEl.classList.remove('is-critical');
+      updateTokenDisplay(TOKEN_POOL_SIZE);
 
       roundOver = false;
       gameoverEl.hidden = true;
@@ -549,11 +713,32 @@
       setAiHealth(100);
 
       judgePanel.classList.remove('is-visible');
+      judgePanel.hidden = true;
       setJudgeBar(judgeLogicFill, judgeLogicVal, 0);
       setJudgeBar(judgePrecisionFill, judgePrecisionVal, 0);
       setJudgeBar(judgeDeliveryFill, judgeDeliveryVal, 0);
 
-      transcript.innerHTML = '<p class="cuss-arena-empty">Your turn. Make the case for the resolution — precise phrasing strengthens your position, filler words weaken it instantly.</p>';
+      // Light pre-round anchor — sits where the first AI card / user bubble
+      // will land (left/right, same as .cuss-bubble-ai / .cuss-bubble-user)
+      // so the transcript reads as populated, not broken, before the first
+      // message. Side letters/colors get filled in by chooseStance() once
+      // a side is picked; addUserBubbleAnimated() removes this block the
+      // moment the first real bubble is added.
+      transcript.innerHTML =
+        '<div class="cuss-transcript-anchor" id="cuss-transcript-anchor">' +
+          '<div class="cuss-anchor-row cuss-anchor-left">' +
+            '<span class="cuss-anchor-avatar" id="cuss-anchor-ai-avatar">?</span>' +
+            '<span class="cuss-anchor-label" id="cuss-anchor-ai-label">AI opponent</span>' +
+          '</div>' +
+          '<div class="cuss-anchor-row cuss-anchor-right">' +
+            '<span class="cuss-anchor-label" id="cuss-anchor-you-label">You</span>' +
+            '<span class="cuss-anchor-avatar" id="cuss-anchor-you-avatar">?</span>' +
+          '</div>' +
+        '</div>' +
+        '<p class="cuss-arena-empty">' +
+          '<span class="tag tag-outline cuss-arena-prompt-badge">YOUR TURN</span>' +
+          'Make the case for the resolution — precise phrasing strengthens your position, filler words weaken it instantly.' +
+        '</p>';
       typing.hidden = true;
 
       // Locked until a side is picked on the stance-select screen — see
@@ -564,14 +749,27 @@
       renderHighlight();
 
       playerSide = null;
+      setDifficulty('delegate');
       healthLabelEl.textContent = 'Your position';
       aiHealthLabelEl.textContent = 'AI opponent';
+      if (arenaSideEl) { arenaSideEl.hidden = true; arenaSideEl.textContent = ''; arenaSideEl.className = 'tag tag-outline cuss-arena-side'; }
       stanceAffirmBtn.disabled = false;
       stanceNegateBtn.disabled = false;
       stanceConfirmEl.hidden = true;
       stanceConfirmYouEl.className = 'cuss-stance-confirm-row';
       stanceConfirmAiEl.className = 'cuss-stance-confirm-row';
       stanceSelectEl.hidden = false;
+    }
+
+    // Picked freely on the stance-select screen, independent of Affirm/Negate
+    // — changes only vocabulary/phrasing density server-side (see
+    // DIFFICULTY_STYLES in api/_common.py), never the judging rubric. Chair
+    // also gates out the per-message Simplify action (see addAiCard()).
+    function setDifficulty(level) {
+      difficulty = level;
+      difficultyBtns.forEach(function (btn) {
+        btn.classList.toggle('is-active', btn.dataset.difficulty === level);
+      });
     }
 
     // Player picks Affirm/Negate; the AI automatically takes the opposite
@@ -586,6 +784,29 @@
       var aiSide = side === 'affirm' ? 'negate' : 'affirm';
       healthLabelEl.textContent = 'Your position — ' + (side === 'affirm' ? 'Affirm' : 'Negate');
       aiHealthLabelEl.textContent = 'AI opponent — ' + (aiSide === 'affirm' ? 'Affirm' : 'Negate');
+      if (arenaSideEl) {
+        arenaSideEl.hidden = false;
+        arenaSideEl.textContent = side === 'affirm' ? 'AFFIRM' : 'NEGATE';
+        arenaSideEl.classList.add(side === 'affirm' ? 'is-affirm' : 'is-negate');
+      }
+
+      // Fill in the pre-round anchor's avatars/labels now that sides are
+      // known — re-queried here rather than cached, since resetRound()
+      // rebuilds the transcript (and these nodes with it) on every round.
+      var youAvatar = document.getElementById('cuss-anchor-you-avatar');
+      var youLabel = document.getElementById('cuss-anchor-you-label');
+      var aiAvatar = document.getElementById('cuss-anchor-ai-avatar');
+      var aiLabel = document.getElementById('cuss-anchor-ai-label');
+      if (youAvatar) {
+        youAvatar.textContent = side === 'affirm' ? 'A' : 'N';
+        youAvatar.className = 'cuss-anchor-avatar is-' + side;
+      }
+      if (youLabel) youLabel.textContent = 'You · ' + (side === 'affirm' ? 'Affirm' : 'Negate');
+      if (aiAvatar) {
+        aiAvatar.textContent = aiSide === 'affirm' ? 'A' : 'N';
+        aiAvatar.className = 'cuss-anchor-avatar is-' + aiSide;
+      }
+      if (aiLabel) aiLabel.textContent = 'AI opponent · ' + (aiSide === 'affirm' ? 'Affirm' : 'Negate');
 
       stanceConfirmYouEl.textContent = 'You: ' + side.toUpperCase();
       stanceConfirmYouEl.className = 'cuss-stance-confirm-row cuss-text-' + side;
@@ -603,6 +824,7 @@
         textarea.disabled = false;
         submitBtn.disabled = false;
         textarea.focus();
+        startTurnTimer();
       }, 1700);
     }
 
@@ -620,14 +842,69 @@
       textarea.disabled = true;
       submitBtn.disabled = true;
       typing.hidden = true;
+      stopTurnTimer();
+
+      // The turn that ends the round can return before the normal
+      // post-turn reveal path reaches revealJudge() (see the submit
+      // handler's early checkGameOver() returns) — call it here too so
+      // the panel always reflects the final turn, not the one before it.
+      revealJudge();
       gameoverTitle.textContent = playerWon ? 'You Win' : 'You Lose';
       gameoverTitle.classList.toggle('is-win', playerWon);
       gameoverTitle.classList.toggle('is-lose', !playerWon);
       gameoverSub.textContent = playerWon
         ? "The AI opponent's position collapsed under the pressure of your argument."
         : "Your position collapsed under the pressure of the AI opponent's argument.";
+
+      var totalFillerThisRound = Object.keys(roundFillerWords).reduce(function (sum, w) {
+        return sum + roundFillerWords[w];
+      }, 0);
+      var priorHistory = loadRoundHistory();
+      recordRoundFillerCount(totalFillerThisRound);
+      renderRoundTrend(totalFillerThisRound, priorHistory);
+
       renderFillerRecap();
       gameoverEl.hidden = false;
+    }
+
+    // This round's filler total against the average of the player's own
+    // last (up to) 3 completed rounds — priorHistory is read before this
+    // round gets recorded, so it never includes the round it's judging.
+    function renderRoundTrend(currentCount, priorHistory) {
+      trendEl.innerHTML = '';
+
+      var headline = document.createElement('p');
+      headline.className = 'cuss-trend-count';
+      headline.textContent = currentCount + (currentCount === 1 ? ' filler word this round' : ' filler words this round');
+      trendEl.appendChild(headline);
+
+      var recent = priorHistory.slice(-3);
+      if (!recent.length) {
+        var first = document.createElement('p');
+        first.className = 'cuss-trend-note cuss-trend-flat';
+        first.textContent = "That's your first tracked round — play a few more to see your trend.";
+        trendEl.appendChild(first);
+        return;
+      }
+
+      var avg = recent.reduce(function (a, b) { return a + b; }, 0) / recent.length;
+      var avgRounded = Math.round(avg * 10) / 10;
+      var delta = Math.round(currentCount - avg);
+      var roundWord = recent.length > 1 ? ' rounds' : ' round';
+
+      var trendLine = document.createElement('p');
+      trendLine.className = 'cuss-trend-note';
+      if (delta < 0) {
+        trendLine.classList.add('cuss-trend-down');
+        trendLine.textContent = '▼ ' + Math.abs(delta) + ' fewer than your last ' + recent.length + roundWord + ' (avg ' + avgRounded + ')';
+      } else if (delta > 0) {
+        trendLine.classList.add('cuss-trend-up');
+        trendLine.textContent = '▲ ' + delta + ' more than your last ' + recent.length + roundWord + ' (avg ' + avgRounded + ')';
+      } else {
+        trendLine.classList.add('cuss-trend-flat');
+        trendLine.textContent = '— same as your last ' + recent.length + roundWord + ' (avg ' + avgRounded + ')';
+      }
+      trendEl.appendChild(trendLine);
     }
 
     // Post-round takeaway: the player's own filler words from this round
@@ -697,16 +974,44 @@
       }
     }
 
+    // Forces the browser to restart a CSS animation that's already mid-run
+    // (removing then re-adding the class alone is a no-op without a reflow
+    // in between) — used so back-to-back HP changes in the same turn (a
+    // word-level delta immediately followed by a verdict delta) each get
+    // their own visible pulse instead of the second one silently no-opping.
+    function flashHealth(el) {
+      el.classList.remove('is-flash');
+      void el.offsetWidth;
+      el.classList.add('is-flash');
+    }
+
+    function updateHealthDisplay(fillEl, valEl, value, previous) {
+      fillEl.style.width = value + '%';
+      valEl.textContent = value;
+
+      var isCritical = value <= 25;
+      var isWarning = !isCritical && value <= 50;
+      fillEl.classList.toggle('is-hp-critical', isCritical);
+      fillEl.classList.toggle('is-hp-warning', isWarning);
+      valEl.classList.toggle('is-hp-critical', isCritical);
+      valEl.classList.toggle('is-hp-warning', isWarning);
+
+      if (value !== previous) {
+        flashHealth(fillEl);
+        flashHealth(valEl);
+      }
+    }
+
     function setHealth(v) {
-      health = clamp(v, 0, 100);
-      healthFill.style.width = health + '%';
-      healthVal.textContent = health;
+      var next = clamp(v, 0, 100);
+      updateHealthDisplay(healthFill, healthVal, next, health);
+      health = next;
     }
 
     function setAiHealth(v) {
-      aiHealth = clamp(v, 0, 100);
-      aiHealthFill.style.width = aiHealth + '%';
-      aiHealthVal.textContent = aiHealth;
+      var next = clamp(v, 0, 100);
+      updateHealthDisplay(aiHealthFill, aiHealthVal, next, aiHealth);
+      aiHealth = next;
     }
 
     // Live word-by-word highlighting while typing — same highlight classes
@@ -717,6 +1022,7 @@
       highlightLayer.scrollTop = textarea.scrollTop;
     }
     textarea.addEventListener('input', renderHighlight);
+    textarea.addEventListener('input', checkTokenBudget);
     textarea.addEventListener('scroll', function () {
       highlightLayer.scrollTop = textarea.scrollTop;
     });
@@ -729,6 +1035,7 @@
       stanceAffirmBtn.focus();
     }
     function closeArena() {
+      stopTurnTimer();
       arena.classList.remove('is-open');
       arena.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
@@ -739,6 +1046,12 @@
     if (gameoverRestartBtn) gameoverRestartBtn.addEventListener('click', resetRound);
     if (stanceAffirmBtn) stanceAffirmBtn.addEventListener('click', function () { chooseStance('affirm'); });
     if (stanceNegateBtn) stanceNegateBtn.addEventListener('click', function () { chooseStance('negate'); });
+    difficultyBtns.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (playerSide) return;
+        setDifficulty(btn.dataset.difficulty);
+      });
+    });
     arena.addEventListener('click', function (e) { if (e.target === arena) closeArena(); });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && arena.classList.contains('is-open')) closeArena();
@@ -752,6 +1065,8 @@
     function addUserBubbleAnimated(html, onDone) {
       var empty = transcript.querySelector('.cuss-arena-empty');
       if (empty) empty.remove();
+      var anchor = transcript.querySelector('.cuss-transcript-anchor');
+      if (anchor) anchor.remove();
 
       var p = document.createElement('p');
       p.className = 'cuss-bubble-user';
@@ -803,16 +1118,73 @@
 
     // Reuses the demo widget's "AI opponent rebuts" card — same
     // .cuss-ai-card / .cuss-ai-label markup and .is-visible fade-in.
-    function addAiCard(html, label) {
+    // rawText (the AI's plain, unhighlighted reply) is only needed for the
+    // Simplify action — omit it (or play Chair) and no button is rendered.
+    function addAiCard(html, label, rawText) {
       var card = document.createElement('div');
       card.className = 'cuss-ai-card cuss-bubble-ai';
+
+      var head = document.createElement('div');
+      head.className = 'cuss-ai-card-head';
       var labelEl = document.createElement('p');
       labelEl.className = 'cuss-ai-label';
       labelEl.textContent = label || 'AI opponent rebuts';
+      head.appendChild(labelEl);
+
       var body = document.createElement('p');
       body.className = 'cuss-ai-body';
       body.innerHTML = html;
-      card.appendChild(labelEl);
+
+      // Simplify re-renders THIS message in plainer English — not a free
+      // toggle, it spends from the same Word Economy pool as everything
+      // else (see checkTokenBudget()), and it's absent entirely in Chair
+      // mode, which is opt-in hard mode with no scaffolding.
+      if (difficulty !== 'chair' && rawText) {
+        var simplifyBtn = document.createElement('button');
+        simplifyBtn.type = 'button';
+        simplifyBtn.className = 'cuss-simplify-btn';
+        simplifyBtn.textContent = 'Simplify (' + SIMPLIFY_COST + ')';
+        simplifyBtn.title = 'Re-render this message in plainer English — costs ' +
+          SIMPLIFY_COST + ' tokens from your Word Economy pool.';
+        simplifyBtn.addEventListener('click', function () {
+          if (simplifyBtn.disabled || roundOver) return;
+          var remaining = TOKEN_POOL_SIZE - tokensUsed;
+          if (remaining < SIMPLIFY_COST) {
+            var original = simplifyBtn.textContent;
+            simplifyBtn.textContent = 'Not enough tokens';
+            setTimeout(function () { simplifyBtn.textContent = original; }, 1500);
+            return;
+          }
+          simplifyBtn.disabled = true;
+          simplifyBtn.textContent = 'Simplifying…';
+          fetch('/api/simplify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: rawText })
+          })
+            .then(function (res) {
+              return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+            })
+            .catch(function () {
+              return { ok: false, data: { error: 'Failed to reach the server.' } };
+            })
+            .then(function (result) {
+              if (!result.ok) {
+                simplifyBtn.disabled = false;
+                simplifyBtn.textContent = 'Simplify (' + SIMPLIFY_COST + ')';
+                return;
+              }
+              body.innerHTML = classifyText(result.data.reply).html;
+              tokensUsed += SIMPLIFY_COST;
+              checkTokenBudget();
+              simplifyBtn.textContent = 'Simplified';
+              simplifyBtn.classList.add('is-done');
+            });
+        });
+        head.appendChild(simplifyBtn);
+      }
+
+      card.appendChild(head);
       card.appendChild(body);
       transcript.appendChild(card);
       transcript.scrollTop = transcript.scrollHeight;
@@ -860,6 +1232,7 @@
 
     function revealJudge() {
       var targets = computeJudgeTargets();
+      judgePanel.hidden = false;
       judgePanel.classList.add('is-visible');
       if (judgeAnimTimer) clearTimeout(judgeAnimTimer);
 
@@ -894,12 +1267,16 @@
       analysis.fillerWordsUsed.forEach(function (w) {
         roundFillerWords[w] = (roundFillerWords[w] || 0) + 1;
       });
+      recordFillerWords(analysis.fillerWordsUsed);
+      tokensUsed += countWordTokens(text);
 
       history.push({ role: 'user', content: text });
       textarea.value = '';
       renderHighlight();
       textarea.disabled = true;
       submitBtn.disabled = true;
+      stopTurnTimer();
+      checkTokenBudget();
 
       // A speaker can only self-KO from their own word-level hits, so this
       // can already be decided before the AI is even asked to respond.
@@ -913,7 +1290,7 @@
       var respondPromise = fetch('/api/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ motion: MOTION, argument: text, history: history, side: playerSide })
+        body: JSON.stringify({ motion: MOTION, argument: text, history: history, side: playerSide, difficulty: difficulty })
       })
         .then(function (res) {
           return res.json().then(function (data) { return { ok: res.ok, data: data }; });
@@ -931,6 +1308,7 @@
             textarea.disabled = false;
             submitBtn.disabled = false;
             textarea.focus();
+            startTurnTimer();
             return;
           }
 
@@ -947,7 +1325,7 @@
           if (checkGameOver()) return;
 
           var aiAnalysis = classifyText(result.data.reply);
-          addAiCard(aiAnalysis.html, 'AI opponent rebuts');
+          addAiCard(aiAnalysis.html, 'AI opponent rebuts', result.data.reply);
           setAiHealth(aiHealth + aiAnalysis.delta);
           history.push({ role: 'assistant', content: result.data.reply });
           if (checkGameOver()) return;
@@ -957,17 +1335,113 @@
           applyVerdict(result.data.ai_reply_verdict, aiAnalysis, false);
           if (checkGameOver()) return;
 
-          setTimeout(revealJudge, 700);
+          // Update the Judge panel BEFORE unlocking the input — otherwise a
+          // fast player can submit the next argument while this turn's
+          // scores are still pending, and the panel reads one exchange
+          // behind until the following reveal catches up.
+          revealJudge();
           textarea.disabled = false;
           submitBtn.disabled = false;
           textarea.focus();
+          startTurnTimer();
         });
       });
     });
   }
 
+  // Standalone view of the persistent Vocabulary Scars tally — reachable
+  // any time from the nav, independent of whether a round is in progress.
+  function initVocabScars() {
+    var scarsEl = document.getElementById('cuss-scars');
+    var scarsList = document.getElementById('cuss-scars-list');
+    var scarsLink = document.getElementById('cuss-scars-link');
+    var scarsCloseBtn = document.getElementById('cuss-scars-close');
+    if (!scarsEl || !scarsList) return;
+
+    function renderScars() {
+      var scars = loadVocabScars();
+      var entries = Object.keys(scars)
+        .map(function (w) { return { word: w, count: scars[w] }; })
+        .sort(function (a, b) { return b.count - a.count; });
+
+      scarsList.innerHTML = '';
+
+      if (!entries.length) {
+        var empty = document.createElement('p');
+        empty.className = 'cuss-recap-clean';
+        empty.textContent = "No filler words tracked yet — play a round to start building your list.";
+        scarsList.appendChild(empty);
+        return;
+      }
+
+      entries.forEach(function (entry) {
+        var alternatives = FILLER_ALTERNATIVES[entry.word] || ['specifically', 'precisely'];
+        var row = document.createElement('div');
+        row.className = 'cuss-recap-row';
+
+        var from = document.createElement('span');
+        from.className = 'cuss-recap-from';
+        from.textContent = '"' + entry.word + '" ×' + entry.count;
+
+        var arrow = document.createElement('span');
+        arrow.className = 'cuss-recap-arrow';
+        arrow.textContent = '→';
+
+        var to = document.createElement('span');
+        to.className = 'cuss-recap-to';
+        to.textContent = alternatives.join(' / ');
+
+        row.appendChild(from);
+        row.appendChild(arrow);
+        row.appendChild(to);
+        scarsList.appendChild(row);
+      });
+    }
+
+    function openScars() {
+      renderScars();
+      scarsEl.classList.add('is-open');
+      scarsEl.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeScars() {
+      scarsEl.classList.remove('is-open');
+      scarsEl.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    if (scarsLink) scarsLink.addEventListener('click', function (e) { e.preventDefault(); openScars(); });
+    if (scarsCloseBtn) scarsCloseBtn.addEventListener('click', closeScars);
+    scarsEl.addEventListener('click', function (e) { if (e.target === scarsEl) closeScars(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && scarsEl.classList.contains('is-open')) closeScars();
+    });
+  }
+
+  // The hero stats band's "filler words by round 2" tile — reads the same
+  // round-history log endRound() writes to, so it's the player's own real
+  // number instead of a fixed marketing figure. Left at the static
+  // placeholder (see index.html) until they've actually played 2 rounds.
+  function initHomepageStat() {
+    var numEl = document.getElementById('cuss-stat-improvement');
+    var labelEl = document.getElementById('cuss-stat-improvement-label');
+    if (!numEl || !labelEl) return;
+
+    var history = loadRoundHistory();
+    if (history.length < 2) return;
+
+    var r1 = history[0];
+    var r2 = history[1];
+    var pct = r1 === 0 ? 0 : Math.round(((r1 - r2) / r1) * 100);
+
+    numEl.textContent = pct >= 0 ? ('−' + pct + '%') : ('+' + Math.abs(pct) + '%');
+    labelEl.textContent = 'filler words by round 2 (yours)';
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initDemo();
     initArena();
+    initVocabScars();
+    initHomepageStat();
   });
 })();

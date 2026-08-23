@@ -24,6 +24,29 @@ MATCH_THRESHOLD = 0.3
 
 DEFAULT_MOTION = "This House believes nuclear power is the fastest path to decarbonization."
 
+DEFAULT_DIFFICULTY = "delegate"
+
+# Controls only vocabulary/phrasing density — argument quality and the judging
+# rubric stay identical across levels, so difficulty changes how hard the AI is
+# to READ, not how hard it argues.
+DIFFICULTY_STYLES = {
+    "rookie": (
+        "- Difficulty: Rookie. Use simple, common, everyday words and short, direct sentences. "
+        "No idioms, no advanced vocabulary, no dense or compressed phrasing. Stay just as "
+        "logically sharp and just as willing to press hard on a weak point — you're simplifying "
+        "the language, never the argument."
+    ),
+    "delegate": (
+        "- Difficulty: Delegate. Normal conversational range for a sharp, well-read debater — "
+        "not simplified, not showing off, just how you'd actually talk."
+    ),
+    "chair": (
+        "- Difficulty: Chair. Deliberately dense, idiomatic, native-level phrasing — advanced "
+        "vocabulary, compressed clauses, cultural idioms, no hand-holding. This is opt-in hard "
+        "mode for a player who wants a real challenge just parsing what you're saying."
+    ),
+}
+
 DEBATE_SYSTEM_PROMPT = (
     'You are a live participant in Cussator debates, a format close to Model UN — not a news anchor. '
     'Round motion: "{motion}". The user chose their side before the round started: {user_stance}. '
@@ -45,7 +68,8 @@ DEBATE_SYSTEM_PROMPT = (
     'rhetorical questions ("And that proves what, exactly?", "Seriously?"). Feel free to open '
     'a line with an interjection or a short reaction ("Okay, wait.", "Sure, but...").\n'
     "- No corporate or textbook tone: no \"it should be noted\", \"it's important to understand\", "
-    '"thus", "in conclusion" — this is a live argument, not an academic paper.\n\n'
+    '"thus", "in conclusion" — this is a live argument, not an academic paper.\n'
+    "{difficulty_style}\n\n"
     "Content rules:\n"
     "- RESPONSE LANGUAGE: always write only in English, no matter what language the user writes "
     "in. Even if the user writes in Russian — you still respond in English. "
@@ -135,6 +159,9 @@ def debate_reply(body):
     side = str(body.get("side", "affirm")).strip().lower()
     if side not in ("affirm", "negate"):
         side = "affirm"
+    difficulty = str(body.get("difficulty", DEFAULT_DIFFICULTY)).strip().lower()
+    if difficulty not in DIFFICULTY_STYLES:
+        difficulty = DEFAULT_DIFFICULTY
 
     if not argument:
         return 400, {"error": "Empty argument."}
@@ -155,7 +182,8 @@ def debate_reply(body):
             model="claude-opus-5",
             max_tokens=400,
             system=DEBATE_SYSTEM_PROMPT.format(
-                motion=motion or DEFAULT_MOTION, user_stance=user_stance, ai_stance=ai_stance
+                motion=motion or DEFAULT_MOTION, user_stance=user_stance, ai_stance=ai_stance,
+                difficulty_style=DIFFICULTY_STYLES[difficulty]
             ),
             output_config={"effort": "low"},
             tools=[DEBATE_TOOL],
@@ -173,6 +201,42 @@ def debate_reply(body):
             "user_argument_verdict": data.get("user_argument_verdict", "neutral"),
             "ai_reply_verdict": data.get("ai_reply_verdict", "neutral"),
         }
+    except anthropic.AuthenticationError:
+        return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
+    except anthropic.APIStatusError as e:
+        return 500, {"error": f"Claude API error: {e.message}"}
+    except Exception as e:
+        return 500, {"error": f"Server error: {e}"}
+
+
+SIMPLIFY_SYSTEM_PROMPT = (
+    "Rewrite the given debate rebuttal in plain, simple English: short sentences, common "
+    "everyday vocabulary, no idioms, no jargon. Keep the exact same argument, claims, and "
+    "direct/pointed tone — you're simplifying the language, not the substance, and not "
+    "softening it into something polite. Plain text, no markdown, no quotation marks, no "
+    "preamble like \"Here's a simpler version\". Output only the rewritten rebuttal."
+)
+
+
+def simplify_reply(body):
+    text = str(body.get("text", ""))[:2000].strip()
+
+    if not text:
+        return 400, {"error": "Empty text."}
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return 500, {"error": "ANTHROPIC_API_KEY is not set."}
+
+    try:
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model="claude-opus-5",
+            max_tokens=300,
+            system=SIMPLIFY_SYSTEM_PROMPT,
+            output_config={"effort": "low"},
+            messages=[{"role": "user", "content": text}],
+        )
+        reply = "".join(b.text for b in response.content if b.type == "text").strip()
+        return 200, {"reply": reply or text}
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
     except anthropic.APIStatusError as e:

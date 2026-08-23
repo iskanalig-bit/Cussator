@@ -15,6 +15,7 @@
     <a href="#demo">Demo</a>
     <a href="#features">Features</a>
     <a href="#how">How it works</a>
+    <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
   </nav>
 
   <div class="cuss-wrap">
@@ -91,8 +92,8 @@
           <p class="cuss-stat-label">judging criteria</p>
         </div>
         <div>
-          <p class="cuss-stat-num">−86%</p>
-          <p class="cuss-stat-label">filler words by round 2</p>
+          <p class="cuss-stat-num" id="cuss-stat-improvement">—</p>
+          <p class="cuss-stat-label" id="cuss-stat-improvement-label">filler words by round 2 — play two rounds to see yours</p>
         </div>
       </div>
     </div>
@@ -170,6 +171,25 @@
     <div class="cuss-stance-select" id="cuss-stance-select">
       <p class="cuss-stance-eyebrow">Choose your side</p>
       <p class="cuss-stance-motion">Motion: &laquo;<span id="cuss-stance-motion-text"></span>&raquo;</p>
+
+      <div class="cuss-difficulty-select">
+        <p class="cuss-difficulty-eyebrow">AI opponent difficulty</p>
+        <div class="cuss-difficulty-buttons" role="group" aria-label="AI opponent difficulty">
+          <button type="button" class="cuss-difficulty-btn" id="cuss-difficulty-rookie" data-difficulty="rookie">
+            <span class="cuss-difficulty-btn-title">Rookie</span>
+            <span class="cuss-difficulty-btn-sub">Simple words, short sentences</span>
+          </button>
+          <button type="button" class="cuss-difficulty-btn is-active" id="cuss-difficulty-delegate" data-difficulty="delegate">
+            <span class="cuss-difficulty-btn-title">Delegate</span>
+            <span class="cuss-difficulty-btn-sub">Standard</span>
+          </button>
+          <button type="button" class="cuss-difficulty-btn" id="cuss-difficulty-chair" data-difficulty="chair">
+            <span class="cuss-difficulty-btn-title">Chair</span>
+            <span class="cuss-difficulty-btn-sub">Dense, idiomatic, no Simplify</span>
+          </button>
+        </div>
+      </div>
+
       <div class="cuss-stance-buttons">
         <button type="button" class="btn cuss-stance-btn cuss-stance-affirm" id="cuss-stance-affirm">
           <span class="cuss-stance-btn-title">Affirm</span>
@@ -188,12 +208,17 @@
 
     <div class="cuss-arena-head">
       <div class="cuss-arena-head-info">
+        <span class="cuss-arena-brand">Cussator</span>
         <span class="cuss-live-dot"></span>
         <span class="tag tag-outline">LIVE ROUND</span>
-        <span class="cuss-arena-motion">Motion: &laquo;<span id="cuss-arena-motion-text">This House believes nuclear power is the fastest path to decarbonization.</span>&raquo;</span>
+        <span class="tag tag-outline cuss-arena-timer" id="cuss-arena-timer">01:00</span>
       </div>
-      <button type="button" class="btn btn-icon" id="cuss-arena-close" aria-label="Close round">✕</button>
+      <div class="cuss-arena-head-right">
+        <span class="tag tag-outline cuss-arena-side" id="cuss-arena-side" hidden></span>
+        <button type="button" class="btn btn-icon" id="cuss-arena-close" aria-label="Close round">✕</button>
+      </div>
     </div>
+    <p class="cuss-arena-motion">Motion: &laquo;<span id="cuss-arena-motion-text">This House believes nuclear power is the fastest path to decarbonization.</span>&raquo;</p>
 
     <div class="cuss-arena-health">
       <div class="cuss-judge-row">
@@ -216,7 +241,7 @@
       <p class="cuss-ai-label">AI opponent is typing…</p>
     </div>
 
-    <div class="cuss-judge" id="cuss-arena-judge">
+    <div class="cuss-judge" id="cuss-arena-judge" hidden>
       <p class="cuss-judge-label">Judge</p>
       <p class="cuss-judge-note">Feedback only — these scores don't affect Credibility.</p>
       <div class="cuss-judge-row">
@@ -239,6 +264,15 @@
       <p class="cuss-judge-hint">Fluency — clean, confident phrasing; hurt by filler words and profanity.</p>
     </div>
 
+    <div class="cuss-color-legend">
+      <span class="cuss-legend-item"><span class="cuss-legend-dot is-filler"></span>Filler</span>
+      <span class="cuss-legend-item"><span class="cuss-legend-dot is-vocab"></span>Vocab</span>
+      <span class="cuss-legend-item"><span class="cuss-legend-dot is-penalty"></span>Penalty</span>
+      <span class="cuss-token-budget" id="cuss-token-budget" title="Word Economy budget — 1 token = 1 word. Running out ends the round.">
+        <span class="cuss-token-val" id="cuss-token-val">1000</span> / 1000 tokens
+      </span>
+    </div>
+
     <form class="cuss-arena-form" id="cuss-arena-form">
       <div class="cuss-highlight-wrap">
         <div class="cuss-highlight-layer" id="cuss-arena-highlight" aria-hidden="true"></div>
@@ -250,9 +284,21 @@
     <div class="cuss-gameover" id="cuss-gameover" hidden>
       <p class="cuss-gameover-title" id="cuss-gameover-title">You Win</p>
       <p class="cuss-gameover-sub" id="cuss-gameover-sub"></p>
+      <div class="cuss-trend" id="cuss-trend"></div>
       <div class="cuss-recap" id="cuss-recap"></div>
       <button type="button" class="btn btn-primary cuss-cta-xl" id="cuss-gameover-restart">Rematch</button>
     </div>
+  </div>
+</div>
+
+<div class="cuss-scars" id="cuss-scars" aria-hidden="true">
+  <div class="cuss-scars-inner">
+    <div class="cuss-scars-head">
+      <span class="cuss-scars-title">Vocabulary Scars</span>
+      <button type="button" class="btn btn-icon" id="cuss-scars-close" aria-label="Close">✕</button>
+    </div>
+    <p class="cuss-scars-sub">Your most repeated filler words across every round you've played, each with a stronger swap.</p>
+    <div class="cuss-scars-list" id="cuss-scars-list"></div>
   </div>
 </div>
 

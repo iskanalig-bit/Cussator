@@ -233,6 +233,12 @@ textarea.input { min-height: 90px; resize: vertical; }
 .tag-accent-2 { background: var(--color-accent-2-800); color: var(--color-accent-2-100); }
 .tag-neutral { background: var(--color-neutral-800); color: var(--color-neutral-100); }
 .tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
+/* Per-turn countdown, styled as the same outlined pill as the LIVE ROUND
+   badge next to it — tabular-nums keeps the digits from jittering the
+   pill's width as they count down. Ticks only while it's the player's
+   turn (input enabled); warns in the last 10 seconds. */
+.cuss-arena-timer { font-variant-numeric: tabular-nums; }
+.cuss-arena-timer.is-warn { border-color: var(--color-warn); color: var(--color-warn); }
 
 /* — navigation — */
 .nav {
@@ -380,8 +386,18 @@ html { scroll-behavior: smooth; }
   opacity: 0; transform: translateY(4px); transition: opacity 0.35s ease, transform 0.35s ease;
 }
 .cuss-ai-card.is-visible { opacity: 1; transform: translateY(0); }
-.cuss-ai-label { margin: 0 0 4px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-warn); }
+.cuss-ai-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: 4px; }
+.cuss-ai-label { margin: 0; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-warn); }
 .cuss-ai-card p.cuss-ai-body { margin: 0; font-size: 14px; line-height: 1.5; }
+.cuss-simplify-btn {
+  font-family: inherit; font-size: 10.5px; letter-spacing: 0.03em; text-transform: uppercase;
+  color: var(--color-accent); background: transparent; cursor: pointer; white-space: nowrap;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent); border-radius: 999px;
+  padding: 3px 9px; transition: background 0.15s ease, opacity 0.15s ease;
+}
+.cuss-simplify-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+.cuss-simplify-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.cuss-simplify-btn.is-done { color: color-mix(in srgb, var(--color-text) 55%, transparent); border-color: var(--color-divider); }
 
 .cuss-judge {
   display: flex; flex-direction: column; gap: 6px; padding-top: var(--space-2);
@@ -389,6 +405,10 @@ html { scroll-behavior: smooth; }
   opacity: 0; transition: opacity 0.35s ease;
 }
 .cuss-judge.is-visible { opacity: 1; }
+/* Collapses out of the flex flow entirely before the first turn resolves —
+   otherwise its (invisible but full-height) box sits between the transcript
+   and the legend/input, breaking the uniform gap rhythm described above. */
+.cuss-judge[hidden] { display: none; }
 .cuss-judge-label {
   margin: 0 0 2px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
@@ -399,6 +419,36 @@ html { scroll-behavior: smooth; }
 .cuss-judge-fill { height: 100%; width: 0%; background: var(--color-accent); transition: width 0.1s linear; }
 .cuss-judge-fill.is-warn { background: var(--color-warn); }
 .cuss-judge-val { font-size: 11px; width: 28px; text-align: right; font-feature-settings: 'tnum' 1; }
+
+/* Credibility (HP) bars get real visual weight — thicker track, a color
+   shift toward danger as they drop, and a brief pulse whenever the number
+   actually changes. Scoped under .cuss-arena-health so the Judge panel's
+   bars (deliberately secondary — "feedback only") stay untouched; they
+   share the same .cuss-judge-track/-fill/-val classes otherwise. */
+.cuss-arena-health .cuss-judge-track { height: 12px; }
+.cuss-arena-health .cuss-judge-fill {
+  background: var(--color-accent); color: var(--color-accent);
+  transition: width 0.15s ease, background 0.3s ease, color 0.3s ease;
+}
+.cuss-arena-health .cuss-judge-fill.is-warn { background: var(--color-warn); color: var(--color-warn); }
+.cuss-arena-health .cuss-judge-fill.is-hp-warning { background: oklch(0.78 0.16 80); color: oklch(0.78 0.16 80); }
+.cuss-arena-health .cuss-judge-fill.is-hp-critical { background: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25); }
+.cuss-arena-health .cuss-judge-val { font-size: 13px; font-weight: 700; transition: color 0.3s ease; }
+.cuss-arena-health .cuss-judge-val.is-hp-warning { color: oklch(0.78 0.16 80); }
+.cuss-arena-health .cuss-judge-val.is-hp-critical { color: oklch(0.63 0.22 25); }
+
+@keyframes cuss-hp-pulse {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  35% { box-shadow: 0 0 16px 2px currentColor; }
+  100% { box-shadow: 0 0 0 0 currentColor; }
+}
+.cuss-arena-health .cuss-judge-fill.is-flash { animation: cuss-hp-pulse 0.7s ease-out; }
+@keyframes cuss-hp-val-pulse {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.4); }
+  100% { transform: scale(1); }
+}
+.cuss-arena-health .cuss-judge-val.is-flash { display: inline-block; animation: cuss-hp-val-pulse 0.5s ease-out; }
 /* Per-metric explanations under the live Judge panel — purely informational,
    these never feed back into Credibility (that's driven only by the per-word tags
    and the AI's per-turn verdict; folding the Judge score in too would
@@ -489,23 +539,76 @@ html { scroll-behavior: smooth; }
 .cuss-arena-inner {
   position: relative;
   width: 100%; max-width: 900px; height: 100%; max-height: 100vh;
-  display: flex; flex-direction: column; gap: var(--space-3);
+  /* Same gap token as .cuss-arena-transcript's internal gap (see below) —
+     one consistent rhythm the whole way down: head → motion → HP bars →
+     transcript (→ avatar row → prompt) → legend → input. */
+  display: flex; flex-direction: column; gap: var(--space-4);
   background: var(--color-bg); border-radius: 0; box-shadow: none;
   padding: var(--space-4) var(--edge); overflow: hidden;
 }
-.cuss-arena-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
-.cuss-arena-head-info { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.cuss-arena-motion { font-size: 12px; font-style: italic; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
-.cuss-arena-transcript {
-  /* Now that the arena is full-screen, a short transcript (opening line,
-     one exchange) would otherwise sit pinned at the top of a tall empty
-     column. justify-content: center closes that gap while the content is
-     shorter than the viewport; once a real back-and-forth overflows it,
-     centering has no effect and it behaves like a normal scrolling log. */
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; gap: var(--space-3);
-  padding-right: 4px; padding-top: 14px; min-height: 120px;
+/* Stacked above the stance-select (z-index: 10) and round-over (z-index: 5)
+   overlays so the close button stays clickable no matter which screen is
+   showing — without this it sits at the default stacking level and the
+   overlay's own layer (positioned + z-indexed) intercepts the click even
+   though the header is still faintly visible through it. */
+.cuss-arena-head {
+  position: relative; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
 }
-.cuss-arena-empty { font-size: 13px; color: color-mix(in srgb, var(--color-text) 55%, transparent); margin: 0; }
+.cuss-arena-head-info { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+/* Right-hand cluster mirrors the left one, same even left/right split the
+   bottom legend row and the avatar row also use — keeps the header from
+   reading as left-heavy with a bare close button stranded on the far right. */
+.cuss-arena-head-right { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+/* Reflects the side the player already picked (see chooseStance()) — hidden
+   until then. Same blue/red as the stance-select buttons and pre-round
+   avatars for one consistent affirm/negate color language. */
+.cuss-arena-side.is-affirm { border-color: oklch(0.72 0.15 250); color: oklch(0.72 0.15 250); }
+.cuss-arena-side.is-negate { border-color: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25); }
+.cuss-arena-side[hidden] { display: none; }
+/* Keeps product identity present during an actual round, not just on the
+   marketing page — same weight/family as .nav-brand, just smaller since it
+   shares the row with the LIVE ROUND badge and timer. */
+.cuss-arena-brand {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 14px; margin-right: 2px; color: var(--color-text);
+}
+.cuss-arena-motion { margin: 0; font-size: 12px; font-style: italic; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.cuss-arena-transcript {
+  /* Top-aligned with the same uniform gap used for every other row in this
+     panel (see .cuss-arena-inner) — deliberately NOT vertically centered,
+     so the HP bars → avatar row → prompt → input rhythm reads as one
+     consistent stack instead of floating in the middle of the remaining
+     space above a short transcript. */
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);
+  padding-right: 4px; min-height: 120px;
+}
+/* Reads as an active prompt, not passive filler copy — the "YOUR TURN"
+   badge reuses the exact .tag.tag-outline styling the "LIVE ROUND" badge
+   uses, so the two read as the same visual language. */
+.cuss-arena-empty {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
+  font-size: 13px; color: color-mix(in srgb, var(--color-text) 68%, transparent); margin: 0;
+}
+.cuss-arena-prompt-badge { flex: none; font-weight: 600; }
+/* Pre-round anchor — foreshadows the left/right layout the first AI card
+   and user bubble will actually use (.cuss-bubble-ai / .cuss-bubble-user),
+   so the empty transcript reads as an intentional, populated layout rather
+   than blank space. Removed the moment the first bubble is added. Same
+   even left/right split as the bottom legend row and the header — AI
+   pinned left, player pinned right, both on one horizontal line. */
+.cuss-transcript-anchor { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); opacity: 0.65; }
+.cuss-anchor-row { display: flex; align-items: center; gap: 8px; max-width: 46%; }
+.cuss-anchor-right { flex-direction: row-reverse; }
+.cuss-anchor-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid currentColor;
+  font-size: 11px; font-weight: 700; font-family: var(--font-heading);
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.cuss-anchor-avatar.is-affirm { color: oklch(0.72 0.15 250); }
+.cuss-anchor-avatar.is-negate { color: oklch(0.63 0.22 25); }
+.cuss-anchor-label { font-size: 12px; letter-spacing: 0.02em; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
 .cuss-bubble-user {
   align-self: flex-end; max-width: 88%; background: var(--color-surface);
   border-radius: var(--radius-md); padding: var(--space-3); font-size: 14px; line-height: 1.5; margin: 0;
@@ -539,6 +642,32 @@ html { scroll-behavior: smooth; }
 .cuss-bubble-ai { align-self: flex-start; max-width: 88%; }
 .cuss-arena-typing[hidden] { display: none; }
 .cuss-arena-error { color: var(--color-warn); font-size: 13px; margin: 0; }
+
+/* Color-legend key — visible from the start of every round (static, not
+   tied to any round state) so new players learn the highlight system by
+   reading it, not by losing Credibility first. Colors match the live
+   highlight classes exactly: .cuss-weak (filler), .cuss-vocab, .cuss-curse. */
+.cuss-color-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 0 2px 6px; }
+.cuss-legend-item {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.cuss-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.cuss-legend-dot.is-filler { background: var(--color-warn); }
+.cuss-legend-dot.is-vocab { background: oklch(0.75 0.13 150); }
+.cuss-legend-dot.is-penalty { background: oklch(0.63 0.22 25); }
+
+/* Word Economy token budget — shares the legend's row, pinned to the right.
+   Ticks down live (see checkTokenBudget() in script.js) as the player
+   types, same event as the highlighter; turns critical-red in the last 10%
+   of the pool as a quiet warning before the auto-loss actually fires. */
+.cuss-token-budget {
+  margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.cuss-token-val { font-weight: 700; color: var(--color-text); }
+.cuss-token-budget.is-critical, .cuss-token-budget.is-critical .cuss-token-val { color: oklch(0.63 0.22 25); }
+
 .cuss-arena-form { display: flex; gap: var(--space-3); align-items: flex-end; }
 
 .cuss-highlight-wrap {
@@ -575,6 +704,27 @@ html { scroll-behavior: smooth; }
 .cuss-stance-motion {
   margin: 0; max-width: 60ch; font-size: clamp(18px, 3vw, 26px); font-style: italic; line-height: 1.4;
 }
+.cuss-difficulty-select { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.cuss-difficulty-eyebrow {
+  margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.cuss-difficulty-buttons { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: center; }
+.cuss-difficulty-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: 150px;
+  padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-divider);
+  background: transparent; color: var(--color-text); cursor: pointer; font-family: inherit;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.cuss-difficulty-btn:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--color-text) 40%, transparent); }
+.cuss-difficulty-btn-title { font-size: 14px; font-weight: var(--font-heading-weight); }
+.cuss-difficulty-btn-sub { font-size: 10.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.cuss-difficulty-btn.is-active {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+.cuss-difficulty-btn.is-active .cuss-difficulty-btn-title { color: var(--color-accent); }
+
 .cuss-stance-buttons { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: center; margin-top: var(--space-2); }
 .cuss-stance-btn {
   flex-direction: column; width: 220px; height: auto; padding: 28px 20px; gap: 6px;
@@ -638,7 +788,44 @@ html { scroll-behavior: smooth; }
 .cuss-recap-arrow { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
 .cuss-recap-to { color: oklch(0.75 0.13 150); font-weight: 600; }
 
+/* Vocabulary Scars — a persistent, cross-round view of the same filler
+   data the post-round recap already computes (site/script.js accumulates
+   it into localStorage as each argument is scored), so this page is just a
+   different display of existing numbers, not a new tracker. Full-screen,
+   same pattern as .cuss-arena. */
+.cuss-scars {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: stretch; justify-content: center;
+  padding: 0; background: var(--color-bg);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+}
+.cuss-scars.is-open { opacity: 1; pointer-events: auto; }
+.cuss-scars-inner {
+  width: 100%; max-width: 720px; height: 100%; max-height: 100vh;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4) var(--edge); overflow-y: auto;
+}
+.cuss-scars-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.cuss-scars-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 20px; }
+.cuss-scars-sub {
+  margin: 0; font-size: 13.5px; max-width: 60ch;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.cuss-scars-list { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }
+.cuss-scars-list .cuss-recap-row { justify-content: flex-start; font-size: 15px; }
+
+/* Round-end trend — this round's filler count against the player's own
+   last-3-rounds average, pulled from the same localStorage history that
+   feeds the homepage's real per-player stat tile. */
+.cuss-trend { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.cuss-trend:empty { display: none; }
+.cuss-trend-count { margin: 0; font-size: 16px; font-weight: 600; }
+.cuss-trend-note { margin: 0; font-size: 13.5px; }
+.cuss-trend-down { color: oklch(0.75 0.13 150); }
+.cuss-trend-up { color: oklch(0.63 0.22 25); }
+.cuss-trend-flat { color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+
 @media (max-width: 640px) {
   .cuss-arena-inner { padding: var(--space-3); }
   .cuss-arena-form { flex-direction: column; align-items: stretch; }
+  .cuss-scars-inner { padding: var(--space-3); }
 }
