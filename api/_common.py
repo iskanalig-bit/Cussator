@@ -26,7 +26,18 @@ DEFAULT_MOTION = "This House believes nuclear power is the fastest path to decar
 
 DEBATE_SYSTEM_PROMPT = (
     'You are a live participant in Cussator debates, a format close to Model UN — not a news anchor. '
-    'Round motion: "{motion}". The user argues for the motion (Prop 1), you argue against it (Opp).\n\n'
+    'Round motion: "{motion}". The user chose their side before the round started: {user_stance}. '
+    "You take the other side: {ai_stance}.\n\n"
+    "Who you are:\n"
+    "- A sharp, confident debater who actually wants to win this round — not a moderator, not a "
+    "customer-service bot, not a professor grading a paper. Warm and human enough that you sound "
+    "like a real person talking, but pointed enough that a good hit actually lands.\n"
+    "- Think strategically before you speak: find the ONE real weak point in what they just said — "
+    "the unsupported leap, the term doing all the work, the thing they asserted but never actually "
+    "proved — and go straight at it. Don't summarize their whole argument back at them, don't hedge, "
+    "don't pad. One clean, incisive jab beats three vague objections.\n"
+    "- Vary your openings — a beat of reaction, a direct challenge, a flat one-line rebuttal, a "
+    "question that traps them. Don't fall into a template where every reply has the same shape.\n\n"
     "How to sound:\n"
     "- Talk like someone actually arguing out loud, a little fired up by what's happening: "
     "confident, sometimes with a light edge of sarcasm or irritation.\n"
@@ -40,12 +51,64 @@ DEBATE_SYSTEM_PROMPT = (
     "in. Even if the user writes in Russian — you still respond in English. "
     "No exceptions.\n"
     "- Keep it short: 2-4 sentences.\n"
-    "- Stay substantive and persuasive despite the casual tone: latch onto vague "
-    'phrasing, filler words ("kind of", "in my opinion", "как бы", "вроде", "наверное", '
-    '"типа") and weak claims — call them out directly and demand specifics.\n'
+    "- Stay substantive and persuasive despite the casual tone: notice vague phrasing, hedges, and "
+    "weak claims, and press on them hard — but name the weakness conceptually, in your own words "
+    '("that\'s a shrug, not a claim" / "you asserted it, you didn\'t argue it"). Never quote the '
+    "user's exact wording back at them in quotation marks — and never repeat their filler or hedge "
+    'words verbatim ("kind of", "sort of", "I feel like", "basically", etc.) even paraphrased close '
+    "to the original. Making them YOUR words defeats the point of calling out a hedge, and it's also "
+    "putting a flagged word in your own mouth.\n"
     "- Never fully agree with the user — you're their opponent.\n"
-    "- Plain text, no markdown and no lists."
+    "- Plain text, no markdown and no lists.\n"
+    "- No em dashes (—) anywhere, and no unnecessary quotation marks ('...' or \"...\") — both read as "
+    "AI-generated tells and break the illusion that you're a real person typing fast in an argument. "
+    "Break a thought into two sentences instead of splicing it with a dash, and if you need to name "
+    "something, just say it plainly instead of wrapping it in quotes. Regular commas, periods, and "
+    'colons are fine; a straight apostrophe in a contraction ("don\'t", "isn\'t") is fine too.\n\n'
+    "Judging (this is the scoring backbone of the app, take it seriously):\n"
+    "After deciding what to say, judge argument quality on this rubric —\n"
+    '- "solid": makes a clear claim AND ties it to a specific reason, mechanism, or example relevant '
+    "to the motion — not just an assertion.\n"
+    '- "bad": vague, unsupported, dodges the resolution, or rests on an obvious logical fallacy or '
+    "non-sequitur.\n"
+    '- "neutral": on-topic and coherent but plain — doesn\'t clearly earn "solid" or "bad".\n'
+    "Judge the user's argument on this rubric. Then judge your own rebuttal on the exact same rubric, "
+    'honestly — most rebuttals are "neutral"; reserve "solid" for ones that actually add a real reason '
+    "or mechanism, not just a sharp tone. Don't inflate either verdict.\n"
+    "Call the submit_round_turn tool with your rebuttal and both verdicts — always use the tool, never "
+    "reply in plain text."
 )
+
+DEBATE_TOOL = {
+    "name": "submit_round_turn",
+    "description": (
+        "Submit your in-character rebuttal plus a quality verdict on the user's argument and on your "
+        "own rebuttal, judged by the rubric in the system prompt."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "reply": {
+                "type": "string",
+                "description": (
+                    "Your in-character spoken rebuttal, 2-4 sentences, plain text, no markdown, "
+                    "no em dashes, no unnecessary quotation marks."
+                ),
+            },
+            "user_argument_verdict": {
+                "type": "string",
+                "enum": ["solid", "neutral", "bad"],
+                "description": "Quality verdict on the user's argument, by the rubric.",
+            },
+            "ai_reply_verdict": {
+                "type": "string",
+                "enum": ["solid", "neutral", "bad"],
+                "description": "Quality verdict on your own rebuttal, by the same rubric.",
+            },
+        },
+        "required": ["reply", "user_argument_verdict", "ai_reply_verdict"],
+    },
+}
 
 SUPPORT_SYSTEM_PROMPT = (
     "Ты помощник поддержки. Отвечай ТОЛЬКО по информации из базы знаний, которую даёт "
@@ -69,11 +132,19 @@ def _history_messages(history):
 def debate_reply(body):
     motion = str(body.get("motion", ""))[:500].strip()
     argument = str(body.get("argument", ""))[:2000].strip()
+    side = str(body.get("side", "affirm")).strip().lower()
+    if side not in ("affirm", "negate"):
+        side = "affirm"
 
     if not argument:
         return 400, {"error": "Empty argument."}
     if not os.environ.get("ANTHROPIC_API_KEY"):
         return 500, {"error": "ANTHROPIC_API_KEY is not set."}
+
+    if side == "affirm":
+        user_stance, ai_stance = "arguing FOR the motion (Prop)", "arguing AGAINST it (Opp)"
+    else:
+        user_stance, ai_stance = "arguing AGAINST the motion (Opp)", "arguing FOR it (Prop)"
 
     messages = _history_messages(body.get("history", []))
     messages.append({"role": "user", "content": argument})
@@ -82,13 +153,26 @@ def debate_reply(body):
         client = anthropic.Anthropic()
         response = client.messages.create(
             model="claude-opus-5",
-            max_tokens=300,
-            system=DEBATE_SYSTEM_PROMPT.format(motion=motion or DEFAULT_MOTION),
+            max_tokens=400,
+            system=DEBATE_SYSTEM_PROMPT.format(
+                motion=motion or DEFAULT_MOTION, user_stance=user_stance, ai_stance=ai_stance
+            ),
             output_config={"effort": "low"},
+            tools=[DEBATE_TOOL],
+            tool_choice={"type": "tool", "name": "submit_round_turn"},
             messages=messages,
         )
-        reply = "".join(b.text for b in response.content if b.type == "text").strip()
-        return 200, {"reply": reply or "…"}
+        tool_use = next((b for b in response.content if b.type == "tool_use"), None)
+        if not tool_use:
+            return 500, {"error": "Model did not return a structured turn."}
+
+        data = tool_use.input
+        reply = str(data.get("reply") or "").strip()
+        return 200, {
+            "reply": reply or "…",
+            "user_argument_verdict": data.get("user_argument_verdict", "neutral"),
+            "ai_reply_verdict": data.get("ai_reply_verdict", "neutral"),
+        }
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
     except anthropic.APIStatusError as e:

@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --color-bg: #161826;
+  --color-bg: #000000;
   --color-surface: #232532;
   --color-text: #e9e9ed;
   --color-accent: #9184d9; /* review round 7 (Barron): the accent moves to
@@ -75,10 +75,14 @@
   --radius-lg: 14px;
 
   /* Elevation — derived from the ground: soft ink-tinted shadows on a
-     light theme, a hairline edge + ambient darkness on a dark one. */
+     light theme, a hairline edge + ambient darkness on a dark one.
+     The ground is pure black (#000), so a black ambient shadow would be
+     literally invisible (same color as what's behind it) — the ambient
+     component is instead a faint accent-tinted glow, which also keeps it
+     visually consistent with the accent glow on the primary CTA. */
   --shadow-sm: 0 0 0 1px #3f424d;
-  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px rgba(0,0,0,0.55);
-  --shadow-lg: 0 0 0 1px #9397ab, 0 16px 40px rgba(0,0,0,0.65);
+  --shadow-md: 0 0 0 1px #595d6c, 0 6px 18px color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --shadow-lg: 0 0 0 1px var(--color-neutral-300), 0 16px 40px color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
 
 body {
@@ -337,10 +341,20 @@ html { scroll-behavior: smooth; }
   font-size: 17px; line-height: var(--leading); max-width: 52ch;
   margin: calc(1.5 * var(--leading)) 0 0; color: var(--color-text);
 }
-.cuss-hero-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--leading); }
+.cuss-hero-actions {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3);
+  margin: var(--space-6) 0 calc(1.5 * var(--leading));
+}
+.cuss-cta-xl {
+  font-size: 24px; padding: 26px 72px; border-width: 1.5px;
+  background: var(--color-accent); color: var(--color-bg);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+.cuss-cta-xl:hover { background: var(--color-accent-2); }
+.cuss-cta-xl:active { background: var(--color-accent); }
 
 .cuss-demo {
-  background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  background: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0;
 }
 .cuss-demo-head { display: flex; align-items: center; gap: var(--space-2); }
@@ -380,11 +394,23 @@ html { scroll-behavior: smooth; }
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
 .cuss-judge-row { display: flex; align-items: center; gap: 8px; }
-.cuss-judge-row span:first-child { font-size: 12px; width: 64px; flex: none; }
+.cuss-judge-row span:first-child { font-size: 12px; width: 64px; flex: none; cursor: help; }
 .cuss-judge-track { flex: 1; height: 6px; border-radius: 99px; background: var(--color-neutral-800); overflow: hidden; }
 .cuss-judge-fill { height: 100%; width: 0%; background: var(--color-accent); transition: width 0.1s linear; }
 .cuss-judge-fill.is-warn { background: var(--color-warn); }
 .cuss-judge-val { font-size: 11px; width: 28px; text-align: right; font-feature-settings: 'tnum' 1; }
+/* Per-metric explanations under the live Judge panel — purely informational,
+   these never feed back into Credibility (that's driven only by the per-word tags
+   and the AI's per-turn verdict; folding the Judge score in too would
+   double-count the same signal). */
+.cuss-judge-note {
+  margin: -2px 0 2px; font-size: 10px; font-style: italic;
+  color: color-mix(in srgb, var(--color-text) 45%, transparent);
+}
+.cuss-judge-hint {
+  margin: -3px 0 1px 72px; font-size: 10.5px; line-height: 1.3;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
 
 .cuss-stats {
   background:
@@ -438,12 +464,6 @@ html { scroll-behavior: smooth; }
 .cuss-steps h3 { font-size: 17px; margin: 0 0 6px; }
 .cuss-steps p { font-size: 14px; line-height: 1.5; margin: 0; color: color-mix(in srgb, var(--color-text) 78%, transparent); }
 
-.cuss-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); }
-
-.cuss-signup { display: flex; gap: var(--space-3); align-items: stretch; max-width: 480px; margin-top: var(--leading); }
-.cuss-signup .input { flex: 1; }
-.cuss-signup .btn { min-height: 36px; }
-
 .cuss-footer { padding: calc(1.6 * var(--leading)) 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
 
 @media (max-width: 900px) {
@@ -451,30 +471,38 @@ html { scroll-behavior: smooth; }
   .cuss-feature { grid-template-columns: 1fr !important; }
   .cuss-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .cuss-steps { grid-template-columns: 1fr !important; }
-  .cuss-cards { grid-template-columns: 1fr !important; }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
    Debate arena — the live-round screen opened from "Start round".
    ══════════════════════════════════════════════════════════════════════ */
 
+/* Full-screen dedicated round view, not a popup over the page — the arena
+   fills the viewport and owns the whole screen while a round is live. */
 .cuss-arena {
-  position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
-  padding: var(--space-4);
-  background: color-mix(in srgb, var(--color-neutral-900) 65%, transparent);
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: stretch; justify-content: center;
+  padding: 0;
+  background: var(--color-bg);
   opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
 }
 .cuss-arena.is-open { opacity: 1; pointer-events: auto; }
 .cuss-arena-inner {
-  width: min(720px, 100%); max-height: 88vh; display: flex; flex-direction: column; gap: var(--space-3);
-  background: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
-  padding: var(--space-4); overflow: hidden;
+  position: relative;
+  width: 100%; max-width: 900px; height: 100%; max-height: 100vh;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  background: var(--color-bg); border-radius: 0; box-shadow: none;
+  padding: var(--space-4) var(--edge); overflow: hidden;
 }
 .cuss-arena-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
 .cuss-arena-head-info { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .cuss-arena-motion { font-size: 12px; font-style: italic; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
 .cuss-arena-transcript {
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-3);
+  /* Now that the arena is full-screen, a short transcript (opening line,
+     one exchange) would otherwise sit pinned at the top of a tall empty
+     column. justify-content: center closes that gap while the content is
+     shorter than the viewport; once a real back-and-forth overflows it,
+     centering has no effect and it behaves like a normal scrolling log. */
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; justify-content: center; gap: var(--space-3);
   padding-right: 4px; padding-top: 14px; min-height: 120px;
 }
 .cuss-arena-empty { font-size: 13px; color: color-mix(in srgb, var(--color-text) 55%, transparent); margin: 0; }
@@ -482,12 +510,29 @@ html { scroll-behavior: smooth; }
   align-self: flex-end; max-width: 88%; background: var(--color-surface);
   border-radius: var(--radius-md); padding: var(--space-3); font-size: 14px; line-height: 1.5; margin: 0;
 }
-.cuss-weak { color: var(--color-warn); text-decoration: underline wavy var(--color-warn); font-weight: 600; }
-.cuss-strong { color: oklch(0.75 0.13 150); font-weight: 600; }
-.cuss-weak, .cuss-strong { transition: color 0.2s ease; }
-.cuss-vocab { position: relative; display: inline-block; color: oklch(0.75 0.13 150); font-weight: 600; }
+/* Highlight tiers — filler orange, curse red, connective blue, vocab green.
+   Each gets a soft text-shadow glow in its own color, same intensity as the
+   Chat button's glow (color-mix at ~35% into a blur, no hard edge). */
+.cuss-weak {
+  color: var(--color-warn); text-decoration: underline wavy var(--color-warn); font-weight: 600;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--color-warn) 35%, transparent);
+}
+.cuss-weak-light { text-decoration-style: dotted; }
+.cuss-curse {
+  color: oklch(0.63 0.22 25); text-decoration: underline wavy oklch(0.63 0.22 25); font-weight: 700;
+  text-shadow: 0 0 8px color-mix(in srgb, oklch(0.63 0.22 25) 35%, transparent);
+}
+.cuss-connective {
+  color: oklch(0.72 0.15 250); font-weight: 600;
+  text-shadow: 0 0 8px color-mix(in srgb, oklch(0.72 0.15 250) 35%, transparent);
+}
+.cuss-weak, .cuss-curse, .cuss-connective { transition: color 0.2s ease; }
+.cuss-vocab {
+  position: relative; display: inline-block; color: oklch(0.75 0.13 150); font-weight: 600;
+  text-shadow: 0 0 8px color-mix(in srgb, oklch(0.75 0.13 150) 35%, transparent);
+}
 .cuss-vocab::before {
-  content: "vocab"; position: absolute; left: 50%; top: -1.15em; transform: translateX(-50%);
+  content: "vocab"; position: absolute; left: 50%; top: -0.4em; transform: translateX(-50%);
   font-size: 8px; line-height: 1; letter-spacing: 0.05em; text-transform: uppercase;
   color: oklch(0.75 0.13 150); opacity: 0.8; white-space: nowrap; pointer-events: none;
 }
@@ -514,7 +559,69 @@ html { scroll-behavior: smooth; }
 }
 .cuss-highlight-input::placeholder { color: color-mix(in srgb, var(--color-text) 45%, transparent); }
 
+/* Stance-select screen — covers the arena when a round opens, until the
+   player picks a side. Blue for Affirm, red for Negate, matching the same
+   hues used elsewhere (connective blue, curse red) for visual consistency. */
+.cuss-stance-select {
+  position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--space-4); text-align: center;
+  padding: var(--space-4); background: var(--color-bg);
+}
+.cuss-stance-select[hidden] { display: none; }
+.cuss-stance-eyebrow {
+  margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.cuss-stance-motion {
+  margin: 0; max-width: 60ch; font-size: clamp(18px, 3vw, 26px); font-style: italic; line-height: 1.4;
+}
+.cuss-stance-buttons { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: center; margin-top: var(--space-2); }
+.cuss-stance-btn {
+  flex-direction: column; width: 220px; height: auto; padding: 28px 20px; gap: 6px;
+  border-radius: var(--radius-lg); font-size: 22px; transition: transform 0.15s ease, background 0.15s ease;
+}
+.cuss-stance-btn:hover { transform: translateY(-2px); }
+.cuss-stance-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.cuss-stance-btn-title { font-size: 22px; font-weight: var(--font-heading-weight); letter-spacing: 0.02em; }
+.cuss-stance-btn-sub { font-size: 12.5px; font-weight: 400; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.cuss-stance-affirm {
+  border-color: oklch(0.72 0.15 250); color: oklch(0.72 0.15 250);
+}
+.cuss-stance-affirm:hover { background: color-mix(in srgb, oklch(0.72 0.15 250) 12%, transparent); }
+.cuss-stance-affirm .cuss-stance-btn-title { text-shadow: 0 0 10px color-mix(in srgb, oklch(0.72 0.15 250) 40%, transparent); }
+.cuss-stance-negate {
+  border-color: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25);
+}
+.cuss-stance-negate:hover { background: color-mix(in srgb, oklch(0.63 0.22 25) 12%, transparent); }
+.cuss-stance-negate .cuss-stance-btn-title { text-shadow: 0 0 10px color-mix(in srgb, oklch(0.63 0.22 25) 40%, transparent); }
+
+.cuss-stance-confirm { display: flex; flex-direction: column; gap: 8px; }
+.cuss-stance-confirm[hidden] { display: none; }
+.cuss-stance-confirm-row {
+  margin: 0; font-size: 20px; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  opacity: 0; transform: translateY(6px); transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.cuss-stance-confirm-row.is-visible { opacity: 1; transform: translateY(0); }
+.cuss-stance-confirm-row.cuss-text-affirm { color: oklch(0.72 0.15 250); }
+.cuss-stance-confirm-row.cuss-text-negate { color: oklch(0.63 0.22 25); }
+
+/* Round-over overlay — covers the arena when either side's Credibility hits 0. */
+.cuss-gameover {
+  position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--space-4); text-align: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, var(--color-bg) 94%, transparent);
+}
+.cuss-gameover[hidden] { display: none; }
+.cuss-gameover-title {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: clamp(32px, 6vw, 52px); margin: 0;
+}
+.cuss-gameover-title.is-win { color: oklch(0.75 0.13 150); }
+.cuss-gameover-title.is-lose { color: oklch(0.63 0.22 25); }
+.cuss-gameover-sub { margin: 0; max-width: 42ch; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+
 @media (max-width: 640px) {
-  .cuss-arena-inner { max-height: 94vh; padding: var(--space-3); }
+  .cuss-arena-inner { padding: var(--space-3); }
   .cuss-arena-form { flex-direction: column; align-items: stretch; }
 }
