@@ -3,14 +3,22 @@
     { "src": "site/index.html", "use": "@vercel/static" },
     { "src": "site/styles.css", "use": "@vercel/static" },
     { "src": "site/script.js", "use": "@vercel/static" },
+    { "src": "site/cussator-mark.svg", "use": "@vercel/static" },
+    { "src": "site/favicon-32.png", "use": "@vercel/static" },
+    { "src": "site/apple-touch-icon.png", "use": "@vercel/static" },
     { "src": "api/respond.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } },
+    { "src": "api/simplify.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } },
     { "src": "api/support-chat.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } }
   ],
   "routes": [
     { "src": "/api/respond", "dest": "/api/respond.py" },
+    { "src": "/api/simplify", "dest": "/api/simplify.py" },
     { "src": "/api/support-chat", "dest": "/api/support-chat.py" },
     { "src": "/styles.css", "dest": "/site/styles.css" },
     { "src": "/script.js", "dest": "/site/script.js" },
+    { "src": "/cussator-mark.svg", "dest": "/site/cussator-mark.svg" },
+    { "src": "/favicon-32.png", "dest": "/site/favicon-32.png" },
+    { "src": "/apple-touch-icon.png", "dest": "/site/apple-touch-icon.png" },
     { "src": "/(.*)", "dest": "/site/index.html" }
   ]
 }

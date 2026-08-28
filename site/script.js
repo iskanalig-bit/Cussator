@@ -409,7 +409,69 @@
     'armistice', 'reconciliation', 'reparation', 'allegation', 'constitutional', 'plebiscite',
     'gerrymandering', 'filibuster', 'lobbying', 'discretion', 'prerogative', 'entitlement',
     'stipulation', 'provision', 'clause', 'amendment', 'ratification', 'treaty', 'accord',
-    'protocol', 'sanction', 'blockade'
+    'protocol', 'sanction', 'blockade',
+    // high-register / GRE-tier — kept separate for provenance, but matched
+    // exactly like every other tier above; also feeds Word of the Day.
+    'perspicacious', 'ineffable', 'recalcitrant', 'assiduous', 'sagacious', 'vicarious',
+    'circuitous', 'obstreperous', 'fastidious', 'inscrutable', 'sanguine', 'parsimonious',
+    'loquacious', 'mercurial'
+  ];
+
+  // "Word of the Day" pulls from this same VOCAB_WORDS bank rather than a
+  // separate list — every entry's `word` is one of the terms above. A short
+  // definition is the only thing that has to live here, since VOCAB_WORDS
+  // itself is just a flat match list with no glosses attached.
+  var WORD_OF_DAY_ENTRIES = [
+    { word: 'ubiquitous', def: 'Present or found everywhere at once.' },
+    { word: 'ostensible', def: 'Stated or appearing to be true, though not necessarily so.' },
+    { word: 'pertinent', def: 'Relevant to the matter at hand.' },
+    { word: 'corroborate', def: 'Confirm or support a claim with further evidence.' },
+    { word: 'ameliorate', def: 'Make a bad situation better.' },
+    { word: 'delineate', def: 'Describe or outline something precisely.' },
+    { word: 'exacerbate', def: 'Make a problem or situation worse.' },
+    { word: 'nuanced', def: 'Marked by subtle shades of meaning or distinction.' },
+    { word: 'conducive', def: 'Making a certain outcome likely to happen.' },
+    { word: 'meticulous', def: 'Extremely careful and precise about details.' },
+    { word: 'pragmatic', def: 'Dealing with things sensibly and realistically.' },
+    { word: 'substantiate', def: 'Provide evidence to support a claim.' },
+    { word: 'circumvent', def: 'Find a way around an obstacle or rule.' },
+    { word: 'elucidate', def: 'Make something clear through explanation.' },
+    { word: 'mitigate', def: 'Make something less severe or serious.' },
+    { word: 'prevalent', def: 'Widespread in a particular area or at a particular time.' },
+    { word: 'cogent', def: 'Clear, logical, and convincing.' },
+    { word: 'unequivocally', def: 'In a way that leaves absolutely no doubt.' },
+    { word: 'quintessential', def: 'Representing the most perfect example of something.' },
+    { word: 'multifaceted', def: 'Having many different aspects or sides.' },
+    { word: 'unprecedented', def: 'Never having happened or existed before.' },
+    { word: 'ramification', def: 'A consequence, often complicated or unwelcome.' },
+    { word: 'tantamount', def: 'Equivalent in effect to something else.' },
+    { word: 'plausible', def: 'Seeming reasonable or probable.' },
+    { word: 'holistic', def: 'Considering something as a whole, not just its parts.' },
+    { word: 'empirical', def: 'Based on observation or experience, not theory alone.' },
+    { word: 'viable', def: 'Capable of working successfully.' },
+    { word: 'feasible', def: 'Possible to do easily or conveniently.' },
+    { word: 'robust', def: 'Strong and unlikely to fail or break down.' },
+    { word: 'coherent', def: 'Logical and consistent; easy to follow.' },
+    { word: 'credible', def: 'Able to be believed or trusted.' },
+    { word: 'resilient', def: 'Able to recover quickly from difficulty.' },
+    { word: 'untenable', def: 'Not able to be defended or maintained.' },
+    { word: 'dubious', def: 'Not to be relied upon; of doubtful value.' },
+    { word: 'contentious', def: 'Likely to cause disagreement or argument.' },
+    { word: 'vehement', def: 'Showing strong, forceful feeling or conviction.' },
+    { word: 'perspicacious', def: 'Having keen insight and sound judgment.' },
+    { word: 'ineffable', def: 'Too great or intense to be expressed in words.' },
+    { word: 'recalcitrant', def: 'Stubbornly resistant to authority or guidance.' },
+    { word: 'assiduous', def: 'Showing great care, attention, and diligence.' },
+    { word: 'sagacious', def: 'Having or showing keen judgment and wisdom.' },
+    { word: 'vicarious', def: 'Experienced through the feelings or actions of another.' },
+    { word: 'circuitous', def: 'Longer and less direct than a straight path; roundabout.' },
+    { word: 'obstreperous', def: 'Noisy, unruly, and difficult to control.' },
+    { word: 'fastidious', def: 'Very attentive to accuracy and detail; hard to please.' },
+    { word: 'inscrutable', def: 'Impossible to understand or interpret.' },
+    { word: 'sanguine', def: 'Optimistic or positive, especially in a difficult situation.' },
+    { word: 'parsimonious', def: 'Unwilling to spend money or use resources; extremely frugal.' },
+    { word: 'loquacious', def: 'Tending to talk a great deal; very talkative.' },
+    { word: 'mercurial', def: 'Subject to sudden or unpredictable changes of mood.' }
   ];
 
   // Fixed per-hit Credibility values — the whole scoring system runs on these flat
@@ -574,9 +636,9 @@
     // Spent cumulatively across every argument submitted this round;
     // running out ends the round through the same Credibility-loss path
     // as any other auto-loss (see checkTokenBudget()).
-    var TOKEN_POOL_SIZE = 1000;
+    var TOKEN_POOL_SIZE = 300;
 
-    var openBtns = [document.getElementById('cuss-start-hero')];
+    var openBtns = [document.getElementById('cuss-start-hero'), document.getElementById('cuss-start-nav')];
     var closeBtn = document.getElementById('cuss-arena-close');
     var transcript = document.getElementById('cuss-arena-transcript');
     var textarea = document.getElementById('cuss-arena-input');
@@ -1438,10 +1500,81 @@
     labelEl.textContent = 'filler words by round 2 (yours)';
   }
 
+  // Word of the Day — a slot-machine reel through WORD_OF_DAY_ENTRIES.
+  // Picked fresh and fully at random on every load/refresh (no date-based
+  // seed), so two visitors — or the same visitor reloading — can land on
+  // different words.
+  var REEL_ITEM_HEIGHT = 56; // px — must match .reel-item's height in CSS
+  var REEL_VISIBLE_SLOTS = 3; // window shows 3 stacked items; the middle one lands
+
+  // Builds the reel's item sequence (a run of random decoys ending on
+  // finalEntry, plus one trailing decoy so the window's bottom slot isn't
+  // left empty once landed), animates the track to center the final item,
+  // and calls onLand() once the landing transition finishes.
+  function buildWordReel(reelWindowEl, trackEl, finalEntry, decoyPool, onLand) {
+    var steps = 9 + Math.floor(Math.random() * 4); // 9-12 decoys before landing
+    var pool = decoyPool.slice();
+    var words = [];
+    for (var i = 0; i < steps; i++) {
+      if (!pool.length) pool = decoyPool.slice();
+      var idx = Math.floor(Math.random() * pool.length);
+      words.push(pool[idx].word);
+      pool.splice(idx, 1);
+    }
+    var finalIndex = words.length;
+    words.push(finalEntry.word);
+    if (!pool.length) pool = decoyPool.slice();
+    words.push(pool[Math.floor(Math.random() * pool.length)].word); // trailing filler
+
+    trackEl.innerHTML = '';
+    words.forEach(function (word, i) {
+      var item = document.createElement('span');
+      item.className = 'reel-item' + (i === finalIndex ? ' reel-item-final' : '');
+      item.textContent = word;
+      trackEl.appendChild(item);
+    });
+
+    reelWindowEl.classList.remove('is-landed');
+    trackEl.style.transition = 'none';
+    trackEl.style.transform = 'translateY(0)';
+    void trackEl.offsetWidth; // force reflow so the transition below actually runs
+
+    var landOffset = -(finalIndex - 1) * REEL_ITEM_HEIGHT; // centers finalIndex in the 3-slot window
+    requestAnimationFrame(function () {
+      trackEl.style.transition = '';
+      trackEl.style.transform = 'translateY(' + landOffset + 'px)';
+    });
+
+    trackEl.addEventListener('transitionend', function onEnd(e) {
+      if (e.propertyName !== 'transform') return;
+      trackEl.removeEventListener('transitionend', onEnd);
+      reelWindowEl.classList.add('is-landed');
+      if (onLand) onLand();
+    });
+  }
+
+  function initWordOfDay() {
+    var reelWindowEl = document.getElementById('cuss-wotd-reel');
+    var trackEl = document.getElementById('cuss-wotd-track');
+    var defEl = document.getElementById('cuss-wotd-def');
+    if (!reelWindowEl || !trackEl || !defEl) return;
+
+    var finalIndex = Math.floor(Math.random() * WORD_OF_DAY_ENTRIES.length);
+    var finalEntry = WORD_OF_DAY_ENTRIES[finalIndex];
+    var decoyPool = WORD_OF_DAY_ENTRIES.filter(function (_, i) { return i !== finalIndex; });
+
+    defEl.classList.remove('is-visible');
+    buildWordReel(reelWindowEl, trackEl, finalEntry, decoyPool, function () {
+      defEl.textContent = finalEntry.def;
+      defEl.classList.add('is-visible');
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initDemo();
     initArena();
     initVocabScars();
     initHomepageStat();
+    initWordOfDay();
   });
 })();

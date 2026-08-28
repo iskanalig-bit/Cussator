@@ -5,17 +5,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cussator — AI debates where every word counts</title>
 <meta name="description" content="Cussator — live one-on-one debates against an AI opponent, in a format close to MUN. Precise phrasing strengthens your position; filler words weaken it in real time.">
+<link rel="icon" type="image/svg+xml" href="cussator-mark.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="cuss-page">
 
   <nav class="nav cuss-nav" style="padding: var(--space-3) var(--edge);">
+    <img src="cussator-mark.svg" alt="" class="nav-mark" width="45" height="34">
     <span class="nav-brand">Cussator</span>
-    <a href="#demo">Demo</a>
-    <a href="#features">Features</a>
     <a href="#how">How it works</a>
-    <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
+    <a href="#features">Features</a>
+    <a href="#" id="cuss-scars-link">Debate Log</a>
+    <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
   </nav>
 
   <div class="cuss-wrap">
@@ -74,30 +78,15 @@
         </div>
       </div>
     </section>
-  </div>
 
-  <section class="cuss-stats">
-    <div class="cuss-wrap">
-      <div class="cuss-stats-grid">
-        <div>
-          <p class="cuss-stat-num">1,200+</p>
-          <p class="cuss-stat-label">MUN delegates in rounds</p>
-        </div>
-        <div>
-          <p class="cuss-stat-num">40ms</p>
-          <p class="cuss-stat-label">live highlight latency</p>
-        </div>
-        <div>
-          <p class="cuss-stat-num">3</p>
-          <p class="cuss-stat-label">judging criteria</p>
-        </div>
-        <div>
-          <p class="cuss-stat-num" id="cuss-stat-improvement">—</p>
-          <p class="cuss-stat-label" id="cuss-stat-improvement-label">filler words by round 2 — play two rounds to see yours</p>
-        </div>
+    <div class="cuss-wotd">
+      <span class="cuss-eyebrow">Word of the day</span>
+      <div class="reel-window" id="cuss-wotd-reel">
+        <div class="reel-track" id="cuss-wotd-track"></div>
       </div>
+      <p class="cuss-wotd-def" id="cuss-wotd-def"></p>
     </div>
-  </section>
+  </div>
 
   <div class="cuss-wrap">
 
@@ -269,7 +258,7 @@
       <span class="cuss-legend-item"><span class="cuss-legend-dot is-vocab"></span>Vocab</span>
       <span class="cuss-legend-item"><span class="cuss-legend-dot is-penalty"></span>Penalty</span>
       <span class="cuss-token-budget" id="cuss-token-budget" title="Word Economy budget — 1 token = 1 word. Running out ends the round.">
-        <span class="cuss-token-val" id="cuss-token-val">1000</span> / 1000 tokens
+        <span class="cuss-token-val" id="cuss-token-val">300</span> / 300 tokens
       </span>
     </div>
 

@@ -246,12 +246,19 @@ textarea.input { min-height: 90px; resize: vertical; }
   padding: var(--space-3) var(--space-4);
   border-bottom: none;
 }
+/* Logo mark — sits immediately left of the wordmark, the nav's own
+   gap (var(--space-4)) provides the spacing between the two. */
+.nav-mark { display: block; height: 34px; width: auto; flex: none; }
 .nav-brand {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
   font-size: 18px; margin-right: auto;
 }
 .nav a { color: inherit; text-decoration: none; font-size: 14px; }
 .nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
+/* Small outlined nav Chat button — reuses .btn-primary as-is (purple
+   border, transparent fill, accent text), deliberately NOT .cuss-cta-xl,
+   so it stays visually secondary to the big solid hero Chat button. */
+.nav-cta { flex: none; }
 
 /* — tables — */
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -462,29 +469,46 @@ html { scroll-behavior: smooth; }
   color: color-mix(in srgb, var(--color-text) 50%, transparent);
 }
 
-.cuss-stats {
-  background:
-    radial-gradient(900px 420px at 85% -40%, color-mix(in srgb, var(--color-section-glow) 70%, transparent), transparent 64%),
-    var(--color-section);
-  padding: calc(2.2 * var(--leading)) 0;
-}
-.cuss-stats-grid {
-  display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between;
-  gap: calc(1.2 * var(--leading)) var(--leading);
-}
-.cuss-stat-num {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: clamp(32px, 3.2vw, 46px); margin: 0; line-height: 1.2;
-}
-.cuss-stat-label {
-  font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase;
-  color: color-mix(in srgb, var(--color-text) 64%, transparent); margin: 6px 0 0;
-}
-
 .cuss-eyebrow {
   position: relative; display: block; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--color-accent); margin: 0 0 calc(var(--leading) - var(--half));
 }
+
+/* Word of the Day — sits in the hero, above the fold, centered as its own
+   unit below the headline/CTA grid. The reel's landed word reuses the exact
+   accent purple from the Chat button / HP bars; the definition reuses the
+   same muted-gray pattern used everywhere else on the page. No new colors. */
+.cuss-wotd {
+  max-width: 480px; margin: 0 auto; padding: 0 0 calc(1.2 * var(--leading));
+  text-align: center; display: flex; flex-direction: column; align-items: center;
+}
+.reel-window {
+  position: relative; height: calc(3 * 56px); overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
+}
+.reel-track {
+  display: flex; flex-direction: column; align-items: center;
+  transition: transform 1.5s cubic-bezier(0.13, 0.83, 0.14, 1), filter 0.4s ease 0.9s;
+  filter: blur(3px);
+}
+.reel-window.is-landed .reel-track { filter: blur(0); }
+.reel-item {
+  height: 56px; flex: none; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: clamp(28px, 4.4vw, 44px); line-height: 1; color: var(--color-accent);
+}
+/* Landing swap — same accent purple throughout, just a distinct italic
+   serif treatment on the word that actually lands, so it reads as a
+   deliberate "hit" rather than just the spin stopping. */
+.reel-window.is-landed .reel-item-final {
+  font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400;
+}
+.cuss-wotd-def {
+  margin: var(--space-2) 0 0; max-width: 52ch; font-size: 15px; opacity: 0;
+  transition: opacity 0.3s ease; color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.cuss-wotd-def.is-visible { opacity: 1; }
 
 .cuss-feature {
   display: grid; grid-template-columns: minmax(64px, 140px) minmax(0, 360px) minmax(0, 1fr);
@@ -519,7 +543,6 @@ html { scroll-behavior: smooth; }
 @media (max-width: 900px) {
   .cuss-hero-grid { grid-template-columns: 1fr !important; }
   .cuss-feature { grid-template-columns: 1fr !important; }
-  .cuss-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .cuss-steps { grid-template-columns: 1fr !important; }
 }
 
