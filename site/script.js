@@ -639,6 +639,8 @@
     var TOKEN_POOL_SIZE = 300;
 
     var openBtns = [document.getElementById('cuss-start-hero'), document.getElementById('cuss-start-nav')];
+    var enterOverlayEl = document.getElementById('cuss-enter-overlay');
+    var ENTER_ANIM_DURATION = 2200; // must match the CSS keyframes' 2.2s duration
     var closeBtn = document.getElementById('cuss-arena-close');
     var transcript = document.getElementById('cuss-arena-transcript');
     var textarea = document.getElementById('cuss-arena-input');
@@ -770,6 +772,7 @@
 
       roundOver = false;
       gameoverEl.hidden = true;
+      gameoverEl.classList.remove('is-visible');
 
       setHealth(100);
       setAiHealth(100);
@@ -802,6 +805,7 @@
           'Make the case for the resolution — precise phrasing strengthens your position, filler words weaken it instantly.' +
         '</p>';
       typing.hidden = true;
+      typing.classList.remove('is-visible');
 
       // Locked until a side is picked on the stance-select screen — see
       // chooseStance(), which re-enables these once the confirm beat ends.
@@ -904,6 +908,7 @@
       textarea.disabled = true;
       submitBtn.disabled = true;
       typing.hidden = true;
+      typing.classList.remove('is-visible');
       stopTurnTimer();
 
       // The turn that ends the round can return before the normal
@@ -927,6 +932,7 @@
 
       renderFillerRecap();
       gameoverEl.hidden = false;
+      requestAnimationFrame(function () { gameoverEl.classList.add('is-visible'); });
     }
 
     // This round's filler total against the average of the player's own
@@ -1096,6 +1102,24 @@
       document.body.style.overflow = 'hidden';
       stanceAffirmBtn.focus();
     }
+
+    // Plays once on every Chat click, before the round setup (motion /
+    // difficulty / side) screen appears — see .cuss-enter-overlay in
+    // styles.css for the animation itself. Falls back to opening the arena
+    // immediately if the overlay markup is ever missing.
+    function playEnterThenOpen() {
+      if (!enterOverlayEl) { openArena(); return; }
+      document.body.style.overflow = 'hidden';
+      enterOverlayEl.hidden = false;
+      enterOverlayEl.classList.remove('is-playing');
+      void enterOverlayEl.offsetWidth; // reflow so a repeat click restarts the keyframes
+      enterOverlayEl.classList.add('is-playing');
+      setTimeout(function () {
+        enterOverlayEl.classList.remove('is-playing');
+        enterOverlayEl.hidden = true;
+        openArena();
+      }, ENTER_ANIM_DURATION);
+    }
     function closeArena() {
       stopTurnTimer();
       arena.classList.remove('is-open');
@@ -1103,7 +1127,7 @@
       document.body.style.overflow = '';
     }
 
-    openBtns.forEach(function (btn) { if (btn) btn.addEventListener('click', openArena); });
+    openBtns.forEach(function (btn) { if (btn) btn.addEventListener('click', playEnterThenOpen); });
     if (closeBtn) closeBtn.addEventListener('click', closeArena);
     if (gameoverRestartBtn) gameoverRestartBtn.addEventListener('click', resetRound);
     if (stanceAffirmBtn) stanceAffirmBtn.addEventListener('click', function () { chooseStance('affirm'); });
@@ -1363,8 +1387,10 @@
 
       addUserBubbleAnimated(analysis.html, function () {
         typing.hidden = false;
+        requestAnimationFrame(function () { typing.classList.add('is-visible'); });
         respondPromise.then(function (result) {
           typing.hidden = true;
+          typing.classList.remove('is-visible');
           if (!result.ok) {
             addError(result.data.error || 'Failed to get a response from the AI opponent.');
             textarea.disabled = false;
@@ -1500,72 +1526,23 @@
     labelEl.textContent = 'filler words by round 2 (yours)';
   }
 
-  // Word of the Day — a slot-machine reel through WORD_OF_DAY_ENTRIES.
-  // Picked fresh and fully at random on every load/refresh (no date-based
+  // Word of the Day — picked fresh at random on every load (no date-based
   // seed), so two visitors — or the same visitor reloading — can land on
-  // different words.
-  var REEL_ITEM_HEIGHT = 56; // px — must match .reel-item's height in CSS
-  var REEL_VISIBLE_SLOTS = 3; // window shows 3 stacked items; the middle one lands
-
-  // Builds the reel's item sequence (a run of random decoys ending on
-  // finalEntry, plus one trailing decoy so the window's bottom slot isn't
-  // left empty once landed), animates the track to center the final item,
-  // and calls onLand() once the landing transition finishes.
-  function buildWordReel(reelWindowEl, trackEl, finalEntry, decoyPool, onLand) {
-    var steps = 9 + Math.floor(Math.random() * 4); // 9-12 decoys before landing
-    var pool = decoyPool.slice();
-    var words = [];
-    for (var i = 0; i < steps; i++) {
-      if (!pool.length) pool = decoyPool.slice();
-      var idx = Math.floor(Math.random() * pool.length);
-      words.push(pool[idx].word);
-      pool.splice(idx, 1);
-    }
-    var finalIndex = words.length;
-    words.push(finalEntry.word);
-    if (!pool.length) pool = decoyPool.slice();
-    words.push(pool[Math.floor(Math.random() * pool.length)].word); // trailing filler
-
-    trackEl.innerHTML = '';
-    words.forEach(function (word, i) {
-      var item = document.createElement('span');
-      item.className = 'reel-item' + (i === finalIndex ? ' reel-item-final' : '');
-      item.textContent = word;
-      trackEl.appendChild(item);
-    });
-
-    reelWindowEl.classList.remove('is-landed');
-    trackEl.style.transition = 'none';
-    trackEl.style.transform = 'translateY(0)';
-    void trackEl.offsetWidth; // force reflow so the transition below actually runs
-
-    var landOffset = -(finalIndex - 1) * REEL_ITEM_HEIGHT; // centers finalIndex in the 3-slot window
-    requestAnimationFrame(function () {
-      trackEl.style.transition = '';
-      trackEl.style.transform = 'translateY(' + landOffset + 'px)';
-    });
-
-    trackEl.addEventListener('transitionend', function onEnd(e) {
-      if (e.propertyName !== 'transform') return;
-      trackEl.removeEventListener('transitionend', onEnd);
-      reelWindowEl.classList.add('is-landed');
-      if (onLand) onLand();
-    });
-  }
-
+  // different words. Shows exactly one word with its one matching
+  // definition; a earlier 3-slot scrolling-reel version showed decoy words
+  // stacked with fading opacity above/below the real one, which read as
+  // three simultaneous candidates rather than a single clear pick.
   function initWordOfDay() {
-    var reelWindowEl = document.getElementById('cuss-wotd-reel');
-    var trackEl = document.getElementById('cuss-wotd-track');
+    var wordEl = document.getElementById('cuss-wotd-word');
     var defEl = document.getElementById('cuss-wotd-def');
-    if (!reelWindowEl || !trackEl || !defEl) return;
+    if (!wordEl || !defEl) return;
 
-    var finalIndex = Math.floor(Math.random() * WORD_OF_DAY_ENTRIES.length);
-    var finalEntry = WORD_OF_DAY_ENTRIES[finalIndex];
-    var decoyPool = WORD_OF_DAY_ENTRIES.filter(function (_, i) { return i !== finalIndex; });
+    var entry = WORD_OF_DAY_ENTRIES[Math.floor(Math.random() * WORD_OF_DAY_ENTRIES.length)];
+    wordEl.textContent = entry.word;
+    defEl.textContent = entry.def;
 
-    defEl.classList.remove('is-visible');
-    buildWordReel(reelWindowEl, trackEl, finalEntry, decoyPool, function () {
-      defEl.textContent = finalEntry.def;
+    requestAnimationFrame(function () {
+      wordEl.classList.add('is-visible');
       defEl.classList.add('is-visible');
     });
   }

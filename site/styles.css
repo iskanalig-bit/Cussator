@@ -148,6 +148,7 @@ figcaption {
   background: transparent; border: 1px solid transparent;
   padding: var(--space-2) calc(var(--space-3) * 1.2);
   border-radius: var(--radius-md);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 .btn svg { display: block; }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -475,38 +476,24 @@ html { scroll-behavior: smooth; }
 }
 
 /* Word of the Day — sits in the hero, above the fold, centered as its own
-   unit below the headline/CTA grid. The reel's landed word reuses the exact
-   accent purple from the Chat button / HP bars; the definition reuses the
-   same muted-gray pattern used everywhere else on the page. No new colors. */
+   unit below the headline/CTA grid. Shows exactly one word — earlier this
+   used a 3-slot scrolling reel, which read as three simultaneous words with
+   only one matching definition and confused more than it delighted. The
+   word reuses the exact accent purple from the Chat button / HP bars; the
+   definition reuses the same muted-gray pattern used everywhere else on
+   the page. No new colors. */
 .cuss-wotd {
   max-width: 480px; margin: 0 auto; padding: 0 0 calc(1.2 * var(--leading));
   text-align: center; display: flex; flex-direction: column; align-items: center;
 }
-.reel-window {
-  position: relative; height: calc(3 * 56px); overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%);
+.cuss-wotd-word {
+  margin: 0; min-height: 1.2em; color: var(--color-accent); font-size: clamp(32px, 5vw, 48px);
+  opacity: 0; transform: translateY(8px); transition: opacity 0.4s ease, transform 0.4s ease;
 }
-.reel-track {
-  display: flex; flex-direction: column; align-items: center;
-  transition: transform 1.5s cubic-bezier(0.13, 0.83, 0.14, 1), filter 0.4s ease 0.9s;
-  filter: blur(3px);
-}
-.reel-window.is-landed .reel-track { filter: blur(0); }
-.reel-item {
-  height: 56px; flex: none; display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: clamp(28px, 4.4vw, 44px); line-height: 1; color: var(--color-accent);
-}
-/* Landing swap — same accent purple throughout, just a distinct italic
-   serif treatment on the word that actually lands, so it reads as a
-   deliberate "hit" rather than just the spin stopping. */
-.reel-window.is-landed .reel-item-final {
-  font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400;
-}
+.cuss-wotd-word.is-visible { opacity: 1; transform: translateY(0); }
 .cuss-wotd-def {
   margin: var(--space-2) 0 0; max-width: 52ch; font-size: 15px; opacity: 0;
-  transition: opacity 0.3s ease; color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  transition: opacity 0.4s ease 0.15s; color: color-mix(in srgb, var(--color-text) 65%, transparent);
 }
 .cuss-wotd-def.is-visible { opacity: 1; }
 
@@ -526,7 +513,11 @@ html { scroll-behavior: smooth; }
   font-size: 15.5px; line-height: var(--leading); margin: 0;
   color: color-mix(in srgb, var(--color-text) 78%, transparent); max-width: 52ch;
 }
-.cuss-scars p { margin: 0 0 var(--space-3); }
+/* Was accidentally sharing the .cuss-scars class with the real full-screen
+   Vocabulary Scars overlay below (position:fixed; opacity:0 by default),
+   which made this decorative preview invisible and pulled out of the grid
+   entirely. Renamed so the two never collide again. */
+.cuss-scars-preview { display: flex; flex-direction: column; gap: var(--space-3); }
 .cuss-scars-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .cuss-scars-tags .tag { background: color-mix(in srgb, var(--color-warn) 22%, var(--color-surface)); color: var(--color-warn); }
 
@@ -784,7 +775,9 @@ html { scroll-behavior: smooth; }
   align-items: center; justify-content: center; gap: var(--space-4); text-align: center;
   padding: var(--space-4);
   background: color-mix(in srgb, var(--color-bg) 94%, transparent);
+  opacity: 0; transform: scale(0.98); transition: opacity 0.3s ease, transform 0.3s ease;
 }
+.cuss-gameover.is-visible { opacity: 1; transform: scale(1); }
 .cuss-gameover[hidden] { display: none; }
 .cuss-gameover-title {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
@@ -810,6 +803,87 @@ html { scroll-behavior: smooth; }
 .cuss-recap-from { color: var(--color-warn); font-weight: 600; }
 .cuss-recap-arrow { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
 .cuss-recap-to { color: oklch(0.75 0.13 150); font-weight: 600; }
+
+/* "Entering the Chat" — plays once when Chat is clicked, before the round
+   setup (motion/difficulty/side) screen appears; see playEnterThenOpen() in
+   script.js. Built from the same two lip paths as the logo mark
+   (cussator-mark.svg), split so each half can move independently. --u is a
+   unitless scale factor (current stage size ÷ the 520px size the motion was
+   originally tuned at) — every distance below is `var(--u) * <original px>`
+   so the whole animation scales proportionally on small viewports instead
+   of overflowing or feeling out of place. */
+.cuss-enter-overlay {
+  position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
+  background: var(--color-bg); opacity: 0; pointer-events: none; transition: opacity 0.15s ease;
+}
+.cuss-enter-overlay[hidden] { display: none; }
+.cuss-enter-overlay.is-playing { opacity: 1; pointer-events: auto; }
+.cuss-enter-stage {
+  position: relative; width: min(65vmin, 420px); height: min(65vmin, 420px);
+  --u: calc(min(65vmin, 420px) / 520px);
+}
+.cuss-enter-lip {
+  position: absolute; left: 50%; top: 50%;
+  width: calc(var(--u) * 170px); height: calc(var(--u) * 130px);
+  margin-left: calc(var(--u) * -85px); margin-top: calc(var(--u) * -65px);
+}
+.cuss-enter-lip svg { width: 100%; height: 100%; display: block; }
+.cuss-enter-overlay.is-playing .cuss-enter-lip-upper {
+  animation: cuss-enter-upper-lip 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.cuss-enter-overlay.is-playing .cuss-enter-lip-lower {
+  animation: cuss-enter-lower-lip 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes cuss-enter-upper-lip {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  20%  { transform: translate(0, calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  45%  { transform: translate(calc(var(--u) * -90px), calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  70%  { transform: translate(calc(var(--u) * 70px), calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  100% { transform: translate(0, calc(var(--u) * -150px)) scale(0.95); opacity: 0; }
+}
+@keyframes cuss-enter-lower-lip {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  20%  { transform: translate(0, calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  45%  { transform: translate(calc(var(--u) * -90px), calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  70%  { transform: translate(calc(var(--u) * 70px), calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  100% { transform: translate(0, calc(var(--u) * 150px)) scale(0.95); opacity: 0; }
+}
+.cuss-enter-ball {
+  position: absolute; left: 50%; top: 50%;
+  width: calc(var(--u) * 14px); height: calc(var(--u) * 14px);
+  margin-left: calc(var(--u) * -7px); margin-top: calc(var(--u) * -7px);
+  border-radius: 50%; background: #8B5CF6;
+  box-shadow: 0 0 18px 4px rgba(139, 92, 246, 0.6);
+  opacity: 0;
+}
+.cuss-enter-overlay.is-playing .cuss-enter-ball {
+  animation: cuss-enter-ball 2.2s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+@keyframes cuss-enter-ball {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  20%  { transform: translate(0, 0); opacity: 1; }
+  35%  { transform: translate(calc(var(--u) * -90px), calc(var(--u) * -120px)); }
+  45%  { transform: translate(calc(var(--u) * -90px), calc(var(--u) * 120px)); }
+  60%  { transform: translate(calc(var(--u) * 70px), calc(var(--u) * -120px)); }
+  70%  { transform: translate(calc(var(--u) * 70px), calc(var(--u) * 120px)); }
+  90%  { transform: translate(0, calc(var(--u) * -40px)); opacity: 1; }
+  100% { transform: translate(0, 0) scale(0.3); opacity: 0; }
+}
+.cuss-enter-label {
+  position: absolute; left: 0; right: 0; bottom: calc(var(--u) * -70px); text-align: center;
+  font-family: var(--font-heading); font-size: 13px; letter-spacing: 0.18em;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent); opacity: 0;
+}
+.cuss-enter-label b { color: var(--color-text); font-weight: 600; }
+.cuss-enter-overlay.is-playing .cuss-enter-label {
+  animation: cuss-enter-label-fade 2.2s ease-in-out forwards;
+}
+@keyframes cuss-enter-label-fade {
+  0%, 25% { opacity: 0; }
+  45% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
 
 /* Vocabulary Scars — a persistent, cross-round view of the same filler
    data the post-round recap already computes (site/script.js accumulates

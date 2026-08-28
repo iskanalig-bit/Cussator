@@ -18,7 +18,7 @@
     <span class="nav-brand">Cussator</span>
     <a href="#how">How it works</a>
     <a href="#features">Features</a>
-    <a href="#" id="cuss-scars-link">Debate Log</a>
+    <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
     <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
   </nav>
 
@@ -81,9 +81,7 @@
 
     <div class="cuss-wotd">
       <span class="cuss-eyebrow">Word of the day</span>
-      <div class="reel-window" id="cuss-wotd-reel">
-        <div class="reel-track" id="cuss-wotd-track"></div>
-      </div>
+      <h2 class="cuss-wotd-word" id="cuss-wotd-word"></h2>
       <p class="cuss-wotd-def" id="cuss-wotd-def"></p>
     </div>
   </div>
@@ -108,8 +106,8 @@
       <div class="cuss-feature">
         <p class="cuss-feature-num">03</p>
         <h2>Vocabulary Scars</h2>
-        <div class="cuss-scars">
-          <p>Weak phrasing doesn't disappear after the round — it stays on your profile until you close it out with precise language in later rounds.</p>
+        <div class="cuss-scars-preview">
+          <p class="cuss-feature-body">Your most repeated filler words carry over between rounds, each with a stronger swap suggested — so the same weak phrase doesn't just cost you once.</p>
           <div class="cuss-scars-tags">
             <span class="tag">kind of ×3</span>
             <span class="tag">basically ×2</span>
@@ -136,12 +134,12 @@
         <div>
           <p class="cuss-step-num">02</p>
           <h3>Argue live</h3>
-          <p>By text or voice, one on one with an AI opponent.</p>
+          <p>By text, one on one with an AI opponent.</p>
         </div>
         <div>
           <p class="cuss-step-num">03</p>
           <h3>Watch the signals in real time</h3>
-          <p>Words get highlighted as you speak, not in a report afterward.</p>
+          <p>Words get highlighted as you type, not in a report afterward.</p>
         </div>
         <div>
           <p class="cuss-step-num">04</p>
@@ -277,6 +275,19 @@
       <div class="cuss-recap" id="cuss-recap"></div>
       <button type="button" class="btn btn-primary cuss-cta-xl" id="cuss-gameover-restart">Rematch</button>
     </div>
+  </div>
+</div>
+
+<div class="cuss-enter-overlay" id="cuss-enter-overlay" aria-hidden="true" hidden>
+  <div class="cuss-enter-stage">
+    <div class="cuss-enter-lip cuss-enter-lip-upper">
+      <svg viewBox="0 0 160 120"><path d="M16 60 C16 42,48 34,68 36 C74 37,76 42,80 42 C84 42,86 37,92 36 C112 34,144 42,144 60 C144 60,105 50,80 50 C55 50,16 60,16 60 Z" fill="#8B5CF6"/></svg>
+    </div>
+    <div class="cuss-enter-lip cuss-enter-lip-lower">
+      <svg viewBox="0 0 160 120"><path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="#8B5CF6"/></svg>
+    </div>
+    <div class="cuss-enter-ball"></div>
+    <div class="cuss-enter-label"><b>ENTERING</b> THE CHAT</div>
   </div>
 </div>
 
