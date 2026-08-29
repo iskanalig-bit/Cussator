@@ -1024,11 +1024,24 @@
     }
 
     // Applies the AI-judged per-turn verdict on top of the word-level delta
-    // already scored for this turn. "solid" only pays out the bigger
-    // symmetric bonus (self-heal + opponent damage) when it's backed by
-    // actual lexis — logic alone isn't enough, matching the brief's
-    // "good vocab, connectives, AND judged logically solid" conjunction.
-    function applyVerdict(verdict, analysis, selfIsPlayer) {
+    // already scored for this turn — this is what makes Credibility respond
+    // to whether an argument actually held up, not just to filler/vocab
+    // word choice. Called twice per exchange, once per verdict the judge
+    // call already returns: applyVerdict(user_argument_verdict, ..., true)
+    // for the player's own turn, and applyVerdict(ai_reply_verdict, ...,
+    // false) for the AI's rebuttal — so a turn that's bad AND gets called
+    // out by a solid rebuttal costs the player twice in one exchange,
+    // same as actually getting caught being vague would.
+    //
+    // Previously "solid" only paid out when the turn ALSO happened to
+    // contain a tracked connective + vocab word on top of the LLM judging
+    // it solid — a narrow, mostly-coincidental gate that made genuinely
+    // strong arguments (real reasoning, just not using one of the specific
+    // tracked words) pay out nothing, so the opponent's Credibility bar
+    // effectively never moved. The verdict itself already reflects the
+    // rubric (a real reason or mechanism, not just tone), so it's the
+    // signal on its own now.
+    function applyVerdict(verdict, selfIsPlayer) {
       var selfVal = selfIsPlayer ? health : aiHealth;
       var oppVal = selfIsPlayer ? aiHealth : health;
       var setSelf = selfIsPlayer ? setHealth : setAiHealth;
@@ -1036,7 +1049,7 @@
 
       if (verdict === 'bad') {
         setSelf(selfVal - BAD_ARGUMENT_PENALTY);
-      } else if (verdict === 'solid' && analysis.connectiveCount >= 1 && analysis.vocabCount >= 1) {
+      } else if (verdict === 'solid') {
         setSelf(selfVal + STRONG_ARGUMENT_SELF_HEAL);
         setOpp(oppVal - STRONG_ARGUMENT_OPPONENT_DAMAGE);
       }
@@ -1297,6 +1310,20 @@
     // one signal that actually reflects whether the reasoning held up),
     // not just filler/connective counts, which used to leave Logic blind to
     // whether an "argument" was an argument at all.
+    //
+    // Precision used to be JUST roundStats.vocab * 9 — a hard match against
+    // the ~350-word VOCAB_WORDS list and nothing else, with no floor tied to
+    // actual argument quality the way Logic has via verdictAvg. Two equally
+    // precise arguments that happened to phrase things with different
+    // (both legitimate) advanced words could score 0 and 18 purely on
+    // whether their specific word choice happened to land in that fixed
+    // list — indistinguishable from a genuinely vague turn to this metric.
+    // Giving it the same verdictAvg floor Logic has (smaller weight, so it
+    // stays a distinct signal, not a Logic clone) means a precise,
+    // well-supported turn scores reasonably even if the classifier doesn't
+    // recognize its exact vocabulary; matched vocab words still add on top,
+    // so using tracked terms is still rewarded, just no longer the only way
+    // to avoid a near-zero score for filler-free, on-topic precision.
     function computeJudgeTargets() {
       var turns = roundStats.solid + roundStats.neutral + roundStats.bad;
       if (!turns) return { logic: 0, precision: 0, delivery: 0 };
@@ -1306,7 +1333,7 @@
 
       return {
         logic: Math.round(clamp(verdictAvg + roundStats.connective * 3 - roundStats.filler * 2, 0, 100)),
-        precision: Math.round(clamp(roundStats.vocab * 9 - roundStats.filler * 6 - roundStats.curse * 5, 0, 100)),
+        precision: Math.round(clamp(verdictAvg * 0.4 + roundStats.vocab * 9 - roundStats.filler * 6 - roundStats.curse * 5, 0, 100)),
         delivery: Math.round(clamp(Math.min(avgWords, 25) * 2.4 - roundStats.filler * 9 - roundStats.curse * 10, 0, 100))
       };
     }
@@ -1402,14 +1429,14 @@
 
           // The AI's holistic verdict on the user's own turn — can push the
           // player's Credibility the rest of the way to 0 (bad) or land the
-          // symmetric strong-argument hit on the AI (solid + lexis). Also
-          // feeds the Judge panel's Logic score (see computeJudgeTargets) —
+          // symmetric strong-argument hit on the AI (solid). Also feeds the
+          // Judge panel's Logic score (see computeJudgeTargets) —
           // that's the only signal there that reflects whether the turn was
           // an actual argument at all, not just its word choice.
           if (result.data.user_argument_verdict === 'solid') roundStats.solid++;
           else if (result.data.user_argument_verdict === 'bad') roundStats.bad++;
           else roundStats.neutral++;
-          applyVerdict(result.data.user_argument_verdict, analysis, true);
+          applyVerdict(result.data.user_argument_verdict, true);
           if (checkGameOver()) return;
 
           var aiAnalysis = classifyText(result.data.reply);
@@ -1420,7 +1447,7 @@
 
           // Same verdict treatment, mirrored onto the AI's own rebuttal —
           // a lazy reply hurts the AI, a sharp one hurts the player back.
-          applyVerdict(result.data.ai_reply_verdict, aiAnalysis, false);
+          applyVerdict(result.data.ai_reply_verdict, false);
           if (checkGameOver()) return;
 
           // Update the Judge panel BEFORE unlocking the input — otherwise a
