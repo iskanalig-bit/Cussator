@@ -1614,23 +1614,81 @@
 
   // Word of the Day — picked fresh at random on every load (no date-based
   // seed), so two visitors — or the same visitor reloading — can land on
-  // different words. Shows exactly one word with its one matching
-  // definition; a earlier 3-slot scrolling-reel version showed decoy words
-  // stacked with fading opacity above/below the real one, which read as
-  // three simultaneous candidates rather than a single clear pick.
+  // different words. The word itself is picked exactly as before; only the
+  // reveal changed. It's now a horizontal sliding reel (case-opening
+  // style): a long strip of decoy words — drawn from the same
+  // WORD_OF_DAY_ENTRIES pool — slides left and decelerates to a stop with
+  // the real pick centered in the window. Only that landed item gets the
+  // "big and accent-colored" treatment; every other item in the strip stays
+  // small and dim, so the landing pops instead of reading as several
+  // simultaneous candidates (an earlier vertical 3-slot version had exactly
+  // that problem). The definition only appears once the reel has actually
+  // stopped, matching the landed word.
+  //
+  // Mechanic (sequence-building, decelerating easing + blur-clear, edge
+  // mask fade) adapted from a reference case-opening reel the user
+  // supplied; every color/font/spacing value here is Cussator's own token,
+  // not the reference's.
+  var WOTD_ITEM_WIDTH = 190; // must match .cuss-wotd-item's flex-basis
+  var WOTD_BEFORE_COUNT = 34;
+  var WOTD_AFTER_COUNT = 6;
+  var WOTD_SPIN_SECONDS = 4;
+  var WOTD_BLUR_CLEAR_SECONDS = 2.2;
+
   function initWordOfDay() {
-    var wordEl = document.getElementById('cuss-wotd-word');
+    var reelWindow = document.getElementById('cuss-wotd-reel');
+    var track = document.getElementById('cuss-wotd-track');
     var defEl = document.getElementById('cuss-wotd-def');
-    if (!wordEl || !defEl) return;
+    if (!reelWindow || !track || !defEl) return;
 
     var entry = WORD_OF_DAY_ENTRIES[Math.floor(Math.random() * WORD_OF_DAY_ENTRIES.length)];
-    wordEl.textContent = entry.word;
-    defEl.textContent = entry.def;
+    var pool = WORD_OF_DAY_ENTRIES.filter(function (e) { return e.word !== entry.word; });
+    function randomDecoy() { return pool[Math.floor(Math.random() * pool.length)].word; }
 
-    requestAnimationFrame(function () {
-      wordEl.classList.add('is-visible');
-      defEl.classList.add('is-visible');
+    var sequence = [];
+    for (var i = 0; i < WOTD_BEFORE_COUNT; i++) sequence.push(randomDecoy());
+    var landIndex = sequence.length;
+    sequence.push(entry.word);
+    for (var j = 0; j < WOTD_AFTER_COUNT; j++) sequence.push(randomDecoy());
+
+    track.innerHTML = '';
+    sequence.forEach(function (word) {
+      var span = document.createElement('span');
+      span.className = 'cuss-wotd-item';
+      span.textContent = word;
+      track.appendChild(span);
     });
+
+    // Centers the landing word in the (now full-width) window regardless of
+    // how wide that window actually is.
+    var containerWidth = reelWindow.clientWidth;
+    var offset = landIndex * WOTD_ITEM_WIDTH + WOTD_ITEM_WIDTH / 2 - containerWidth / 2;
+
+    track.style.transition = 'none';
+    track.style.transform = 'translateX(0px)';
+    track.style.filter = 'blur(3px)';
+    // Reflow so the transition below animates from this reset position
+    // rather than wherever the track last was — same technique
+    // playEnterThenOpen() uses for the "Entering the Chat" replay, and
+    // applied synchronously right after (not wrapped in
+    // requestAnimationFrame, which needless here and risks never firing at
+    // all if the tab is backgrounded when a round starts).
+    void track.offsetWidth;
+    track.style.transition = 'transform ' + WOTD_SPIN_SECONDS + 's cubic-bezier(0.14,0.85,0.24,1), filter ' + WOTD_BLUR_CLEAR_SECONDS + 's ease-out';
+    track.style.transform = 'translateX(-' + offset + 'px)';
+    track.style.filter = 'blur(0px)';
+
+    // A plain timeout matching the transition duration, same completion
+    // pattern as the win/lose transition and "Entering the Chat" elsewhere
+    // in this file — more reliable than a transitionend listener, which
+    // can silently never fire if anything interrupts or re-triggers the
+    // transition before it naturally finishes.
+    setTimeout(function () {
+      var landed = track.children[landIndex];
+      if (landed) landed.classList.add('is-landed');
+      defEl.textContent = entry.def;
+      requestAnimationFrame(function () { defEl.classList.add('is-visible'); });
+    }, WOTD_SPIN_SECONDS * 1000);
   }
 
   document.addEventListener('DOMContentLoaded', function () {
