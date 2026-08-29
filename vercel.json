@@ -1,6 +1,8 @@
 {
   "builds": [
     { "src": "site/index.html", "use": "@vercel/static" },
+    { "src": "site/terms.html", "use": "@vercel/static" },
+    { "src": "site/privacy.html", "use": "@vercel/static" },
     { "src": "site/styles.css", "use": "@vercel/static" },
     { "src": "site/script.js", "use": "@vercel/static" },
     { "src": "site/cussator-mark.svg", "use": "@vercel/static" },
@@ -14,6 +16,8 @@
     { "src": "/api/respond", "dest": "/api/respond.py" },
     { "src": "/api/simplify", "dest": "/api/simplify.py" },
     { "src": "/api/support-chat", "dest": "/api/support-chat.py" },
+    { "src": "/terms.html", "dest": "/site/terms.html" },
+    { "src": "/privacy.html", "dest": "/site/privacy.html" },
     { "src": "/styles.css", "dest": "/site/styles.css" },
     { "src": "/script.js", "dest": "/site/script.js" },
     { "src": "/cussator-mark.svg", "dest": "/site/cussator-mark.svg" },

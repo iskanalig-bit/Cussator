@@ -149,7 +149,13 @@
       </div>
     </section>
 
-    <footer class="cuss-footer">Cussator — AI debates for people who weigh every word.</footer>
+    <footer class="cuss-footer">
+      <span>Cussator — AI debates for people who weigh every word.</span>
+      <span class="cuss-footer-links">
+        <a href="terms.html">Terms of Service</a>
+        <a href="privacy.html">Privacy Policy</a>
+      </span>
+    </footer>
   </div>
 </div>
 
@@ -163,28 +169,43 @@
         <p class="cuss-difficulty-eyebrow">AI opponent difficulty</p>
         <div class="cuss-difficulty-buttons" role="group" aria-label="AI opponent difficulty">
           <button type="button" class="cuss-difficulty-btn" id="cuss-difficulty-rookie" data-difficulty="rookie">
-            <span class="cuss-difficulty-btn-title">Rookie</span>
-            <span class="cuss-difficulty-btn-sub">Simple words, short sentences</span>
+            <span class="cuss-difficulty-num">01</span>
+            <span class="cuss-difficulty-text">
+              <span class="cuss-difficulty-btn-title">Rookie</span>
+              <span class="cuss-difficulty-btn-sub">Simple words, short sentences</span>
+            </span>
           </button>
           <button type="button" class="cuss-difficulty-btn is-active" id="cuss-difficulty-delegate" data-difficulty="delegate">
-            <span class="cuss-difficulty-btn-title">Delegate</span>
-            <span class="cuss-difficulty-btn-sub">Standard</span>
+            <span class="cuss-difficulty-num">02</span>
+            <span class="cuss-difficulty-text">
+              <span class="cuss-difficulty-btn-title">Delegate</span>
+              <span class="cuss-difficulty-btn-sub">Standard</span>
+            </span>
           </button>
           <button type="button" class="cuss-difficulty-btn" id="cuss-difficulty-chair" data-difficulty="chair">
-            <span class="cuss-difficulty-btn-title">Chair</span>
-            <span class="cuss-difficulty-btn-sub">Dense, idiomatic, no Simplify</span>
+            <span class="cuss-difficulty-num">03</span>
+            <span class="cuss-difficulty-text">
+              <span class="cuss-difficulty-btn-title">Chair</span>
+              <span class="cuss-difficulty-btn-sub">Dense, idiomatic, no Simplify</span>
+            </span>
           </button>
         </div>
       </div>
 
       <div class="cuss-stance-buttons">
         <button type="button" class="btn cuss-stance-btn cuss-stance-affirm" id="cuss-stance-affirm">
-          <span class="cuss-stance-btn-title">Affirm</span>
-          <span class="cuss-stance-btn-sub">Argue for the motion</span>
+          <span class="cuss-stance-avatar">A</span>
+          <span class="cuss-stance-text">
+            <span class="cuss-stance-btn-title">Affirm</span>
+            <span class="cuss-stance-btn-sub">Argue for the motion</span>
+          </span>
         </button>
         <button type="button" class="btn cuss-stance-btn cuss-stance-negate" id="cuss-stance-negate">
-          <span class="cuss-stance-btn-title">Negate</span>
-          <span class="cuss-stance-btn-sub">Argue against the motion</span>
+          <span class="cuss-stance-text">
+            <span class="cuss-stance-btn-title">Negate</span>
+            <span class="cuss-stance-btn-sub">Argue against the motion</span>
+          </span>
+          <span class="cuss-stance-avatar">N</span>
         </button>
       </div>
       <div class="cuss-stance-confirm" id="cuss-stance-confirm" hidden>
@@ -231,24 +252,30 @@
     <div class="cuss-judge" id="cuss-arena-judge" hidden>
       <p class="cuss-judge-label">Judge</p>
       <p class="cuss-judge-note">Feedback only — these scores don't affect Credibility.</p>
-      <div class="cuss-judge-row">
-        <span title="Reasoning structure — earns points for logical connectors, loses them for fillers and profanity.">Logic</span>
-        <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-logic-fill"></div></div>
-        <span class="cuss-judge-val" id="cuss-judge-logic-val">0</span>
+      <div class="cuss-judge-item">
+        <div class="cuss-judge-row">
+          <span title="Reasoning structure — earns points for logical connectors, loses them for fillers and profanity.">Logic</span>
+          <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-logic-fill"></div></div>
+          <span class="cuss-judge-val" id="cuss-judge-logic-val">0</span>
+        </div>
+        <p class="cuss-judge-hint">Reasoning structure — logical connectors help, fillers and profanity hurt.</p>
       </div>
-      <p class="cuss-judge-hint">Reasoning structure — logical connectors help, fillers and profanity hurt.</p>
-      <div class="cuss-judge-row">
-        <span title="Specificity — earns points for advanced vocabulary, loses them for fillers and profanity.">Precision</span>
-        <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-judge-precision-fill"></div></div>
-        <span class="cuss-judge-val" id="cuss-judge-precision-val">0</span>
+      <div class="cuss-judge-item">
+        <div class="cuss-judge-row">
+          <span title="Specificity — earns points for advanced vocabulary, loses them for fillers and profanity.">Precision</span>
+          <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-judge-precision-fill"></div></div>
+          <span class="cuss-judge-val" id="cuss-judge-precision-val">0</span>
+        </div>
+        <p class="cuss-judge-hint">Specificity — advanced vocabulary helps, fillers and profanity hurt.</p>
       </div>
-      <p class="cuss-judge-hint">Specificity — advanced vocabulary helps, fillers and profanity hurt.</p>
-      <div class="cuss-judge-row">
-        <span title="Fluency — clean, confident phrasing; hurt by filler words and profanity.">Delivery</span>
-        <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-delivery-fill"></div></div>
-        <span class="cuss-judge-val" id="cuss-judge-delivery-val">0</span>
+      <div class="cuss-judge-item">
+        <div class="cuss-judge-row">
+          <span title="Fluency — clean, confident phrasing; hurt by filler words and profanity.">Delivery</span>
+          <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-delivery-fill"></div></div>
+          <span class="cuss-judge-val" id="cuss-judge-delivery-val">0</span>
+        </div>
+        <p class="cuss-judge-hint">Fluency — clean, confident phrasing; hurt by filler words and profanity.</p>
       </div>
-      <p class="cuss-judge-hint">Fluency — clean, confident phrasing; hurt by filler words and profanity.</p>
     </div>
 
     <div class="cuss-color-legend">
@@ -269,6 +296,7 @@
     </form>
 
     <div class="cuss-gameover" id="cuss-gameover" hidden>
+      <img src="cussator-mark.svg" alt="" class="cuss-gameover-mark">
       <p class="cuss-gameover-title" id="cuss-gameover-title">You Win</p>
       <p class="cuss-gameover-sub" id="cuss-gameover-sub"></p>
       <div class="cuss-trend" id="cuss-trend"></div>

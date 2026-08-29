@@ -421,6 +421,14 @@ html { scroll-behavior: smooth; }
   margin: 0 0 2px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
+/* Itemizes Logic/Precision/Delivery the same way the homepage's numbered
+   rows are itemized — a fading rule between each, not just a bare stack of
+   rows. Wraps the existing row+hint pair; nothing inside it changed. */
+.cuss-judge-item {
+  display: flex; flex-direction: column; padding-top: 6px;
+  background: linear-gradient(to right, transparent, var(--color-neutral-800) 4px calc(100% - 4px), transparent) no-repeat top / 100% 1px;
+}
+.cuss-judge-item:first-child { background-image: none; padding-top: 0; }
 .cuss-judge-row { display: flex; align-items: center; gap: 8px; }
 .cuss-judge-row span:first-child { font-size: 12px; width: 64px; flex: none; cursor: help; }
 .cuss-judge-track { flex: 1; height: 6px; border-radius: 99px; background: var(--color-neutral-800); overflow: hidden; }
@@ -529,7 +537,27 @@ html { scroll-behavior: smooth; }
 .cuss-steps h3 { font-size: 17px; margin: 0 0 6px; }
 .cuss-steps p { font-size: 14px; line-height: 1.5; margin: 0; color: color-mix(in srgb, var(--color-text) 78%, transparent); }
 
-.cuss-footer { padding: calc(1.6 * var(--leading)) 0; font-size: 13px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.cuss-footer {
+  padding: calc(1.6 * var(--leading)) 0; font-size: 13px;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); justify-content: space-between;
+}
+.cuss-footer-links { display: flex; gap: var(--space-3); }
+.cuss-footer-links a { color: inherit; }
+.cuss-footer-links a:hover { color: var(--color-accent); }
+
+/* Terms / Privacy — plain, readable legal copy fit to the site's existing
+   dark theme; deliberately not styled beyond basic typography and rhythm. */
+.cuss-legal { max-width: 68ch; padding: calc(2 * var(--leading)) 0 calc(3 * var(--leading)); }
+.cuss-legal h1 { margin-bottom: var(--space-2); }
+.cuss-legal-updated {
+  font-size: 13px; margin: 0 0 calc(1.5 * var(--leading));
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.cuss-legal h2 { font-size: 19px; margin: calc(1.5 * var(--leading)) 0 var(--space-2); }
+.cuss-legal p, .cuss-legal li { font-size: 15px; line-height: var(--leading); color: color-mix(in srgb, var(--color-text) 85%, transparent); }
+.cuss-legal ul { padding-left: 1.2em; margin: var(--space-2) 0; }
+.cuss-legal a { color: var(--color-accent); }
 
 @media (max-width: 900px) {
   .cuss-hero-grid { grid-template-columns: 1fr !important; }
@@ -741,29 +769,53 @@ html { scroll-behavior: smooth; }
   margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
-.cuss-difficulty-buttons { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: center; }
+/* Ledger-row picker — same numbered-line-item language as the homepage's
+   "How it works" steps (see .cuss-feature's fading top-rule), reused here
+   instead of the equal bordered boxes this screen used to show. Only the
+   contents/CSS of .cuss-difficulty-btn changed; the element itself keeps
+   its id/class/data-difficulty untouched, so setDifficulty()'s querySelectorAll
+   and .is-active toggling in script.js need no changes. */
+.cuss-difficulty-buttons { display: flex; flex-direction: column; width: 100%; max-width: 440px; margin: 0 auto; }
 .cuss-difficulty-btn {
-  display: flex; flex-direction: column; align-items: center; gap: 2px; width: 150px;
-  padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-divider);
-  background: transparent; color: var(--color-text); cursor: pointer; font-family: inherit;
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  display: flex; align-items: baseline; gap: var(--space-3); width: 100%; text-align: left;
+  padding: var(--space-2) var(--space-2); border: none; border-radius: var(--radius-sm);
+  background: linear-gradient(to right, transparent, var(--color-neutral-800) 6px calc(100% - 6px), transparent) no-repeat top / 100% 1px;
+  color: var(--color-text); cursor: pointer; font-family: inherit;
+  transition: background-color 0.15s ease;
 }
-.cuss-difficulty-btn:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--color-text) 40%, transparent); }
+.cuss-difficulty-btn:first-child { background-image: none; }
+.cuss-difficulty-btn:hover { background-color: color-mix(in srgb, var(--color-text) 6%, transparent); }
+.cuss-difficulty-num {
+  flex: none; width: 20px; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 14px; color: var(--color-accent); font-feature-settings: 'tnum' 1;
+}
+.cuss-difficulty-text { display: flex; flex-direction: column; gap: 2px; }
 .cuss-difficulty-btn-title { font-size: 14px; font-weight: var(--font-heading-weight); }
 .cuss-difficulty-btn-sub { font-size: 10.5px; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
-.cuss-difficulty-btn.is-active {
-  border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
-}
-.cuss-difficulty-btn.is-active .cuss-difficulty-btn-title { color: var(--color-accent); }
+.cuss-difficulty-btn.is-active { background-color: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+.cuss-difficulty-btn.is-active .cuss-difficulty-btn-title,
+.cuss-difficulty-btn.is-active .cuss-difficulty-num { color: var(--color-accent); }
 
 .cuss-stance-buttons { display: flex; gap: var(--space-4); flex-wrap: wrap; justify-content: center; margin-top: var(--space-2); }
+/* Affirm/Negate keep their size and color-coding, but now differ in more
+   than color: each reuses the exact avatar recipe from .cuss-anchor-avatar
+   (the same lettered-circle mark that appears once the round actually
+   starts), mirrored left/right — Affirm's mark leads, Negate's trails —
+   the same left/right mirroring already used for the pre-round transcript
+   anchor, so the picker, the anchor, and the real transcript all share one
+   avatar convention instead of introducing a new shape just for this screen. */
 .cuss-stance-btn {
-  flex-direction: column; width: 220px; height: auto; padding: 28px 20px; gap: 6px;
-  border-radius: var(--radius-lg); font-size: 22px; transition: transform 0.15s ease, background 0.15s ease;
+  flex-direction: row; align-items: center; width: 240px; height: auto; padding: 22px 22px; gap: var(--space-3);
+  border-radius: var(--radius-lg); transition: transform 0.15s ease, background 0.15s ease;
 }
 .cuss-stance-btn:hover { transform: translateY(-2px); }
 .cuss-stance-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.cuss-stance-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid currentColor;
+  font-family: var(--font-heading); font-weight: 700; font-size: 14px;
+}
+.cuss-stance-text { display: flex; flex-direction: column; gap: 4px; }
 .cuss-stance-btn-title { font-size: 22px; font-weight: var(--font-heading-weight); letter-spacing: 0.02em; }
 .cuss-stance-btn-sub { font-size: 12.5px; font-weight: 400; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
 .cuss-stance-affirm {
@@ -772,8 +824,10 @@ html { scroll-behavior: smooth; }
 .cuss-stance-affirm:hover { background: color-mix(in srgb, oklch(0.72 0.15 250) 12%, transparent); }
 .cuss-stance-affirm .cuss-stance-btn-title { text-shadow: 0 0 10px color-mix(in srgb, oklch(0.72 0.15 250) 40%, transparent); }
 .cuss-stance-negate {
+  flex-direction: row-reverse; text-align: right;
   border-color: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25);
 }
+.cuss-stance-negate .cuss-stance-text { align-items: flex-end; }
 .cuss-stance-negate:hover { background: color-mix(in srgb, oklch(0.63 0.22 25) 12%, transparent); }
 .cuss-stance-negate .cuss-stance-btn-title { text-shadow: 0 0 10px color-mix(in srgb, oklch(0.63 0.22 25) 40%, transparent); }
 
@@ -797,13 +851,26 @@ html { scroll-behavior: smooth; }
 }
 .cuss-gameover.is-visible { opacity: 1; transform: scale(1); }
 .cuss-gameover[hidden] { display: none; }
+/* Small stamp above the result — the lips mark otherwise only shows up in
+   the nav and the favicon, despite being the site's one distinctive,
+   ownable icon. Muted so it reads as a mark on the page, not a logo lockup
+   competing with the win/lose headline. */
+.cuss-gameover-mark { width: 34px; height: auto; opacity: 0.55; }
 .cuss-gameover-title {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
   font-size: clamp(32px, 6vw, 52px); margin: 0;
 }
 .cuss-gameover-title.is-win { color: oklch(0.75 0.13 150); }
 .cuss-gameover-title.is-lose { color: oklch(0.63 0.22 25); }
-.cuss-gameover-sub { margin: 0; max-width: 42ch; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
+/* Fading rule under the headline, same language as the homepage's ledger
+   rows — separates the result from the itemized trend/recap below it
+   regardless of whether either is empty (unlike a divider on .cuss-trend
+   or .cuss-recap themselves, which can be empty and collapse via :empty). */
+.cuss-gameover-sub {
+  margin: 0; max-width: 42ch; padding-bottom: var(--space-4);
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+  background: linear-gradient(to right, transparent, var(--color-neutral-800) 15%, var(--color-neutral-800) 85%, transparent) no-repeat bottom / 100% 1px;
+}
 
 /* Post-round filler-word recap — the player's own words from that round
    only, each paired with a stronger alternative. */
