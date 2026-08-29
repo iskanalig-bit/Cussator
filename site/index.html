@@ -20,6 +20,7 @@
     <a href="#features">Features</a>
     <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
     <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
+    <button type="button" class="btn btn-ghost nav-cta" id="cuss-bag-nav">Bag <span id="cuss-bag-nav-count">(0)</span></button>
   </nav>
 
   <div class="cuss-wrap">
@@ -32,7 +33,10 @@
         </h1>
 
         <div class="cuss-hero-actions">
-          <button type="button" class="btn btn-primary cuss-cta-xl" id="cuss-start-hero">Chat</button>
+          <div class="cuss-hero-cta-row">
+            <button type="button" class="btn btn-primary cuss-cta-xl" id="cuss-start-hero">Chat</button>
+            <button type="button" class="btn btn-ghost cuss-bag-cta" id="cuss-bag-hero">Bag <span id="cuss-bag-hero-count">(0)</span></button>
+          </div>
           <a href="#how"><button type="button" class="btn btn-ghost">How it works</button></a>
         </div>
 
@@ -350,6 +354,17 @@
     </div>
     <p class="cuss-scars-sub">Your most repeated filler words across every round you've played, each with a stronger swap.</p>
     <div class="cuss-scars-list" id="cuss-scars-list"></div>
+  </div>
+</div>
+
+<div class="cuss-bag" id="cuss-bag" aria-hidden="true">
+  <div class="cuss-bag-inner">
+    <div class="cuss-bag-head">
+      <span class="cuss-bag-title">Bag</span>
+      <button type="button" class="btn btn-icon" id="cuss-bag-close" aria-label="Close">✕</button>
+    </div>
+    <p class="cuss-bag-sub">Strong vocabulary you've actually landed in an argument, collected across every round you've played.</p>
+    <div class="cuss-bag-list" id="cuss-bag-list"></div>
   </div>
 </div>
 

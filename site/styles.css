@@ -376,6 +376,11 @@ html { scroll-behavior: smooth; }
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3);
   margin: var(--space-4) 0 var(--space-4);
 }
+/* Bag's entry point sits immediately right of Chat, not stacked below it —
+   its own row so the big primary CTA still reads as the one dominant
+   action, with "How it works" staying on its own line beneath both. */
+.cuss-hero-cta-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.cuss-bag-cta { align-self: center; }
 .cuss-cta-xl {
   font-size: 24px; padding: 26px 72px; border-width: 1.5px;
   background: var(--color-accent); color: var(--color-bg);
@@ -1227,6 +1232,39 @@ html { scroll-behavior: smooth; }
 .cuss-scars-list { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }
 .cuss-scars-list .cuss-recap-row { justify-content: flex-start; font-size: 15px; }
 
+/* Bag — the positive mirror of Vocabulary Scars just above: identical
+   full-screen panel structure, but the word itself is styled in the same
+   green already used for the live "vocab" highlight (.cuss-vocab) instead
+   of Scars' filler-orange, so the trophy-case framing reads immediately
+   even before the sub-copy is read. See initBag() in script.js. */
+.cuss-bag {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: stretch; justify-content: center;
+  padding: 0; background: var(--color-bg);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+}
+.cuss-bag.is-open { opacity: 1; pointer-events: auto; }
+.cuss-bag-inner {
+  width: 100%; max-width: 720px; height: 100%; max-height: 100vh;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4) var(--edge); overflow-y: auto;
+}
+.cuss-bag-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.cuss-bag-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 20px; }
+.cuss-bag-sub {
+  margin: 0; font-size: 13.5px; max-width: 60ch;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.cuss-bag-list { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }
+.cuss-bag-row {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px;
+  font-size: 15px;
+  background: linear-gradient(to right, transparent, var(--color-neutral-800) 4px calc(100% - 4px), transparent) no-repeat top / 100% 1px;
+  padding-top: var(--space-3);
+}
+.cuss-bag-list .cuss-bag-row:first-child { background-image: none; padding-top: 0; }
+.cuss-bag-word { color: oklch(0.75 0.13 150); font-weight: 600; }
+.cuss-bag-def { color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+
 /* Round-end trend — this round's filler count against the player's own
    last-3-rounds average, pulled from the same localStorage history that
    feeds the homepage's real per-player stat tile. */
@@ -1242,4 +1280,5 @@ html { scroll-behavior: smooth; }
   .cuss-arena-inner { padding: var(--space-3); }
   .cuss-arena-form { flex-direction: column; align-items: stretch; }
   .cuss-scars-inner { padding: var(--space-3); }
+  .cuss-bag-inner { padding: var(--space-3); }
 }

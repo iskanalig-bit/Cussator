@@ -229,6 +229,48 @@
     }
   }
 
+  // Bag — the positive mirror of Vocabulary Scars above: same pattern
+  // (persistent word -> use-count tally in localStorage, no accounts),
+  // just tracking the player's own successfully-used advanced vocabulary
+  // instead of their repeated filler words. Also no separate detection
+  // logic — every submitted argument's vocabWordsUsed (classifyText(),
+  // same 'vocab' tier that already colors these words green live) gets
+  // folded in here. Only ever called with the PLAYER's own analysis, never
+  // the AI reply's — see the submit handler below.
+  var BAG_KEY = 'cussatorBag';
+
+  function loadBag() {
+    try {
+      var raw = localStorage.getItem(BAG_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function recordBagWords(words) {
+    if (!words.length) return;
+    try {
+      var bag = loadBag();
+      words.forEach(function (w) { bag[w] = (bag[w] || 0) + 1; });
+      localStorage.setItem(BAG_KEY, JSON.stringify(bag));
+    } catch (e) {
+      // localStorage unavailable — this round's catches just won't persist.
+    }
+  }
+
+  // Keeps the "Bag (N)" count fresh on both entry points (hero + nav) —
+  // called once on load and again after every argument that might have
+  // added a new word, so the number is never stale while sitting on the
+  // homepage mid-round.
+  function updateBagBadge() {
+    var count = Object.keys(loadBag()).length;
+    ['cuss-bag-nav-count', 'cuss-bag-hero-count'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = '(' + count + ')';
+    });
+  }
+
   // Per-round total filler-word count, oldest first — a second, smaller
   // localStorage log alongside the Scars word tally above. This is what
   // powers both the round-end "vs your last 3 rounds" trend and the
@@ -474,6 +516,14 @@
     { word: 'mercurial', def: 'Subject to sudden or unpredictable changes of mood.' }
   ];
 
+  // Bag (see initBag()) shows a definition alongside each collected word
+  // when one exists — but WORD_OF_DAY_ENTRIES only glosses 50 of the ~350
+  // words in VOCAB_WORDS (the rest are a flat match list with no glosses
+  // attached, see the comment above VOCAB_WORDS). A Bag word outside that
+  // 50 just renders without a definition line rather than a fabricated one.
+  var WORD_OF_DAY_DEFS = {};
+  WORD_OF_DAY_ENTRIES.forEach(function (e) { WORD_OF_DAY_DEFS[e.word] = e.def; });
+
   // Fixed per-hit Credibility values — the whole scoring system runs on these flat
   // numbers, no formulas or randomness. Loosely modeled on how MUN judges
   // weight rubric lines: content failures (a bad, unsupported argument) cost
@@ -553,6 +603,7 @@
   function classifyText(text) {
     var counts = { curse: 0, filler: 0, fillerLight: 0, connective: 0, vocab: 0 };
     var fillerWordsUsed = [];
+    var vocabWordsUsed = [];
     var html = escapeHtml(text);
 
     html = html.replace(CLASSIFIER_REGEX, function (m) {
@@ -560,6 +611,7 @@
       if (!entry) return m;
       counts[entry.kind]++;
       if (entry.kind === 'filler' || entry.kind === 'fillerLight') fillerWordsUsed.push(entry.base);
+      if (entry.kind === 'vocab') vocabWordsUsed.push(entry.base);
       return '<span class="' + CLASSIFIER_CLASS[entry.kind] + '">' + m + '</span>';
     });
 
@@ -577,7 +629,8 @@
       connectiveCount: counts.connective,
       vocabCount: counts.vocab,
       wordCount: words.length,
-      fillerWordsUsed: fillerWordsUsed
+      fillerWordsUsed: fillerWordsUsed,
+      vocabWordsUsed: vocabWordsUsed
     };
   }
 
@@ -1440,6 +1493,8 @@
         roundFillerWords[w] = (roundFillerWords[w] || 0) + 1;
       });
       recordFillerWords(analysis.fillerWordsUsed);
+      recordBagWords(analysis.vocabWordsUsed);
+      updateBagBadge();
       tokensUsed += countWordTokens(text);
 
       history.push({ role: 'user', content: text });
@@ -1592,6 +1647,78 @@
     });
   }
 
+  // Standalone view of the persistent Bag tally — the positive mirror of
+  // Vocabulary Scars above, same structure (full-screen panel, one row per
+  // word, sorted by use-count), reachable from either of the two entry
+  // points next to the Chat button (hero + nav).
+  function initBag() {
+    var bagEl = document.getElementById('cuss-bag');
+    var bagList = document.getElementById('cuss-bag-list');
+    var bagLinks = [document.getElementById('cuss-bag-hero'), document.getElementById('cuss-bag-nav')];
+    var bagCloseBtn = document.getElementById('cuss-bag-close');
+    if (!bagEl || !bagList) return;
+
+    function renderBag() {
+      var bag = loadBag();
+      var entries = Object.keys(bag)
+        .map(function (w) { return { word: w, count: bag[w] }; })
+        .sort(function (a, b) { return b.count - a.count; });
+
+      bagList.innerHTML = '';
+
+      if (!entries.length) {
+        var empty = document.createElement('p');
+        empty.className = 'cuss-recap-clean';
+        empty.textContent = "No words collected yet — land a strong vocabulary word in a round to start your Bag.";
+        bagList.appendChild(empty);
+        return;
+      }
+
+      entries.forEach(function (entry) {
+        var row = document.createElement('div');
+        row.className = 'cuss-bag-row';
+
+        var word = document.createElement('span');
+        word.className = 'cuss-bag-word';
+        word.textContent = entry.word + ' ×' + entry.count;
+        row.appendChild(word);
+
+        var def = WORD_OF_DAY_DEFS[entry.word];
+        if (def) {
+          var defEl = document.createElement('span');
+          defEl.className = 'cuss-bag-def';
+          defEl.textContent = def;
+          row.appendChild(defEl);
+        }
+
+        bagList.appendChild(row);
+      });
+    }
+
+    function openBag() {
+      renderBag();
+      bagEl.classList.add('is-open');
+      bagEl.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeBag() {
+      bagEl.classList.remove('is-open');
+      bagEl.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    bagLinks.forEach(function (btn) {
+      if (btn) btn.addEventListener('click', function (e) { e.preventDefault(); openBag(); });
+    });
+    if (bagCloseBtn) bagCloseBtn.addEventListener('click', closeBag);
+    bagEl.addEventListener('click', function (e) { if (e.target === bagEl) closeBag(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && bagEl.classList.contains('is-open')) closeBag();
+    });
+
+    updateBagBadge();
+  }
+
   // The hero stats band's "filler words by round 2" tile — reads the same
   // round-history log endRound() writes to, so it's the player's own real
   // number instead of a fixed marketing figure. Left at the static
@@ -1695,6 +1822,7 @@
     initDemo();
     initArena();
     initVocabScars();
+    initBag();
     initHomepageStat();
     initWordOfDay();
   });
