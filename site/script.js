@@ -663,6 +663,13 @@
     var gameoverTitle = document.getElementById('cuss-gameover-title');
     var gameoverSub = document.getElementById('cuss-gameover-sub');
     var gameoverRestartBtn = document.getElementById('cuss-gameover-restart');
+    var resultOverlay = document.getElementById('cuss-result-transition');
+    var resultVerdict = document.getElementById('cuss-result-verdict');
+    var resultHeadline = document.getElementById('cuss-result-headline');
+    var resultSub = document.getElementById('cuss-result-sub');
+    var resultRuleText = document.getElementById('cuss-result-rule-text');
+    var RESULT_ANIM_DURATION = 3600; // must match the CSS keyframes' 3.6s duration
+    var RESULT_LINE_DRAW_DELAY = 2700; // matches the keyframes' ~75-78% reveal point
     var recapEl = document.getElementById('cuss-recap');
     var trendEl = document.getElementById('cuss-trend');
     var stanceSelectEl = document.getElementById('cuss-stance-select');
@@ -695,6 +702,8 @@
     var judgeAnimTimer = null;
     var roundOver = false;
     var stanceTimer = null;
+    var resultLineTimer = null;
+    var resultDoneTimer = null;
     var playerSide = null;
     var difficulty = 'delegate';
     var turnTimer = null;
@@ -763,6 +772,13 @@
       trendEl.innerHTML = '';
       if (judgeAnimTimer) { clearTimeout(judgeAnimTimer); judgeAnimTimer = null; }
       if (stanceTimer) { clearTimeout(stanceTimer); stanceTimer = null; }
+      if (resultLineTimer) { clearTimeout(resultLineTimer); resultLineTimer = null; }
+      if (resultDoneTimer) { clearTimeout(resultDoneTimer); resultDoneTimer = null; }
+      if (resultOverlay) {
+        resultOverlay.classList.remove('playing-win', 'playing-lose');
+        resultOverlay.hidden = true;
+      }
+      if (resultVerdict) resultVerdict.classList.remove('line-drawn');
       stopTurnTimer();
       turnSecondsLeft = TURN_DURATION_SECONDS;
       updateTurnTimerDisplay();
@@ -789,6 +805,7 @@
       // message. Side letters/colors get filled in by chooseStance() once
       // a side is picked; addUserBubbleAnimated() removes this block the
       // moment the first real bubble is added.
+      transcript.classList.add('is-empty');
       transcript.innerHTML =
         '<div class="cuss-transcript-anchor" id="cuss-transcript-anchor">' +
           '<div class="cuss-anchor-row cuss-anchor-left">' +
@@ -931,8 +948,45 @@
       renderRoundTrend(totalFillerThisRound, priorHistory);
 
       renderFillerRecap();
-      gameoverEl.hidden = false;
-      requestAnimationFrame(function () { gameoverEl.classList.add('is-visible'); });
+      playRoundResultTransition(playerWon, function () {
+        gameoverEl.hidden = false;
+        requestAnimationFrame(function () { gameoverEl.classList.add('is-visible'); });
+      });
+    }
+
+    // Ping-pong-volley win/lose transition, same visual language as
+    // "Entering the Chat" (playEnterThenOpen()) — plays once, then hands off
+    // to the existing gameover reveal via onDone(). Upper lip = player,
+    // lower = AI, matching the health-bar order; whichever one "returns" the
+    // final volley vs. fades out as the ball flies past is driven entirely
+    // by playerWon, never guessed from anything else. Only ever called from
+    // endRound(), which itself only runs once per round (see roundOver
+    // guard in checkGameOver()) — so this can't double-fire or play for a
+    // mid-round state.
+    function playRoundResultTransition(playerWon, onDone) {
+      if (!resultOverlay || !resultVerdict) { onDone(); return; }
+      if (resultLineTimer) clearTimeout(resultLineTimer);
+      if (resultDoneTimer) clearTimeout(resultDoneTimer);
+
+      resultHeadline.textContent = playerWon ? 'YOU WIN' : 'YOU LOSE';
+      resultSub.textContent = playerWon ? 'CREDIBILITY HELD' : 'POSITION COLLAPSED';
+      resultRuleText.textContent = playerWon ? 'MOTION CARRIES' : 'MOTION FAILS';
+
+      resultOverlay.classList.remove('playing-win', 'playing-lose');
+      resultVerdict.classList.remove('line-drawn');
+      resultOverlay.hidden = false;
+      void resultOverlay.offsetWidth; // reflow so the keyframes always start from frame 0
+      resultOverlay.classList.add(playerWon ? 'playing-win' : 'playing-lose');
+
+      resultLineTimer = setTimeout(function () {
+        resultVerdict.classList.add('line-drawn');
+      }, RESULT_LINE_DRAW_DELAY);
+
+      resultDoneTimer = setTimeout(function () {
+        resultOverlay.classList.remove('playing-win', 'playing-lose');
+        resultOverlay.hidden = true;
+        onDone();
+      }, RESULT_ANIM_DURATION);
     }
 
     // This round's filler total against the average of the player's own
@@ -1078,6 +1132,9 @@
       valEl.classList.toggle('is-hp-warning', isWarning);
 
       if (value !== previous) {
+        var isHit = value < previous;
+        fillEl.classList.toggle('is-hit', isHit);
+        valEl.classList.toggle('is-hit', isHit);
         flashHealth(fillEl);
         flashHealth(valEl);
       }
@@ -1166,10 +1223,12 @@
       if (empty) empty.remove();
       var anchor = transcript.querySelector('.cuss-transcript-anchor');
       if (anchor) anchor.remove();
+      transcript.classList.remove('is-empty');
 
       var p = document.createElement('p');
       p.className = 'cuss-bubble-user';
       transcript.appendChild(p);
+      requestAnimationFrame(function () { p.classList.add('is-visible'); });
 
       var temp = document.createElement('div');
       temp.innerHTML = html;

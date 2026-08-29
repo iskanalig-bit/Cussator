@@ -295,6 +295,27 @@
       <button type="submit" class="btn btn-primary" id="cuss-arena-submit">Send</button>
     </form>
 
+    <div class="cuss-result-transition" id="cuss-result-transition" aria-hidden="true" hidden>
+      <div class="cuss-result-stage">
+        <div class="cuss-result-lip cuss-result-lip-upper">
+          <svg viewBox="0 0 160 120"><path d="M16 60 C16 42,48 34,68 36 C74 37,76 42,80 42 C84 42,86 37,92 36 C112 34,144 42,144 60 C144 60,105 50,80 50 C55 50,16 60,16 60 Z" fill="#8B5CF6"/></svg>
+        </div>
+        <div class="cuss-result-lip cuss-result-lip-lower">
+          <svg viewBox="0 0 160 120"><path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="#8B5CF6"/></svg>
+        </div>
+        <div class="cuss-result-ball"></div>
+        <div class="cuss-result-verdict" id="cuss-result-verdict">
+          <div class="cuss-result-rule-line">
+            <span class="cuss-result-rule"></span>
+            <span class="cuss-result-rule-text" id="cuss-result-rule-text">MOTION CARRIES</span>
+            <span class="cuss-result-rule"></span>
+          </div>
+          <p class="cuss-result-headline" id="cuss-result-headline">YOU WIN</p>
+          <p class="cuss-result-sub" id="cuss-result-sub">CREDIBILITY HELD</p>
+        </div>
+      </div>
+    </div>
+
     <div class="cuss-gameover" id="cuss-gameover" hidden>
       <img src="cussator-mark.svg" alt="" class="cuss-gameover-mark">
       <p class="cuss-gameover-title" id="cuss-gameover-title">You Win</p>

@@ -345,6 +345,23 @@ html { scroll-behavior: smooth; }
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: clamp(32px, 5vw, 80px); align-items: center;
   padding: calc(3 * var(--leading)) 0 calc(2.5 * var(--leading));
+  position: relative;
+  z-index: 0;
+}
+/* Ambient court-line texture, homepage hero only — echoes the volley
+   metaphor from the "Entering the Chat" animation. Kept to a near-invisible
+   opacity on purpose; it's atmosphere, not a graphic. */
+.cuss-hero-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.08;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'%3E%3Cg fill='none' stroke='%23e9e9ed' stroke-width='1.5'%3E%3Crect x='20' y='20' width='560' height='360'/%3E%3Cline x1='90' y1='20' x2='90' y2='380'/%3E%3Cline x1='510' y1='20' x2='510' y2='380'/%3E%3Cline x1='20' y1='200' x2='580' y2='200'/%3E%3Cline x1='90' y1='103' x2='510' y2='103'/%3E%3Cline x1='90' y1='297' x2='510' y2='297'/%3E%3Cline x1='300' y1='103' x2='300' y2='297'/%3E%3C/g%3E%3C/svg%3E");
 }
 .cuss-hero-copy h1 {
   font-size: clamp(40px, 5.6vw, 72px); line-height: 1.08;
@@ -391,9 +408,7 @@ html { scroll-behavior: smooth; }
 .cuss-ai-card {
   background: color-mix(in srgb, var(--color-warn) 14%, var(--color-surface));
   border-radius: var(--radius-md); padding: var(--space-3);
-  opacity: 0; transform: translateY(4px); transition: opacity 0.35s ease, transform 0.35s ease;
 }
-.cuss-ai-card.is-visible { opacity: 1; transform: translateY(0); }
 .cuss-ai-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: 4px; }
 .cuss-ai-label { margin: 0; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-warn); }
 .cuss-ai-card p.cuss-ai-body { margin: 0; font-size: 14px; line-height: 1.5; }
@@ -444,7 +459,7 @@ html { scroll-behavior: smooth; }
 .cuss-arena-health .cuss-judge-track { height: 12px; }
 .cuss-arena-health .cuss-judge-fill {
   background: var(--color-accent); color: var(--color-accent);
-  transition: width 0.15s ease, background 0.3s ease, color 0.3s ease;
+  transition: width 0.5s cubic-bezier(.22,.61,.36,1), background 0.3s ease, color 0.3s ease;
 }
 .cuss-arena-health .cuss-judge-fill.is-warn { background: var(--color-warn); color: var(--color-warn); }
 .cuss-arena-health .cuss-judge-fill.is-hp-warning { background: oklch(0.78 0.16 80); color: oklch(0.78 0.16 80); }
@@ -459,6 +474,19 @@ html { scroll-behavior: smooth; }
   100% { box-shadow: 0 0 0 0 currentColor; }
 }
 .cuss-arena-health .cuss-judge-fill.is-flash { animation: cuss-hp-pulse 0.7s ease-out; }
+/* A drop (filler hit or a "bad"/"solid" verdict costing this side) always
+   pulses in the filler-orange used for highlighted words in the transcript,
+   regardless of which HP tier color the bar itself currently is — without
+   this, a small hit while still above 50 HP pulsed in the ordinary accent
+   purple, which read as neutral/positive rather than "something just
+   landed." Gains (a solid-argument self-heal) keep the tier-color pulse,
+   since those aren't a hit. See updateHealthDisplay() in script.js. */
+.cuss-arena-health .cuss-judge-fill.is-flash.is-hit { animation-name: cuss-hp-pulse-hit; }
+@keyframes cuss-hp-pulse-hit {
+  0% { box-shadow: 0 0 0 0 var(--color-warn); }
+  35% { box-shadow: 0 0 18px 3px var(--color-warn); }
+  100% { box-shadow: 0 0 0 0 var(--color-warn); }
+}
 @keyframes cuss-hp-val-pulse {
   0% { transform: scale(1); }
   35% { transform: scale(1.4); }
@@ -623,8 +651,25 @@ html { scroll-behavior: smooth; }
      consistent stack instead of floating in the middle of the remaining
      space above a short transcript. */
   flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);
-  padding-right: 4px; min-height: 120px;
+  padding-right: 4px; min-height: 120px; position: relative;
 }
+/* Faint ruled lines behind the empty transcript, before the first message —
+   hints "your argument will appear here" instead of leaving flex:1's
+   leftover space a flat black gap. Same fading-line technique as
+   .cuss-judge-item/.cuss-feature, just repeated down the page like ledger
+   paper. Toggled by .is-empty (see resetRound()/addUserBubbleAnimated() in
+   script.js) so it fades out the moment real content exists, rather than
+   showing behind every message forever. */
+.cuss-arena-transcript::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom, transparent, transparent 30px,
+    color-mix(in srgb, var(--color-neutral-800) 65%, transparent) 30px,
+    color-mix(in srgb, var(--color-neutral-800) 65%, transparent) 31px
+  );
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.cuss-arena-transcript.is-empty::after { opacity: 1; }
 /* Reads as an active prompt, not passive filler copy — the "YOUR TURN"
    badge reuses the exact .tag.tag-outline styling the "LIVE ROUND" badge
    uses, so the two read as the same visual language. */
@@ -654,6 +699,35 @@ html { scroll-behavior: smooth; }
 .cuss-bubble-user {
   align-self: flex-end; max-width: 88%; background: var(--color-surface);
   border-radius: var(--radius-md); padding: var(--space-3); font-size: 14px; line-height: 1.5; margin: 0;
+}
+/* Entrance for both message types — a receipt line-item settling into place
+   rather than the generic fade+lift used everywhere else: a quick vertical
+   settle plus a ruled divider line drawing in above it (scaleX, same
+   neutral-800 used for every other ruled line on the site). Shared by
+   .cuss-bubble-user and .cuss-ai-card (aliased .cuss-bubble-ai) so both
+   sides of the exchange read as the same kind of "entry," not two
+   different animation languages. Kept under 250ms total — this fires on
+   every turn, so it needs to feel instant, not decorative. */
+.cuss-bubble-user, .cuss-bubble-ai {
+  position: relative;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.cuss-bubble-user::before, .cuss-bubble-ai::before {
+  content: ''; position: absolute; top: -7px; left: 0; right: 0; height: 1px;
+  background: var(--color-neutral-800);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 0.25s ease-out 0.04s;
+}
+.cuss-bubble-user.is-visible, .cuss-ai-card.is-visible {
+  opacity: 1; transform: translateY(0);
+}
+.cuss-bubble-user.is-visible::before, .cuss-ai-card.is-visible::before {
+  transform: scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cuss-bubble-user, .cuss-bubble-ai { transition: opacity 0.15s ease; transform: none; }
+  .cuss-bubble-user::before, .cuss-bubble-ai::before { transition: none; }
 }
 /* Highlight tiers — filler orange, curse red, connective blue, vocab green.
    Each gets a soft text-shadow glow in its own color, same intensity as the
@@ -728,7 +802,15 @@ html { scroll-behavior: smooth; }
 .cuss-token-val { font-weight: 700; color: var(--color-text); }
 .cuss-token-budget.is-critical, .cuss-token-budget.is-critical .cuss-token-val { color: oklch(0.63 0.22 25); }
 
-.cuss-arena-form { display: flex; gap: var(--space-3); align-items: flex-end; }
+/* Ruled line separating the debate above from the input below — same
+   fading-line technique as .cuss-judge-item/.cuss-feature elsewhere on the
+   site, so the input reads as its own zone instead of floating disconnected
+   under the legend row. */
+.cuss-arena-form {
+  display: flex; gap: var(--space-3); align-items: flex-end;
+  padding-top: var(--space-3);
+  background: linear-gradient(to right, transparent, var(--color-neutral-800) 4px calc(100% - 4px), transparent) no-repeat top / 100% 1px;
+}
 
 .cuss-highlight-wrap {
   position: relative; flex: 1; min-height: 78px; border-radius: var(--radius-md);
@@ -888,6 +970,138 @@ html { scroll-behavior: smooth; }
 .cuss-recap-from { color: var(--color-warn); font-weight: 600; }
 .cuss-recap-arrow { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
 .cuss-recap-to { color: oklch(0.75 0.13 150); font-weight: 600; }
+
+/* Round-result transition — plays once when a round ends (either side hits
+   0 Credibility), before the existing .cuss-gameover screen reveals. Same
+   ping-pong-volley language as "Entering the Chat" (.cuss-enter-*): the two
+   lip halves lifted from the logo mark volley the ball, then on the final
+   exchange the winning side's lip returns it (pulses, stays solid) and the
+   losing side's lip fades out as the ball flies past. Upper = player, lower
+   = AI opponent, matching the health-bar order above. See
+   playRoundResultTransition() in script.js. Reuses the exact --u scale-
+   factor technique .cuss-enter-stage uses so this also scales down on small
+   viewports instead of overflowing the arena card. */
+.cuss-result-transition {
+  position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center;
+  background: var(--color-bg); opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+}
+.cuss-result-transition[hidden] { display: none; }
+.cuss-result-transition.playing-win, .cuss-result-transition.playing-lose { opacity: 1; pointer-events: auto; }
+.cuss-result-stage {
+  position: relative; width: min(65vmin, 420px); height: min(65vmin, 420px);
+  --u: calc(min(65vmin, 420px) / 520px);
+}
+.cuss-result-lip {
+  position: absolute; left: 50%; top: 50%;
+  width: calc(var(--u) * 170px); height: calc(var(--u) * 130px);
+  margin-left: calc(var(--u) * -85px); margin-top: calc(var(--u) * -65px);
+  opacity: 0;
+}
+.cuss-result-lip svg { width: 100%; height: 100%; display: block; }
+.cuss-result-ball {
+  position: absolute; left: 50%; top: 50%;
+  width: calc(var(--u) * 14px); height: calc(var(--u) * 14px);
+  margin-left: calc(var(--u) * -7px); margin-top: calc(var(--u) * -7px);
+  border-radius: 50%; background: #8B5CF6;
+  box-shadow: 0 0 18px 4px rgba(139, 92, 246, 0.6);
+  opacity: 0;
+}
+.cuss-result-verdict {
+  position: absolute; left: 0; right: 0; bottom: calc(var(--u) * -110px); text-align: center;
+  opacity: 0;
+}
+.cuss-result-rule-line { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 0 0 12px; }
+.cuss-result-rule { display: inline-block; height: 1px; width: 60px; background: currentColor; transform: scaleX(0); transform-origin: center; }
+.cuss-result-verdict.line-drawn .cuss-result-rule { animation: cuss-result-rule-draw 0.5s ease forwards; }
+@keyframes cuss-result-rule-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.cuss-result-rule-text {
+  font-family: var(--font-heading); font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+}
+.cuss-result-headline {
+  margin: 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: clamp(30px, 6vw, 44px); letter-spacing: -0.01em;
+}
+.cuss-result-sub {
+  margin: 6px 0 0; font-family: var(--font-heading); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+
+/* Win: upper (player) lip returns the final volley, lower (AI) lip misses —
+   same green/red already used for .cuss-gameover-title, no new colors. */
+.cuss-result-transition.playing-win .cuss-result-lip-upper { animation: cuss-result-upper-win 3.6s cubic-bezier(0.4,0,0.2,1) forwards; }
+.cuss-result-transition.playing-win .cuss-result-lip-lower { animation: cuss-result-lower-win 3.6s cubic-bezier(0.4,0,0.2,1) forwards; }
+.cuss-result-transition.playing-win .cuss-result-ball { animation: cuss-result-ball-win 3.6s cubic-bezier(0.45,0,0.55,1) forwards; }
+.cuss-result-transition.playing-win .cuss-result-verdict { animation: cuss-result-reveal 3.6s ease forwards; color: oklch(0.75 0.13 150); }
+
+@keyframes cuss-result-upper-win {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  15%  { transform: translate(0, calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  35%  { transform: translate(calc(var(--u) * -70px), calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  55%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  75%  { transform: translate(0, calc(var(--u) * -150px)) scale(1.15); opacity: 1; }
+  85%  { transform: translate(0, calc(var(--u) * -150px)) scale(1); opacity: 1; }
+  100% { transform: translate(0, calc(var(--u) * -150px)) scale(1); opacity: 0.3; }
+}
+@keyframes cuss-result-lower-win {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  15%  { transform: translate(0, calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  35%  { transform: translate(calc(var(--u) * -70px), calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  55%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  75%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * 150px)) scale(0.9); opacity: 0.6; }
+  100% { transform: translate(calc(var(--u) * 60px), calc(var(--u) * 150px)) scale(0.8); opacity: 0.15; }
+}
+@keyframes cuss-result-ball-win {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0; }
+  12%  { transform: translate(0, 0) scale(1); opacity: 1; }
+  25%  { transform: translate(calc(var(--u) * -70px), calc(var(--u) * -120px)) scale(1); opacity: 1; }
+  35%  { transform: translate(calc(var(--u) * -70px), calc(var(--u) * 120px)) scale(1); opacity: 1; }
+  45%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * -120px)) scale(1); opacity: 1; }
+  55%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * 120px)) scale(1); opacity: 1; }
+  68%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * 340px)) scale(0.5); opacity: 0.5; }
+  72%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* Lose: lower (AI) lip returns the final volley, upper (player) lip misses. */
+.cuss-result-transition.playing-lose .cuss-result-lip-upper { animation: cuss-result-upper-lose 3.6s cubic-bezier(0.4,0,0.2,1) forwards; }
+.cuss-result-transition.playing-lose .cuss-result-lip-lower { animation: cuss-result-lower-lose 3.6s cubic-bezier(0.4,0,0.2,1) forwards; }
+.cuss-result-transition.playing-lose .cuss-result-ball { animation: cuss-result-ball-lose 3.6s cubic-bezier(0.45,0,0.55,1) forwards; }
+.cuss-result-transition.playing-lose .cuss-result-verdict { animation: cuss-result-reveal 3.6s ease forwards; color: oklch(0.63 0.22 25); }
+
+@keyframes cuss-result-upper-lose {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  15%  { transform: translate(0, calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  35%  { transform: translate(calc(var(--u) * -70px), calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  55%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * -150px)) scale(0.92); opacity: 0.9; }
+  75%  { transform: translate(calc(var(--u) * -40px), calc(var(--u) * -150px)) scale(0.9); opacity: 0.6; }
+  100% { transform: translate(calc(var(--u) * -40px), calc(var(--u) * -150px)) scale(0.8); opacity: 0.15; }
+}
+@keyframes cuss-result-lower-lose {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  15%  { transform: translate(0, calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  35%  { transform: translate(calc(var(--u) * -70px), calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  55%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * 150px)) scale(0.92); opacity: 0.9; }
+  75%  { transform: translate(0, calc(var(--u) * 150px)) scale(1.15); opacity: 1; }
+  85%  { transform: translate(0, calc(var(--u) * 150px)) scale(1); opacity: 1; }
+  100% { transform: translate(0, calc(var(--u) * 150px)) scale(1); opacity: 0.3; }
+}
+@keyframes cuss-result-ball-lose {
+  0%   { transform: translate(0, 0) scale(1); opacity: 0; }
+  12%  { transform: translate(0, 0) scale(1); opacity: 1; }
+  25%  { transform: translate(calc(var(--u) * -70px), calc(var(--u) * -120px)) scale(1); opacity: 1; }
+  35%  { transform: translate(calc(var(--u) * -70px), calc(var(--u) * 120px)) scale(1); opacity: 1; }
+  45%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * -120px)) scale(1); opacity: 1; }
+  55%  { transform: translate(calc(var(--u) * 60px), calc(var(--u) * 120px)) scale(1); opacity: 1; }
+  68%  { transform: translate(calc(var(--u) * -40px), calc(var(--u) * -340px)) scale(0.5); opacity: 0.5; }
+  72%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes cuss-result-reveal {
+  0%, 60%  { opacity: 0; transform: translateY(6px); }
+  78%      { opacity: 1; transform: translateY(0); }
+  100%     { opacity: 1; transform: translateY(0); }
+}
 
 /* "Entering the Chat" — plays once when Chat is clicked, before the round
    setup (motion/difficulty/side) screen appears; see playEnterThenOpen() in
