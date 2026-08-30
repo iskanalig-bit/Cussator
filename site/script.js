@@ -459,6 +459,165 @@
     'loquacious', 'mercurial'
   ];
 
+  // Real CEFR (Common European Framework of Reference for Languages) level
+  // for every word in VOCAB_WORDS above — shown on each word's Bag card
+  // instead of a made-up "Level N" tied to how many times it's been used.
+  // Classified offline (not at runtime — this is a static site with no
+  // build step) with the `cefrpy` package, which ships English Vocabulary
+  // Profile-derived level data per word. cefrpy occasionally mis-tags a
+  // handful of genuinely uncommon words as A1/A2 (e.g. "untenable"), which
+  // doesn't happen with truly basic vocabulary — cross-checked with
+  // `wordfreq` Zipf frequency and remapped to B1-C2 by actual frequency
+  // whenever cefrpy returned A1, A2, or nothing at all, since this bank is
+  // curated to be advanced-only by construction (a genuine beginner word
+  // should never appear here in the first place). See
+  // scripts/classify_vocab_cefr.py to regenerate this table after
+  // VOCAB_WORDS changes.
+  var VOCAB_CEFR = {
+    'ubiquitous': 'C2', 'paradigm': 'C2', 'notwithstanding': 'C1', 'ostensible': 'C2',
+    'ostensibly': 'C2', 'pertinent': 'B2', 'corroborate': 'C2', 'juxtapose': 'C2',
+    'ameliorate': 'C2', 'delineate': 'C1', 'exacerbate': 'C2', 'nuanced': 'C2',
+    'underscore': 'C2', 'conducive': 'C2', 'inherent': 'B2', 'meticulous': 'C2',
+    'pragmatic': 'C1', 'pragmatism': 'C2', 'substantiate': 'C2', 'circumvent': 'C2',
+    'elucidate': 'C2', 'mitigate': 'C2', 'mitigating': 'C2', 'prevalent': 'C2',
+    'prevalence': 'C2', 'discern': 'C2', 'discernible': 'C2', 'cogent': 'C2', 'cogency': 'C2',
+    'unequivocally': 'C2', 'arguably': 'C2', 'invariably': 'B2', 'hitherto': 'C2',
+    'albeit': 'C1', 'quintessential': 'C2', 'multifaceted': 'C2', 'unprecedented': 'C1',
+    'discrepancy': 'C1', 'discrepancies': 'C1', 'ramification': 'B2', 'ramifications': 'B2',
+    'tantamount': 'C2', 'plausible': 'C1', 'plausibility': 'C2', 'comprehensive': 'B2',
+    'holistic': 'C2', 'holistically': 'C2', 'empirical': 'C1', 'empirically': 'C2',
+    'detrimental': 'C1', 'viable': 'B2', 'viability': 'C1', 'feasible': 'C1',
+    'feasibility': 'C1', 'robust': 'C1', 'robustness': 'C1', 'catalyst': 'B2',
+    'coherent': 'B2', 'coherence': 'B2', 'credible': 'C1', 'credibility': 'C1',
+    'legitimate': 'B2', 'legitimacy': 'C1', 'resilient': 'C2', 'resilience': 'C2',
+    'untenable': 'C2', 'dubious': 'C2', 'contentious': 'C2', 'controversial': 'B1',
+    'polarizing': 'B2', 'polarized': 'B2', 'divisive': 'C2', 'provocative': 'C2',
+    'staunch': 'C2', 'vehement': 'C2', 'adamant': 'B1', 'resolute': 'C2', 'unwavering': 'C2',
+    'uncompromising': 'C2', 'redundant': 'B2', 'superfluous': 'C2', 'extraneous': 'C1',
+    'gratuitous': 'C2', 'arbitrary': 'C2', 'capricious': 'C2', 'inevitable': 'B1',
+    'imperative': 'B2', 'paramount': 'C2', 'indispensable': 'B2', 'obsolete': 'C1',
+    'antiquated': 'B1', 'anachronistic': 'C2', 'archaic': 'C2', 'unorthodox': 'B2',
+    'unconventional': 'C2', 'groundbreaking': 'C1', 'transformative': 'C2', 'formidable': 'B2',
+    'insurmountable': 'C2', 'tenuous': 'C2', 'spurious': 'C2', 'disproportionate': 'B1',
+    'asymmetric': 'C2', 'asymmetrical': 'C2', 'ingrained': 'B2', 'endemic': 'C2',
+    'pervasive': 'C2', 'rampant': 'B2', 'widespread': 'B1', 'chronic': 'B2', 'transient': 'B2',
+    'ephemeral': 'C2', 'fleeting': 'B2', 'enduring': 'B2', 'myopic': 'C2',
+    'shortsighted': 'C2', 'prudent': 'C1', 'imprudent': 'C2', 'judicious': 'C2',
+    'circumspect': 'C2', 'reckless': 'C2', 'negligent': 'C2', 'negligence': 'B1',
+    'exonerate': 'C2', 'vindicate': 'C2', 'vilify': 'C2', 'demonize': 'C1', 'scapegoat': 'C2',
+    'complacent': 'C2', 'complacency': 'C2', 'apathy': 'C2', 'apathetic': 'C2',
+    'ambivalent': 'C2', 'ambivalence': 'C2', 'equivocal': 'C2', 'unequivocal': 'C2',
+    'ambiguous': 'B2', 'ambiguity': 'B2', 'categorical': 'C2', 'definitive': 'C1',
+    'conclusive': 'C2', 'tentative': 'B1', 'provisional': 'B2', 'contingent': 'C1',
+    'multilateral': 'C2', 'unilateral': 'C2', 'bilateral': 'C1', 'bipartisan': 'C2',
+    'nonpartisan': 'B1', 'sovereignty': 'B2', 'sovereign': 'C1', 'geopolitical': 'C2',
+    'autocracy': 'C2', 'autocratic': 'C2', 'authoritarian': 'C2', 'totalitarian': 'C2',
+    'oligarchy': 'C2', 'oligarchic': 'C2', 'plutocracy': 'C2', 'hegemony': 'C2',
+    'hegemonic': 'C2', 'diplomacy': 'C1', 'diplomatic': 'B2', 'insurgency': 'C2',
+    'insurgent': 'C2', 'dissent': 'C1', 'dissident': 'B2', 'coalition': 'B2',
+    'referendum': 'C2', 'secession': 'C2', 'annexation': 'B2', 'annex': 'C2',
+    'sanctions': 'C1', 'appeasement': 'C2', 'propaganda': 'B2', 'censorship': 'C1',
+    'egalitarian': 'C2', 'disenfranchised': 'C2', 'disenfranchise': 'C2', 'enfranchise': 'C2',
+    'constituency': 'C1', 'jurisdiction': 'B2', 'statecraft': 'C2', 'isolationism': 'B1',
+    'protectionism': 'B1', 'globalization': 'B1', 'deregulation': 'B2', 'nationalism': 'B2',
+    'populism': 'C2', 'partisan': 'B2', 'incumbent': 'C2', 'electorate': 'B2',
+    'insurrection': 'C2', 'embargo': 'C2', 'ratify': 'C2', 'repeal': 'C1', 'mandate': 'C1',
+    'autonomy': 'C1', 'federalism': 'C2', 'centralized': 'C1', 'decentralized': 'B1',
+    'statesmanship': 'C2', 'subversive': 'C2', 'subversion': 'C2', 'coercive': 'C2',
+    'coercion': 'C2', 'repression': 'B2', 'repressive': 'B1', 'factionalism': 'C2',
+    'demagogue': 'C2', 'demagoguery': 'C2', 'xenophobia': 'C2', 'xenophobic': 'C2',
+    'jingoism': 'C2', 'realpolitik': 'C2', 'inequitable': 'C2', 'inequity': 'C2',
+    'disparity': 'B1', 'stagnation': 'C2', 'stagnant': 'C2', 'recession': 'B2',
+    'recessionary': 'C1', 'inflationary': 'C2', 'deflationary': 'C2', 'subsidize': 'C2',
+    'subsidy': 'B2', 'deficit': 'B2', 'surplus': 'B2', 'austerity': 'C2', 'fiscal': 'B2',
+    'monetary': 'B2', 'commodify': 'C2', 'commodification': 'C2', 'privatization': 'C2',
+    'privatize': 'C2', 'nationalize': 'C2', 'deregulate': 'B2', 'monopoly': 'C1',
+    'monopolistic': 'C2', 'oligopoly': 'C2', 'cartel': 'C2', 'arbitrage': 'C2',
+    'speculative': 'C1', 'speculation': 'B2', 'volatility': 'C2', 'volatile': 'C1',
+    'liquidity': 'B1', 'illiquid': 'B1', 'insolvency': 'C2', 'insolvent': 'C2',
+    'bankruptcy': 'B2', 'creditworthy': 'C2', 'collateral': 'B2', 'discretionary': 'C1',
+    'redistribution': 'C2', 'redistributive': 'C2', 'entrenched': 'C2', 'exploitative': 'B2',
+    'exploitation': 'C1', 'precarious': 'C2', 'precarity': 'C2', 'incentivize': 'C2',
+    'disincentivize': 'C2', 'externality': 'C2', 'unsustainable': 'B2', 'exorbitant': 'C2',
+    'lucrative': 'B2', 'meager': 'C2', 'diminishing': 'C1', 'exponential': 'C2',
+    'tangible': 'C1', 'intangible': 'C2', 'protracted': 'B1', 'regressive': 'C2',
+    'progressive': 'B1', 'macroeconomic': 'C2', 'microeconomic': 'C2', 'protectionist': 'B1',
+    'offshoring': 'C2', 'outsourcing': 'C1', 'downturn': 'C2', 'hyperinflation': 'C2',
+    'hypothesis': 'C2', 'hypothetical': 'C1', 'methodology': 'B2', 'methodological': 'C2',
+    'falsifiable': 'C2', 'replicable': 'C2', 'correlation': 'C1', 'causation': 'C2',
+    'causal': 'B2', 'variable': 'B1', 'anomaly': 'C2', 'anomalous': 'C2', 'phenomenon': 'B1',
+    'quantifiable': 'C2', 'qualitative': 'C2', 'quantitative': 'C1', 'longitudinal': 'C1',
+    'theoretical': 'B2', 'rigorous': 'C1', 'rigor': 'C2', 'inconclusive': 'C2',
+    'conjecture': 'C2', 'deduction': 'B2', 'deductive': 'C1', 'induction': 'C1',
+    'inductive': 'C1', 'inference': 'B2', 'inferential': 'C2', 'empiricism': 'C2',
+    'calibrate': 'C2', 'calibration': 'C1', 'extrapolate': 'C2', 'extrapolation': 'C2',
+    'verifiable': 'C2', 'verification': 'C1', 'reproducibility': 'C2', 'confounding': 'C2',
+    'utilitarian': 'C2', 'utilitarianism': 'C2', 'deontological': 'C2',
+    'consequentialist': 'C2', 'consequentialism': 'C2', 'normative': 'B2', 'subjective': 'B2',
+    'objective': 'B2', 'relativism': 'C1', 'absolutism': 'C2', 'dichotomy': 'C2',
+    'dichotomous': 'C2', 'paradox': 'B2', 'paradoxical': 'B2', 'fallacy': 'C2',
+    'fallacious': 'C2', 'sophistry': 'C2', 'rhetoric': 'B2', 'rhetorical': 'C2',
+    'syllogism': 'C2', 'epistemology': 'C2', 'epistemological': 'C2', 'ontology': 'C2',
+    'ontological': 'C2', 'metaphysical': 'C1', 'existential': 'C2', 'existentialism': 'C2',
+    'nihilism': 'C2', 'nihilistic': 'C2', 'determinism': 'C2', 'deterministic': 'C2',
+    'culpability': 'C2', 'culpable': 'C2', 'complicity': 'C2', 'complicit': 'C2',
+    'transgression': 'C2', 'sanctity': 'C2', 'egregious': 'C2', 'reprehensible': 'C2',
+    'unconscionable': 'C2', 'indefensible': 'C2', 'unjustifiable': 'C2', 'unwarranted': 'C2',
+    'disingenuous': 'C2', 'hypocrisy': 'C2', 'hypocritical': 'C2', 'paternalistic': 'C2',
+    'condescending': 'C2', 'axiomatic': 'C2', 'teleological': 'C2', 'adjudicate': 'C2',
+    'adjudication': 'C2', 'litigation': 'B1', 'litigious': 'C2', 'plaintiff': 'C1',
+    'defendant': 'B2', 'liable': 'B1', 'liability': 'B2', 'indemnity': 'C1',
+    'injunction': 'B2', 'precedent': 'B2', 'jurisprudence': 'C2', 'statute': 'B2',
+    'statutory': 'B1', 'unconstitutional': 'C1', 'constitutionality': 'B1', 'testimony': 'B2',
+    'admissible': 'C2', 'inadmissible': 'C2', 'indictment': 'B2', 'prosecution': 'B1',
+    'acquittal': 'C2', 'conviction': 'B1', 'extradite': 'C2', 'extradition': 'C2',
+    'arbitration': 'B1', 'mediation': 'C2', 'contractual': 'B2', 'breach': 'C1',
+    'infringe': 'B2', 'infringement': 'B2', 'litigant': 'C2', 'malfeasance': 'C2',
+    'algorithmic': 'B1', 'obsolescence': 'C2', 'disruptive': 'C2', 'scalable': 'C2',
+    'scalability': 'C2', 'interoperable': 'C2', 'interoperability': 'C2', 'encrypted': 'C2',
+    'encryption': 'C2', 'surveillance': 'B2', 'autonomous': 'C1', 'automation': 'C2',
+    'digitize': 'C1', 'digitization': 'C1', 'proliferation': 'B2', 'proliferate': 'C2',
+    'disintermediation': 'C2', 'cybersecurity': 'C1', 'vulnerability': 'C1', 'malicious': 'C2',
+    'obfuscate': 'C2', 'obfuscation': 'C2', 'rudimentary': 'C2', 'technocratic': 'C2',
+    'technocracy': 'C2', 'computational': 'C2', 'depletion': 'C1', 'deplete': 'C2',
+    'degradation': 'C1', 'degrade': 'C2', 'mitigation': 'C2', 'adaptation': 'B2',
+    'biodiversity': 'C1', 'ecosystem': 'B1', 'renewable': 'B2', 'finite': 'C2',
+    'irreversible': 'C2', 'catastrophic': 'B2', 'anthropogenic': 'C2', 'emission': 'C1',
+    'sequestration': 'C2', 'deforestation': 'B2', 'desertification': 'C2',
+    'overexploitation': 'C2', 'ecological': 'B1', 'sustainability': 'B2', 'marginalized': 'C1',
+    'marginalization': 'C2', 'stigmatize': 'C2', 'stigma': 'C2', 'perpetuate': 'C2',
+    'entrench': 'C2', 'disenfranchisement': 'C2', 'socioeconomic': 'C2', 'demographic': 'C1',
+    'assimilation': 'C2', 'assimilate': 'C2', 'integration': 'B1', 'segregation': 'C2',
+    'segregated': 'C2', 'discriminatory': 'C2', 'discrimination': 'B1', 'prejudice': 'B1',
+    'prejudiced': 'B1', 'ostracize': 'C2', 'ostracized': 'C2', 'alienation': 'B2',
+    'alienate': 'B2', 'disparate': 'B1', 'underprivileged': 'C2', 'underrepresented': 'C2',
+    'overrepresented': 'C2', 'institutionalized': 'B2', 'institutionalize': 'B2',
+    'systemic': 'B2', 'coincide': 'B2', 'articulate': 'B2', 'refute': 'B2', 'reconcile': 'C1',
+    'undermine': 'C1', 'reinforce': 'B2', 'encompass': 'C2', 'precipitate': 'C2',
+    'subsequent': 'B1', 'profound': 'B2', 'versatile': 'C2', 'marginal': 'B2',
+    'incremental': 'C1', 'cumulative': 'B2', 'transparent': 'B2', 'accountability': 'B2',
+    'sustainable': 'B2', 'equitable': 'C1', 'inclusive': 'C1', 'integral': 'C1',
+    'unsubstantiated': 'C2', 'framework': 'B2', 'infrastructure': 'B1', 'legislation': 'B2',
+    'regulatory': 'B2', 'humanitarian': 'C1', 'compliance': 'B1', 'transparency': 'B1',
+    'vulnerable': 'B2', 'extraction': 'B2', 'allocation': 'C1', 'distribution': 'B1',
+    'procurement': 'B1', 'tariff': 'C1', 'inflation': 'B2', 'liberalization': 'C1',
+    'nationalization': 'C2', 'oversight': 'B2', 'scrutiny': 'C1', 'consensus': 'B2',
+    'deadlock': 'C2', 'gridlock': 'C2', 'polarization': 'B2', 'radicalization': 'C2',
+    'extremism': 'C2', 'moderate': 'B1', 'centrist': 'C2', 'conservative': 'B1',
+    'ideology': 'B2', 'disinformation': 'B1', 'misinformation': 'B1', 'exploit': 'B2',
+    'algorithm': 'C1', 'disruption': 'C1', 'innovation': 'B2', 'escalation': 'C2',
+    'deterrence': 'C2', 'containment': 'B1', 'intervention': 'B1', 'occupation': 'B2',
+    'ceasefire': 'C1', 'armistice': 'C1', 'reconciliation': 'C1', 'reparation': 'B1',
+    'allegation': 'B2', 'constitutional': 'B1', 'plebiscite': 'C2', 'gerrymandering': 'C2',
+    'filibuster': 'C2', 'lobbying': 'B2', 'discretion': 'B1', 'prerogative': 'C2',
+    'entitlement': 'C1', 'stipulation': 'C2', 'provision': 'B2', 'clause': 'B2',
+    'amendment': 'B2', 'ratification': 'C2', 'treaty': 'B2', 'accord': 'C1', 'protocol': 'B1',
+    'sanction': 'C2', 'blockade': 'C2', 'perspicacious': 'C2', 'ineffable': 'C1',
+    'recalcitrant': 'C2', 'assiduous': 'C2', 'sagacious': 'B2', 'vicarious': 'C2',
+    'circuitous': 'B2', 'obstreperous': 'C2', 'fastidious': 'C2', 'inscrutable': 'C2',
+    'sanguine': 'C2', 'parsimonious': 'C2', 'loquacious': 'C2', 'mercurial': 'C2'
+  };
+
   // "Word of the Day" pulls from this same VOCAB_WORDS bank rather than a
   // separate list — every entry's `word` is one of the terms above. A short
   // definition is the only thing that has to live here, since VOCAB_WORDS
@@ -1566,7 +1725,11 @@
       var respondPromise = fetch('/api/respond', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ motion: MOTION, argument: text, history: history, side: playerSide, difficulty: difficulty })
+        body: JSON.stringify({
+          motion: MOTION, argument: text, history: history, side: playerSide, difficulty: difficulty,
+          wordOfDay: currentWordOfDay ? currentWordOfDay.word : '',
+          wordOfDayDef: currentWordOfDay ? currentWordOfDay.def : ''
+        })
       })
         .then(function (res) {
           return res.json().then(function (data) { return { ok: res.ok, data: data }; });
@@ -1735,12 +1898,16 @@
 
         var level = document.createElement('span');
         level.className = 'cuss-bag-card-level';
-        level.textContent = 'LV ' + entry.count;
+        // Real CEFR level (see VOCAB_CEFR above), not a made-up tier tied
+        // to use count — 'B2' is the documented fallback for any word
+        // that somehow isn't in the table (e.g. VOCAB_WORDS grew since a
+        // player's Bag was last saved).
+        level.textContent = VOCAB_CEFR[entry.word] || 'B2';
         card.appendChild(level);
 
         var word = document.createElement('span');
         word.className = 'cuss-bag-card-word';
-        word.textContent = entry.word;
+        word.textContent = entry.word + (entry.count > 1 ? ' ×' + entry.count : '');
         card.appendChild(word);
 
         var def = WORD_OF_DAY_DEFS[entry.word];
@@ -1840,6 +2007,13 @@
   var WOTD_SPIN_SECONDS = 4;
   var WOTD_BLUR_CLEAR_SECONDS = 2.2;
 
+  // Exposed at module scope so the arena's /api/respond call (see
+  // initArena() above) can tell the AI opponent what today's word is, so
+  // it can occasionally work it into a rebuttal. Set once initWordOfDay()
+  // below actually picks one; stays null (and is just omitted from the
+  // request) on the rare case that init hasn't run yet.
+  var currentWordOfDay = null;
+
   function initWordOfDay() {
     var reelWindow = document.getElementById('cuss-wotd-reel');
     var track = document.getElementById('cuss-wotd-track');
@@ -1847,6 +2021,7 @@
     if (!reelWindow || !track || !defEl) return;
 
     var entry = WORD_OF_DAY_ENTRIES[Math.floor(Math.random() * WORD_OF_DAY_ENTRIES.length)];
+    currentWordOfDay = entry;
     var pool = WORD_OF_DAY_ENTRIES.filter(function (e) { return e.word !== entry.word; });
     function randomDecoy() { return pool[Math.floor(Math.random() * pool.length)].word; }
 

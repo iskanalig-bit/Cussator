@@ -393,25 +393,8 @@ html { scroll-behavior: smooth; }
 }
 .cuss-cta-xl:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
 .cuss-cta-xl:active { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
-/* Bag — matches Chat's own size/proportions in whichever context it sits
-   (nav-cta or cuss-cta-xl's own size here), but reads as a distinct,
-   eye-catching counterpart rather than a smaller secondary link: solid
-   white instead of an outline, a black dotted border instead of solid,
-   bold black text set a touch larger than Chat's own. */
-.cuss-bag-cta {
-  align-self: center;
-  font-size: 26px; padding: 26px 72px; border-width: 1.5px;
-}
-.cuss-bag-btn {
-  background: #ffffff; color: #0a0a0d; font-weight: 700;
-  border-style: dotted; border-color: #0a0a0d;
-  box-shadow: 0 0 18px 3px rgba(255, 255, 255, 0.45);
-}
-.cuss-bag-btn:hover { background: #ececec; }
-.cuss-bag-btn:active { background: #dcdcdc; }
-/* Nav-scale Bag stays a touch larger than nav-scale Chat's 14px too, same
-   size relationship as the hero pair above. */
-.nav-cta.cuss-bag-btn { font-size: 15px; }
+/* Bag is styled as Chat's exact twin now (same .btn-primary / .cuss-cta-xl
+   classes in the HTML) — no separate Bag-specific look here anymore. */
 
 .cuss-demo {
   background: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
@@ -497,12 +480,7 @@ html { scroll-behavior: smooth; }
    pill shape instead, so it doesn't need the track to clip it square. */
 .cuss-arena-health .cuss-judge-track { height: 12px; overflow: visible; }
 .cuss-arena-health .cuss-judge-fill {
-  /* overflow:hidden here clips this element's OWN children (the tick
-     marks below) to its rounded shape — it does not clip this element's
-     own box-shadow, which is a paint effect on the border edge, not
-     "content"; only an ancestor's overflow:hidden (the track, now
-     overflow:visible above) could have clipped that. */
-  position: relative; border-radius: 99px; overflow: hidden;
+  position: relative; border-radius: 99px;
   background: var(--color-accent); color: var(--color-accent);
   transition: width 0.5s cubic-bezier(.22,.61,.36,1), background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
   /* Ambient glow in whichever color the bar currently is (accent, warn, or
@@ -513,21 +491,6 @@ html { scroll-behavior: smooth; }
      shadow, not a glow, on something this thin). Turned up to be clearly
      visible at a glance, not just a faint edge softening. */
   box-shadow: 0 0 22px 4px color-mix(in srgb, currentColor 75%, transparent);
-}
-/* Thin vertical tick marks across the filled portion — a retro/pixel
-   health-bar detail (blocks, not one smooth gradient), in the same spirit
-   as the monospace token counter (.cuss-token-budget). Layered as its own
-   ::after rather than folded into .cuss-judge-fill's own background so it
-   doesn't fight with the solid-color overrides the warn/hp-warning/
-   hp-critical states above already use. .cuss-judge-track's existing
-   overflow:hidden clips this to the current width for free, so the ticks
-   reveal progressively as the bar fills/depletes — no extra JS needed. */
-.cuss-arena-health .cuss-judge-fill::after {
-  content: ''; position: absolute; inset: 0;
-  background-image: repeating-linear-gradient(
-    to right, transparent, transparent 6px,
-    rgba(0, 0, 0, 0.32) 6px, rgba(0, 0, 0, 0.32) 8px
-  );
 }
 .cuss-arena-health .cuss-judge-fill.is-warn { background: var(--color-warn); color: var(--color-warn); }
 .cuss-arena-health .cuss-judge-fill.is-hp-warning { background: oklch(0.78 0.16 80); color: oklch(0.78 0.16 80); }

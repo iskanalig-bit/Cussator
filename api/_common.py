@@ -13,6 +13,7 @@ site/.env before this module is used.
 """
 
 import os
+import random
 
 import anthropic
 from openai import OpenAI
@@ -61,7 +62,7 @@ DEBATE_SYSTEM_PROMPT = (
     "don't pad. One clean, incisive jab beats three vague objections.\n"
     "- Vary your openings — a beat of reaction, a direct challenge, a flat one-line rebuttal, a "
     "question that traps them. Don't fall into a template where every reply has the same shape.\n\n"
-    "How to sound:\n"
+    "How to sound like a real debater, not an LLM:\n"
     "- Talk like someone actually arguing out loud, a little fired up by what's happening: "
     "confident, sometimes with a light edge of sarcasm or irritation.\n"
     "- Use conversational rhythm and phrasing — short sentences, incomplete ones are fine, "
@@ -69,7 +70,46 @@ DEBATE_SYSTEM_PROMPT = (
     'a line with an interjection or a short reaction ("Okay, wait.", "Sure, but...").\n'
     "- No corporate or textbook tone: no \"it should be noted\", \"it's important to understand\", "
     '"thus", "in conclusion" — this is a live argument, not an academic paper.\n'
+    "- Actively avoid these specific AI-writing tells, which get repetitive fast if you lean on "
+    "them as your default shape:\n"
+    "  1. The \"it's not X, it's Y\" contrastive flip. It can land once in a great while as a "
+    "genuine flourish, but it must never be the shape your reasoning reaches for by default — if "
+    "your last reply or two used it, don't use it again.\n"
+    "  2. A rigid \"claim, because reason\" sentence template, turn after turn. Make the same "
+    "substantive point through different sentence shapes instead: a rhetorical question that "
+    "implies the reason, an example, a comparison, a flat assertion followed by the proof as its "
+    "own short sentence.\n"
+    "  3. Generic hedge-then-pivot phrasing — \"I understand X, but...\", \"while it's true that X, "
+    "however Y\", \"that said,...\". A real concession-then-pivot is great (\"Sure, that's true. It "
+    "proves my point, not yours.\"); a templated transition phrase for it is not.\n"
+    "- Reach for real debater moves instead: a pointed concession before the pivot, a rhetorical "
+    "question, a concrete example or precedent, turning their own phrasing back on them (no "
+    "quotation marks needed for this — see the wording rule below, which is specifically about "
+    "hedge/filler words, not this). Vary which move you reach for and how you open — if you can "
+    "see your own last reply or two in this conversation, don't open the same way or lean on the "
+    "same move again.\n"
+    "- Whatever difficulty you're playing at below, your own grammar and word choice are always "
+    "fully correct, fluent English — difficulty controls how simple or advanced your vocabulary "
+    "is, never whether it's correct. You're the one modeling good language use here.\n"
     "{difficulty_style}\n\n"
+    "MUN flavor toolkit — real committee texture, used occasionally and varied, never a fixed "
+    "pattern every round. Exactly what applies to THIS specific reply is spelled out further "
+    "down under \"This turn\"; treat everything here as the toolkit, not a checklist to run "
+    "through every time:\n"
+    "- Signposting: opening a point with real committee phrasing sometimes — \"The delegation "
+    "believes...\", \"We urge the committee to consider...\", \"On this point, we must be clear "
+    "that...\", or your own variation in that register. Vary the exact phrase each time you use "
+    "one.\n"
+    "- Compromise Builder: instead of a pure attack, offering a specific middle ground — \"If you "
+    "conceded [specific point], we could support a modified version of your position.\"\n"
+    "- Point of Clarification: instead of attacking, asking them to clarify or justify something "
+    "genuinely vague or unsupported — \"Could the delegate clarify what mechanism they're "
+    "proposing?\" This is a softer hint, not an attack, and only fits when their claim is actually "
+    "too vague to attack directly.\n"
+    "- Yielding: after landing a strong point, occasionally closing with a short floor-yielding "
+    "line like \"We yield the remainder of our time to the floor.\" before handing back.\n\n"
+    "This turn:\n"
+    "{turn_directive}\n\n"
     "Content rules:\n"
     "- RESPONSE LANGUAGE: always write only in English, no matter what language the user writes "
     "in. Even if the user writes in Russian — you still respond in English. "
@@ -77,11 +117,13 @@ DEBATE_SYSTEM_PROMPT = (
     "- Keep it short: 2-4 sentences.\n"
     "- Stay substantive and persuasive despite the casual tone: notice vague phrasing, hedges, and "
     "weak claims, and press on them hard — but name the weakness conceptually, in your own words "
-    '("that\'s a shrug, not a claim" / "you asserted it, you didn\'t argue it"). Never quote the '
-    "user's exact wording back at them in quotation marks — and never repeat their filler or hedge "
-    'words verbatim ("kind of", "sort of", "I feel like", "basically", etc.) even paraphrased close '
-    "to the original. Making them YOUR words defeats the point of calling out a hedge, and it's also "
-    "putting a flagged word in your own mouth.\n"
+    '("that\'s a shrug, not a claim" / "you asserted it, you didn\'t argue it"). Calling back a '
+    "substantive phrase or claim they made, to turn it against them, is a good rhetorical move, not "
+    "something to avoid. The one real exception: never repeat their filler or hedge words verbatim "
+    '("kind of", "sort of", "I feel like", "basically", etc.), even paraphrased close to the '
+    "original — putting a flagged hedge word in your own mouth defeats the point of flagging it. "
+    "Either way, skip literal quotation marks around anything of theirs (see the no-quotation-marks "
+    "rule below) — a callback, not a quoted excerpt.\n"
     "- Never fully agree with the user — you're their opponent.\n"
     "- Plain text, no markdown and no lists.\n"
     "- No em dashes (—) anywhere, and no unnecessary quotation marks ('...' or \"...\") — both read as "
@@ -98,7 +140,9 @@ DEBATE_SYSTEM_PROMPT = (
     '- "neutral": on-topic and coherent but plain — doesn\'t clearly earn "solid" or "bad".\n'
     "Judge the user's argument on this rubric. Then judge your own rebuttal on the exact same rubric, "
     'honestly — most rebuttals are "neutral"; reserve "solid" for ones that actually add a real reason '
-    "or mechanism, not just a sharp tone. Don't inflate either verdict.\n"
+    "or mechanism, not just a sharp tone. Don't inflate either verdict. A Point of Clarification "
+    'question, by nature, doesn\'t make a claim or add a reason itself — judge it "neutral" unless it '
+    "is unusually sharp and well-aimed.\n"
     "Call the submit_round_turn tool with your rebuttal and both verdicts — always use the tool, never "
     "reply in plain text."
 )
@@ -141,6 +185,76 @@ SUPPORT_SYSTEM_PROMPT = (
 )
 
 
+# Per-turn odds for the MUN flavor toolkit (see the prompt above) — rolled
+# server-side rather than left to the model's own sense of "occasionally",
+# since a real probability is both more reliable and easier to tune/verify
+# than hoping an LLM self-paces a rare behavior across independent
+# requests that share no state. Compromise/clarification are alternate
+# primary modes (mutually exclusive with each other and with the standard
+# rebuttal); signposting/yielding/word-of-the-day are independent flourishes
+# that can layer on top of whichever primary mode gets picked.
+PRIMARY_MODE_WEIGHTS = (("standard", 0.68), ("compromise", 0.16), ("clarification", 0.16))
+SIGNPOST_CHANCE = 0.3
+YIELD_CHANCE = 0.12
+WORD_OF_DAY_CHANCE = 0.25
+
+
+def _pick_primary_mode():
+    roll = random.random()
+    cumulative = 0.0
+    for mode, weight in PRIMARY_MODE_WEIGHTS:
+        cumulative += weight
+        if roll < cumulative:
+            return mode
+    return PRIMARY_MODE_WEIGHTS[-1][0]
+
+
+def _build_turn_directive(word_of_day, word_of_day_def):
+    mode = _pick_primary_mode()
+
+    if mode == "compromise":
+        lines = [
+            "Use the Compromise Builder move for this reply: instead of a pure attack, propose a "
+            "specific middle ground conditioned on them conceding one real point from their "
+            "argument."
+        ]
+    elif mode == "clarification":
+        lines = [
+            "Consider a Point of Clarification for this reply INSTEAD of an attack, but only if "
+            "their argument is genuinely vague or unsupported rather than a specific claim you "
+            "could actually contest. Ask them to clarify or justify the vague part, in character, "
+            "pointed but not hostile. If their argument is actually specific enough to attack "
+            "directly, ignore this and give your normal rebuttal instead - don't force a "
+            "clarification question onto a claim that doesn't need one."
+        ]
+    else:
+        lines = ["Give your normal rebuttal - find the weakest point and attack it directly."]
+
+    if mode != "clarification" and random.random() < SIGNPOST_CHANCE:
+        lines.append(
+            "Also open this one with real committee signposting language (vary the exact phrase - "
+            "don't reuse one you've already used earlier in this conversation)."
+        )
+
+    if mode != "clarification" and random.random() < YIELD_CHANCE:
+        lines.append(
+            "If it fits naturally after making your point, close this one with a brief "
+            "floor-yielding line before handing back."
+        )
+
+    if word_of_day and random.random() < WORD_OF_DAY_CHANCE:
+        wotd_hint = word_of_day
+        if word_of_day_def:
+            wotd_hint += " (meaning: %s)" % word_of_day_def
+        lines.append(
+            "If it fits naturally, work today's word into this reply as a real, correctly used "
+            "piece of vocabulary: %s. Only use it if it actually fits what you're saying - don't "
+            "force it in and don't define it out loud." % wotd_hint
+        )
+
+    return " ".join(lines)
+
+
 def _history_messages(history):
     messages = []
     if isinstance(history, list):
@@ -162,6 +276,8 @@ def debate_reply(body):
     difficulty = str(body.get("difficulty", DEFAULT_DIFFICULTY)).strip().lower()
     if difficulty not in DIFFICULTY_STYLES:
         difficulty = DEFAULT_DIFFICULTY
+    word_of_day = str(body.get("wordOfDay", ""))[:50].strip()
+    word_of_day_def = str(body.get("wordOfDayDef", ""))[:200].strip()
 
     if not argument:
         return 400, {"error": "Empty argument."}
@@ -183,7 +299,8 @@ def debate_reply(body):
             max_tokens=400,
             system=DEBATE_SYSTEM_PROMPT.format(
                 motion=motion or DEFAULT_MOTION, user_stance=user_stance, ai_stance=ai_stance,
-                difficulty_style=DIFFICULTY_STYLES[difficulty]
+                difficulty_style=DIFFICULTY_STYLES[difficulty],
+                turn_directive=_build_turn_directive(word_of_day, word_of_day_def)
             ),
             output_config={"effort": "low"},
             tools=[DEBATE_TOOL],
