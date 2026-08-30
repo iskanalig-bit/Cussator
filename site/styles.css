@@ -955,6 +955,16 @@ html { scroll-behavior: smooth; }
 .cuss-difficulty-btn {
   display: flex; align-items: baseline; gap: var(--space-3); width: 100%; text-align: left;
   padding: var(--space-2) var(--space-2); border: none; border-radius: var(--radius-sm);
+  /* This is a bare <button>, not a .btn — without an explicit background
+     here, the browser's native UA-stylesheet button background (a pale
+     gray/white "buttonface") shows through instead of the page's dark
+     background, since nothing else in this rule ever set one. That's what
+     made Rookie/Chair render as pale unreadable boxes: only .is-active
+     (Delegate) happened to set its own background-color, which is the
+     only reason it looked correct. Regressed when the divider-line
+     background (a repeating-gradient) was removed from here without a
+     transparent replacement. */
+  background: transparent;
   color: var(--color-text); cursor: pointer; font-family: inherit;
   transition: background-color 0.15s ease;
 }
