@@ -464,7 +464,14 @@ html { scroll-behavior: smooth; }
 .cuss-arena-health .cuss-judge-track { height: 12px; }
 .cuss-arena-health .cuss-judge-fill {
   background: var(--color-accent); color: var(--color-accent);
-  transition: width 0.5s cubic-bezier(.22,.61,.36,1), background 0.3s ease, color 0.3s ease;
+  transition: width 0.5s cubic-bezier(.22,.61,.36,1), background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+  /* Soft ambient glow in whichever color the bar currently is (accent,
+     warn, or the hp-warning/hp-critical danger tiers below) — same
+     color-mix-with-currentColor technique as the hit pulse below, just
+     always-on instead of a one-off flash. Kept low-opacity/tight-blur so
+     it still reads clearly once the bar (and its color) is down to a
+     sliver near empty, rather than washing it out. */
+  box-shadow: 0 0 8px 1px color-mix(in srgb, currentColor 50%, transparent);
 }
 .cuss-arena-health .cuss-judge-fill.is-warn { background: var(--color-warn); color: var(--color-warn); }
 .cuss-arena-health .cuss-judge-fill.is-hp-warning { background: oklch(0.78 0.16 80); color: oklch(0.78 0.16 80); }
@@ -836,10 +843,21 @@ html { scroll-behavior: smooth; }
 }
 
 .cuss-highlight-wrap {
+  /* Borderless, same --color-bg as the rest of the page — the ruled line
+     on .cuss-arena-form above is the only separation between the round
+     content and the input now, not a boxed panel of its own. */
   position: relative; flex: 1; min-height: 78px; border-radius: var(--radius-md);
-  background: var(--color-surface); border: 1px solid var(--color-divider);
+  background: var(--color-bg);
 }
-.cuss-highlight-wrap:focus-within { border-color: var(--color-accent); }
+/* Send — a small solid-accent circle with an arrow glyph, chat-app style,
+   deliberately far less visually loud than .cuss-cta-xl (the actual Chat
+   CTA elsewhere on the site) despite sharing the same accent purple. */
+.cuss-send-btn {
+  width: 44px; height: 44px; flex: none; border-radius: 50%; padding: 0;
+  background: var(--color-accent); color: var(--color-bg); border-color: transparent;
+}
+.cuss-send-btn:hover { background: var(--color-accent-2); }
+.cuss-send-btn:active { background: var(--color-accent); }
 .cuss-highlight-layer, .cuss-highlight-input {
   position: absolute; inset: 0; margin: 0; padding: 16px 10px 6px; font: inherit; font-size: 14px; line-height: 1.5;
 }
@@ -849,7 +867,7 @@ html { scroll-behavior: smooth; }
 }
 .cuss-highlight-input {
   width: 100%; height: 100%; background: transparent; color: transparent;
-  caret-color: var(--color-text); border: none; resize: none; overflow: auto;
+  caret-color: var(--color-text); border: none; outline: none; resize: none; overflow: auto;
 }
 .cuss-highlight-input::placeholder { color: color-mix(in srgb, var(--color-text) 45%, transparent); }
 

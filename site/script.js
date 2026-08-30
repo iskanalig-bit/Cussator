@@ -1217,6 +1217,16 @@
     textarea.addEventListener('scroll', function () {
       highlightLayer.scrollTop = textarea.scrollTop;
     });
+    // Enter sends, same as clicking Send — Shift+Enter still inserts a
+    // newline for the rare multi-line argument. requestSubmit() (rather
+    // than calling the handler directly) still runs the form's own
+    // validation/guard clauses below, same as a real click would.
+    textarea.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        form.requestSubmit();
+      }
+    });
 
     function openArena() {
       resetRound();
