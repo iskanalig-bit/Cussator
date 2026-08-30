@@ -692,8 +692,9 @@
     var TOKEN_POOL_SIZE = 300;
 
     var openBtns = [document.getElementById('cuss-start-hero'), document.getElementById('cuss-start-nav')];
-    var enterOverlayEl = document.getElementById('cuss-enter-overlay');
     var ENTER_ANIM_DURATION = 2200; // must match the CSS keyframes' 2.2s duration
+    var SEND_KEY_PRESS_DURATION = 320; // must match .cuss-send-btn.is-pressed's 0.32s keyframe duration
+    var entering = false; // guards against overlapping runs from fast repeat Chat clicks
     var closeBtn = document.getElementById('cuss-arena-close');
     var transcript = document.getElementById('cuss-arena-transcript');
     var textarea = document.getElementById('cuss-arena-input');
@@ -712,20 +713,19 @@
     var judgePrecisionVal = document.getElementById('cuss-judge-precision-val');
     var judgeDeliveryFill = document.getElementById('cuss-judge-delivery-fill');
     var judgeDeliveryVal = document.getElementById('cuss-judge-delivery-val');
-    var gameoverEl = document.getElementById('cuss-gameover');
-    var gameoverTitle = document.getElementById('cuss-gameover-title');
-    var gameoverSub = document.getElementById('cuss-gameover-sub');
     var gameoverRestartBtn = document.getElementById('cuss-gameover-restart');
     var resultOverlay = document.getElementById('cuss-result-transition');
     var resultVerdict = document.getElementById('cuss-result-verdict');
     var resultHeadline = document.getElementById('cuss-result-headline');
     var resultSub = document.getElementById('cuss-result-sub');
     var resultRuleText = document.getElementById('cuss-result-rule-text');
-    var RESULT_ANIM_DURATION = 3600; // must match the CSS keyframes' 3.6s duration
+    var resultStats = document.getElementById('cuss-result-stats');
     var RESULT_LINE_DRAW_DELAY = 2700; // matches the keyframes' ~75-78% reveal point
+    var RESULT_STATS_REVEAL_DELAY = 3100; // shortly after the rule-line finishes drawing in
     var recapEl = document.getElementById('cuss-recap');
     var trendEl = document.getElementById('cuss-trend');
     var stanceSelectEl = document.getElementById('cuss-stance-select');
+    var stanceContentEl = document.getElementById('cuss-stance-content');
     var stanceMotionText = document.getElementById('cuss-stance-motion-text');
     var stanceAffirmBtn = document.getElementById('cuss-stance-affirm');
     var stanceNegateBtn = document.getElementById('cuss-stance-negate');
@@ -756,7 +756,7 @@
     var roundOver = false;
     var stanceTimer = null;
     var resultLineTimer = null;
-    var resultDoneTimer = null;
+    var resultStatsTimer = null;
     var playerSide = null;
     var difficulty = 'delegate';
     var turnTimer = null;
@@ -826,12 +826,13 @@
       if (judgeAnimTimer) { clearTimeout(judgeAnimTimer); judgeAnimTimer = null; }
       if (stanceTimer) { clearTimeout(stanceTimer); stanceTimer = null; }
       if (resultLineTimer) { clearTimeout(resultLineTimer); resultLineTimer = null; }
-      if (resultDoneTimer) { clearTimeout(resultDoneTimer); resultDoneTimer = null; }
+      if (resultStatsTimer) { clearTimeout(resultStatsTimer); resultStatsTimer = null; }
       if (resultOverlay) {
         resultOverlay.classList.remove('playing-win', 'playing-lose');
         resultOverlay.hidden = true;
       }
       if (resultVerdict) resultVerdict.classList.remove('line-drawn');
+      if (resultStats) resultStats.classList.remove('is-visible');
       stopTurnTimer();
       turnSecondsLeft = TURN_DURATION_SECONDS;
       updateTurnTimerDisplay();
@@ -840,8 +841,6 @@
       updateTokenDisplay(TOKEN_POOL_SIZE);
 
       roundOver = false;
-      gameoverEl.hidden = true;
-      gameoverEl.classList.remove('is-visible');
 
       setHealth(100);
       setAiHealth(100);
@@ -894,6 +893,11 @@
       stanceConfirmEl.hidden = true;
       stanceConfirmYouEl.className = 'cuss-stance-confirm-row';
       stanceConfirmAiEl.className = 'cuss-stance-confirm-row';
+      // Defensive: Rematch calls resetRound() directly (never through
+      // playEnterThenOpen()), so if anything ever left is-entering set,
+      // this guarantees .cuss-stance-content shows immediately rather than
+      // staying suppressed with no timer left to clear it.
+      stanceSelectEl.classList.remove('is-entering');
       stanceSelectEl.hidden = false;
     }
 
@@ -924,6 +928,10 @@
         arenaSideEl.hidden = false;
         arenaSideEl.textContent = side === 'affirm' ? 'AFFIRM' : 'NEGATE';
         arenaSideEl.classList.add(side === 'affirm' ? 'is-affirm' : 'is-negate');
+        // rAF so the browser paints the pre-fade (opacity:0) frame first —
+        // otherwise adding is-visible in the same tick as unhiding skips
+        // straight to the end state and there's nothing to transition from.
+        requestAnimationFrame(function () { arenaSideEl.classList.add('is-visible'); });
       }
 
       // Fill in the pre-round anchor's avatars/labels now that sides are
@@ -986,12 +994,6 @@
       // handler's early checkGameOver() returns) — call it here too so
       // the panel always reflects the final turn, not the one before it.
       revealJudge();
-      gameoverTitle.textContent = playerWon ? 'You Win' : 'You Lose';
-      gameoverTitle.classList.toggle('is-win', playerWon);
-      gameoverTitle.classList.toggle('is-lose', !playerWon);
-      gameoverSub.textContent = playerWon
-        ? "The AI opponent's position collapsed under the pressure of your argument."
-        : "Your position collapsed under the pressure of the AI opponent's argument.";
 
       var totalFillerThisRound = Object.keys(roundFillerWords).reduce(function (sum, w) {
         return sum + roundFillerWords[w];
@@ -999,27 +1001,29 @@
       var priorHistory = loadRoundHistory();
       recordRoundFillerCount(totalFillerThisRound);
       renderRoundTrend(totalFillerThisRound, priorHistory);
-
       renderFillerRecap();
-      playRoundResultTransition(playerWon, function () {
-        gameoverEl.hidden = false;
-        requestAnimationFrame(function () { gameoverEl.classList.add('is-visible'); });
-      });
+
+      playRoundResultTransition(playerWon);
     }
 
-    // Ping-pong-volley win/lose transition, same visual language as
-    // "Entering the Chat" (playEnterThenOpen()) — plays once, then hands off
-    // to the existing gameover reveal via onDone(). Upper lip = player,
-    // lower = AI, matching the health-bar order; whichever one "returns" the
-    // final volley vs. fades out as the ball flies past is driven entirely
-    // by playerWon, never guessed from anything else. Only ever called from
-    // endRound(), which itself only runs once per round (see roundOver
-    // guard in checkGameOver()) — so this can't double-fire or play for a
-    // mid-round state.
-    function playRoundResultTransition(playerWon, onDone) {
-      if (!resultOverlay || !resultVerdict) { onDone(); return; }
+    // Ping-pong-volley win/lose transition — plays, then the SAME screen
+    // (lips/ball frozen at their end state, verdict line + headline still
+    // up) reveals the round stats and Rematch button below the verdict,
+    // instead of handing off to a separate gameover screen the way this
+    // used to work. That handoff was itself a second screen transition —
+    // its own place for a homepage-flash-style glitch to creep in (see the
+    // "Entering the Chat" -> stance-select fix) — and read as two
+    // differently-styled screens stitched together rather than one result.
+    // Upper lip = player, lower = AI, matching the health-bar order;
+    // whichever one "returns" the final volley vs. fades out as the ball
+    // flies past is driven entirely by playerWon, never guessed from
+    // anything else. Only ever called from endRound(), which itself only
+    // runs once per round (see roundOver guard in checkGameOver()) — so
+    // this can't double-fire or play for a mid-round state.
+    function playRoundResultTransition(playerWon) {
+      if (!resultOverlay || !resultVerdict) return;
       if (resultLineTimer) clearTimeout(resultLineTimer);
-      if (resultDoneTimer) clearTimeout(resultDoneTimer);
+      if (resultStatsTimer) clearTimeout(resultStatsTimer);
 
       resultHeadline.textContent = playerWon ? 'YOU WIN' : 'YOU LOSE';
       resultSub.textContent = playerWon ? 'CREDIBILITY HELD' : 'POSITION COLLAPSED';
@@ -1027,6 +1031,7 @@
 
       resultOverlay.classList.remove('playing-win', 'playing-lose');
       resultVerdict.classList.remove('line-drawn');
+      if (resultStats) resultStats.classList.remove('is-visible');
       resultOverlay.hidden = false;
       void resultOverlay.offsetWidth; // reflow so the keyframes always start from frame 0
       resultOverlay.classList.add(playerWon ? 'playing-win' : 'playing-lose');
@@ -1035,11 +1040,15 @@
         resultVerdict.classList.add('line-drawn');
       }, RESULT_LINE_DRAW_DELAY);
 
-      resultDoneTimer = setTimeout(function () {
-        resultOverlay.classList.remove('playing-win', 'playing-lose');
-        resultOverlay.hidden = true;
-        onDone();
-      }, RESULT_ANIM_DURATION);
+      // Stats + Rematch fade in shortly after the rule-line finishes
+      // drawing in, as a continuation of the same reveal rather than a cut
+      // to a new screen. The overlay itself is never hidden again after
+      // this — it just stays up (lip/ball animations already hold their
+      // final "forwards" keyframe) until resetRound() (Rematch, or closing
+      // and reopening the arena) clears it.
+      resultStatsTimer = setTimeout(function () {
+        if (resultStats) resultStats.classList.add('is-visible');
+      }, RESULT_STATS_REVEAL_DELAY);
     }
 
     // This round's filler total against the average of the player's own
@@ -1217,40 +1226,70 @@
     textarea.addEventListener('scroll', function () {
       highlightLayer.scrollTop = textarea.scrollTop;
     });
+    // Quick scale-down-and-back on the Send keycap, like a physical key
+    // being pressed — .btn has no :active transform of its own, so a real
+    // mouse click wouldn't otherwise show any press feedback either.
+    function flashSendKey() {
+      submitBtn.classList.remove('is-pressed');
+      void submitBtn.offsetWidth; // reflow so back-to-back presses each replay it
+      submitBtn.classList.add('is-pressed');
+      setTimeout(function () { submitBtn.classList.remove('is-pressed'); }, SEND_KEY_PRESS_DURATION);
+    }
+    submitBtn.addEventListener('click', flashSendKey);
     // Enter sends, same as clicking Send — Shift+Enter still inserts a
     // newline for the rare multi-line argument. requestSubmit() (rather
     // than calling the handler directly) still runs the form's own
-    // validation/guard clauses below, same as a real click would.
+    // validation/guard clauses below, same as a real click would. The
+    // button itself never receives this keystroke (the textarea does), so
+    // without flashSendKey() here it would sit inert while a physical
+    // Enter key visibly depresses.
     textarea.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
+        flashSendKey();
         form.requestSubmit();
       }
     });
 
+    // Opens the arena WITHOUT its usual 0.2s opacity fade — the fade is
+    // disabled just for this one open (restored right after, so closing
+    // still fades out normally). Needed now that "Entering the Chat" plays
+    // on .cuss-stance-select, a child of this same arena: if the arena
+    // itself faded in over 0.2s, the animation's very first frame would be
+    // partially see-through and the homepage would show behind it, the
+    // exact bug already fixed once for the old separate-overlay version of
+    // this transition.
     function openArena() {
       resetRound();
+      arena.style.transition = 'none';
       arena.classList.add('is-open');
+      void arena.offsetWidth; // flush the instant, transition-less open
+      arena.style.transition = '';
       arena.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
-      stanceAffirmBtn.focus();
     }
 
-    // Plays once on every Chat click, before the round setup (motion /
-    // difficulty / side) screen appears — see .cuss-enter-overlay in
-    // styles.css for the animation itself. Falls back to opening the arena
-    // immediately if the overlay markup is ever missing.
+    // Plays once on every Chat click, hosted directly on the round-setup
+    // screen (.cuss-stance-select, see "Entering the Chat" in styles.css)
+    // instead of a separate overlay that used to crossfade into it —
+    // exactly the two-screens-with-a-handoff pattern that caused the
+    // original flash-of-homepage bug. There's no second screen to hand off
+    // to anymore: the lip/ball/label animate themselves to invisible via
+    // their own existing keyframes (unchanged timing), then
+    // .cuss-stance-content fades in on this same element the instant
+    // is-entering comes off, all within one continuously-visible,
+    // continuously-opaque .cuss-stance-select.
     function playEnterThenOpen() {
-      if (!enterOverlayEl) { openArena(); return; }
-      document.body.style.overflow = 'hidden';
-      enterOverlayEl.hidden = false;
-      enterOverlayEl.classList.remove('is-playing');
-      void enterOverlayEl.offsetWidth; // reflow so a repeat click restarts the keyframes
-      enterOverlayEl.classList.add('is-playing');
+      if (entering) return; // ignore repeat Chat clicks mid-sequence
+      entering = true;
+      openArena();
+      stanceSelectEl.classList.remove('is-entering');
+      void stanceSelectEl.offsetWidth; // reflow so a repeat click restarts the keyframes
+      stanceSelectEl.classList.add('is-entering');
       setTimeout(function () {
-        enterOverlayEl.classList.remove('is-playing');
-        enterOverlayEl.hidden = true;
-        openArena();
+        stanceSelectEl.classList.remove('is-entering'); // reveals .cuss-stance-content, see CSS
+        stanceAffirmBtn.focus();
+        entering = false;
       }, ENTER_ANIM_DURATION);
     }
     function closeArena() {
@@ -1668,6 +1707,12 @@
     var bagCloseBtn = document.getElementById('cuss-bag-close');
     if (!bagEl || !bagList) return;
 
+    // Must match the CSS keyframes' 2.2s duration — same value as
+    // ENTER_ANIM_DURATION in initArena(), duplicated here since the two
+    // init functions don't share scope.
+    var BAG_ENTER_ANIM_DURATION = 2200;
+    var bagEntering = false; // guards against overlapping runs from fast repeat Bag clicks
+
     function renderBag() {
       var bag = loadBag();
       var entries = Object.keys(bag)
@@ -1684,35 +1729,58 @@
         return;
       }
 
-      entries.forEach(function (entry) {
-        var row = document.createElement('div');
-        row.className = 'cuss-bag-row';
+      entries.forEach(function (entry, i) {
+        var card = document.createElement('div');
+        card.className = 'cuss-bag-card';
+
+        var level = document.createElement('span');
+        level.className = 'cuss-bag-card-level';
+        level.textContent = 'LV ' + entry.count;
+        card.appendChild(level);
 
         var word = document.createElement('span');
-        word.className = 'cuss-bag-word';
-        word.textContent = entry.word + ' ×' + entry.count;
-        row.appendChild(word);
+        word.className = 'cuss-bag-card-word';
+        word.textContent = entry.word;
+        card.appendChild(word);
 
         var def = WORD_OF_DAY_DEFS[entry.word];
         if (def) {
           var defEl = document.createElement('span');
-          defEl.className = 'cuss-bag-def';
+          defEl.className = 'cuss-bag-card-def';
           defEl.textContent = def;
-          row.appendChild(defEl);
+          card.appendChild(defEl);
         }
 
-        bagList.appendChild(row);
+        bagList.appendChild(card);
+        // Dealt out one at a time (like a hand of cards), not popping in
+        // all at once.
+        setTimeout(function () { card.classList.add('is-visible'); }, i * 45);
       });
     }
 
+    // Plays the same lips-paddle "Entering the Chat" animation (see
+    // .cuss-enter-stage in styles.css and playEnterThenOpen() above) on
+    // this same panel before the collected-words content reveals — one
+    // continuous screen, same reasoning as the round entrance.
     function openBag() {
-      renderBag();
+      if (bagEntering) return;
+      bagEntering = true;
       bagEl.classList.add('is-open');
       bagEl.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
+
+      bagEl.classList.remove('is-entering');
+      void bagEl.offsetWidth; // reflow so a repeat click restarts the keyframes
+      bagEl.classList.add('is-entering');
+      setTimeout(function () {
+        bagEl.classList.remove('is-entering'); // reveals .cuss-bag-content, see CSS
+        renderBag();
+        bagEntering = false;
+      }, BAG_ENTER_ANIM_DURATION);
     }
     function closeBag() {
       bagEl.classList.remove('is-open');
+      bagEl.classList.remove('is-entering');
       bagEl.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
     }

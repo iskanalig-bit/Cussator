@@ -20,7 +20,7 @@
     <a href="#features">Features</a>
     <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
     <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
-    <button type="button" class="btn btn-ghost nav-cta" id="cuss-bag-nav">Bag <span id="cuss-bag-nav-count">(0)</span></button>
+    <button type="button" class="btn cuss-bag-btn nav-cta" id="cuss-bag-nav">Bag <span id="cuss-bag-nav-count">(0)</span></button>
   </nav>
 
   <div class="cuss-wrap">
@@ -35,7 +35,7 @@
         <div class="cuss-hero-actions">
           <div class="cuss-hero-cta-row">
             <button type="button" class="btn btn-primary cuss-cta-xl" id="cuss-start-hero">Chat</button>
-            <button type="button" class="btn btn-ghost cuss-bag-cta" id="cuss-bag-hero">Bag <span id="cuss-bag-hero-count">(0)</span></button>
+            <button type="button" class="btn cuss-bag-btn cuss-bag-cta" id="cuss-bag-hero">Bag <span id="cuss-bag-hero-count">(0)</span></button>
           </div>
           <a href="#how"><button type="button" class="btn btn-ghost">How it works</button></a>
         </div>
@@ -168,6 +168,17 @@
 <div class="cuss-arena" id="cuss-arena" aria-hidden="true">
   <div class="cuss-arena-inner">
     <div class="cuss-stance-select" id="cuss-stance-select">
+      <div class="cuss-enter-stage" id="cuss-enter-stage">
+        <div class="cuss-enter-lip cuss-enter-lip-upper">
+          <svg viewBox="0 0 160 120"><path d="M16 60 C16 42,48 34,68 36 C74 37,76 42,80 42 C84 42,86 37,92 36 C112 34,144 42,144 60 C144 60,105 50,80 50 C55 50,16 60,16 60 Z" fill="#8B5CF6"/></svg>
+        </div>
+        <div class="cuss-enter-lip cuss-enter-lip-lower">
+          <svg viewBox="0 0 160 120"><path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="#8B5CF6"/></svg>
+        </div>
+        <div class="cuss-enter-ball"></div>
+        <div class="cuss-enter-label"><b>ENTERING</b> THE CHAT</div>
+      </div>
+      <div class="cuss-stance-content" id="cuss-stance-content">
       <p class="cuss-stance-eyebrow">Choose your side</p>
       <p class="cuss-stance-motion">Motion: &laquo;<span id="cuss-stance-motion-text"></span>&raquo;</p>
 
@@ -217,6 +228,7 @@
       <div class="cuss-stance-confirm" id="cuss-stance-confirm" hidden>
         <p class="cuss-stance-confirm-row" id="cuss-stance-confirm-you"></p>
         <p class="cuss-stance-confirm-row" id="cuss-stance-confirm-ai"></p>
+      </div>
       </div>
     </div>
 
@@ -288,18 +300,19 @@
       <span class="cuss-legend-item"><span class="cuss-legend-dot is-filler"></span>Filler</span>
       <span class="cuss-legend-item"><span class="cuss-legend-dot is-vocab"></span>Vocab</span>
       <span class="cuss-legend-item"><span class="cuss-legend-dot is-penalty"></span>Penalty</span>
-      <span class="cuss-token-budget" id="cuss-token-budget" title="Word Economy budget — 1 token = 1 word. Running out ends the round.">
-        <span class="cuss-token-val" id="cuss-token-val">300</span> / 300 tokens
-      </span>
     </div>
 
     <form class="cuss-arena-form" id="cuss-arena-form">
       <div class="cuss-highlight-wrap">
         <div class="cuss-highlight-layer" id="cuss-arena-highlight" aria-hidden="true"></div>
         <textarea class="cuss-highlight-input" id="cuss-arena-input" rows="3" placeholder="Your argument..." required></textarea>
+        <span class="cuss-token-budget" id="cuss-token-budget" title="Word Economy budget — 1 token = 1 word. Running out ends the round.">
+          <svg class="cuss-token-mark" viewBox="0 0 160 120" aria-hidden="true"><path d="M16 60 C16 42,48 34,68 36 C74 37,76 42,80 42 C84 42,86 37,92 36 C112 34,144 42,144 60 C144 60,105 50,80 50 C55 50,16 60,16 60 Z" fill="currentColor"/><path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="currentColor"/></svg>
+          <span class="cuss-token-arrow" aria-hidden="true">&darr;</span><span class="cuss-token-val" id="cuss-token-val">300</span> tokens
+        </span>
       </div>
       <button type="submit" class="btn cuss-send-btn" id="cuss-arena-submit" aria-label="Send">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="6 11 12 5 18 11"></polyline></svg>
+        <span class="cuss-send-glyph" aria-hidden="true">&crarr;</span>
       </button>
     </form>
 
@@ -312,39 +325,22 @@
           <svg viewBox="0 0 160 120"><path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="#8B5CF6"/></svg>
         </div>
         <div class="cuss-result-ball"></div>
-        <div class="cuss-result-verdict" id="cuss-result-verdict">
-          <div class="cuss-result-rule-line">
-            <span class="cuss-result-rule"></span>
-            <span class="cuss-result-rule-text" id="cuss-result-rule-text">MOTION CARRIES</span>
-            <span class="cuss-result-rule"></span>
-          </div>
-          <p class="cuss-result-headline" id="cuss-result-headline">YOU WIN</p>
-          <p class="cuss-result-sub" id="cuss-result-sub">CREDIBILITY HELD</p>
+      </div>
+      <div class="cuss-result-verdict" id="cuss-result-verdict">
+        <div class="cuss-result-rule-line">
+          <span class="cuss-result-rule"></span>
+          <span class="cuss-result-rule-text" id="cuss-result-rule-text">MOTION CARRIES</span>
+          <span class="cuss-result-rule"></span>
+        </div>
+        <p class="cuss-result-headline" id="cuss-result-headline">YOU WIN</p>
+        <p class="cuss-result-sub" id="cuss-result-sub">CREDIBILITY HELD</p>
+        <div class="cuss-result-stats" id="cuss-result-stats">
+          <div class="cuss-trend" id="cuss-trend"></div>
+          <div class="cuss-recap" id="cuss-recap"></div>
+          <button type="button" class="btn cuss-result-rematch" id="cuss-gameover-restart">Rematch</button>
         </div>
       </div>
     </div>
-
-    <div class="cuss-gameover" id="cuss-gameover" hidden>
-      <img src="cussator-mark.svg" alt="" class="cuss-gameover-mark">
-      <p class="cuss-gameover-title" id="cuss-gameover-title">You Win</p>
-      <p class="cuss-gameover-sub" id="cuss-gameover-sub"></p>
-      <div class="cuss-trend" id="cuss-trend"></div>
-      <div class="cuss-recap" id="cuss-recap"></div>
-      <button type="button" class="btn btn-primary cuss-cta-xl" id="cuss-gameover-restart">Rematch</button>
-    </div>
-  </div>
-</div>
-
-<div class="cuss-enter-overlay" id="cuss-enter-overlay" aria-hidden="true" hidden>
-  <div class="cuss-enter-stage">
-    <div class="cuss-enter-lip cuss-enter-lip-upper">
-      <svg viewBox="0 0 160 120"><path d="M16 60 C16 42,48 34,68 36 C74 37,76 42,80 42 C84 42,86 37,92 36 C112 34,144 42,144 60 C144 60,105 50,80 50 C55 50,16 60,16 60 Z" fill="#8B5CF6"/></svg>
-    </div>
-    <div class="cuss-enter-lip cuss-enter-lip-lower">
-      <svg viewBox="0 0 160 120"><path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="#8B5CF6"/></svg>
-    </div>
-    <div class="cuss-enter-ball"></div>
-    <div class="cuss-enter-label"><b>ENTERING</b> THE CHAT</div>
   </div>
 </div>
 
@@ -361,12 +357,24 @@
 
 <div class="cuss-bag" id="cuss-bag" aria-hidden="true">
   <div class="cuss-bag-inner">
-    <div class="cuss-bag-head">
-      <span class="cuss-bag-title">Bag</span>
-      <button type="button" class="btn btn-icon" id="cuss-bag-close" aria-label="Close">✕</button>
+    <div class="cuss-enter-stage" id="cuss-bag-enter-stage">
+      <div class="cuss-enter-lip cuss-enter-lip-upper">
+        <svg viewBox="0 0 160 120"><path d="M16 60 C16 42,48 34,68 36 C74 37,76 42,80 42 C84 42,86 37,92 36 C112 34,144 42,144 60 C144 60,105 50,80 50 C55 50,16 60,16 60 Z" fill="#8B5CF6"/></svg>
+      </div>
+      <div class="cuss-enter-lip cuss-enter-lip-lower">
+        <svg viewBox="0 0 160 120"><path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="#8B5CF6"/></svg>
+      </div>
+      <div class="cuss-enter-ball"></div>
+      <div class="cuss-enter-label"><b>ENTERING</b> THE BAG</div>
     </div>
-    <p class="cuss-bag-sub">Strong vocabulary you've actually landed in an argument, collected across every round you've played.</p>
-    <div class="cuss-bag-list" id="cuss-bag-list"></div>
+    <div class="cuss-bag-content" id="cuss-bag-content">
+      <div class="cuss-bag-head">
+        <span class="cuss-bag-title">Bag</span>
+        <button type="button" class="btn btn-icon" id="cuss-bag-close" aria-label="Close">✕</button>
+      </div>
+      <p class="cuss-bag-sub">Strong vocabulary you've actually landed in an argument, collected across every round you've played.</p>
+      <div class="cuss-bag-list" id="cuss-bag-list"></div>
+    </div>
   </div>
 </div>
 

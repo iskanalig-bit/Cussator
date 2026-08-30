@@ -62,6 +62,7 @@
   --font-heading: "Inter", system-ui, sans-serif;
   --font-heading-weight: 500;
   --font-body: "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Consolas", monospace;
 
   --space-1: 2.8px;
   --space-2: 5.6px;
@@ -257,8 +258,9 @@ textarea.input { min-height: 90px; resize: vertical; }
 .nav a { color: inherit; text-decoration: none; font-size: 14px; }
 .nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
 /* Small outlined nav Chat button — reuses .btn-primary as-is (purple
-   border, transparent fill, accent text), deliberately NOT .cuss-cta-xl,
-   so it stays visually secondary to the big solid hero Chat button. */
+   border, transparent fill, accent text). Same outline recipe as the big
+   hero Chat button now, just at nav scale, so it still reads as visually
+   secondary to it purely by size. */
 .nav-cta { flex: none; }
 
 /* — tables — */
@@ -380,14 +382,36 @@ html { scroll-behavior: smooth; }
    its own row so the big primary CTA still reads as the one dominant
    action, with "How it works" staying on its own line beneath both. */
 .cuss-hero-cta-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.cuss-bag-cta { align-self: center; }
+/* Chat — outlined, not solid: black fill, purple border and text, same
+   recipe .btn-primary already uses everywhere else, just scaled up. Keeps
+   the same ambient purple glow it always had (an outline can still glow),
+   referenced elsewhere in this file as "the homepage Chat button's glow". */
 .cuss-cta-xl {
   font-size: 24px; padding: 26px 72px; border-width: 1.5px;
-  background: var(--color-accent); color: var(--color-bg);
+  background: var(--color-bg); color: var(--color-accent); border-color: var(--color-accent);
   box-shadow: 0 16px 40px color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
-.cuss-cta-xl:hover { background: var(--color-accent-2); }
-.cuss-cta-xl:active { background: var(--color-accent); }
+.cuss-cta-xl:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.cuss-cta-xl:active { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+/* Bag — matches Chat's own size/proportions in whichever context it sits
+   (nav-cta or cuss-cta-xl's own size here), but reads as a distinct,
+   eye-catching counterpart rather than a smaller secondary link: solid
+   white instead of an outline, a black dotted border instead of solid,
+   bold black text set a touch larger than Chat's own. */
+.cuss-bag-cta {
+  align-self: center;
+  font-size: 26px; padding: 26px 72px; border-width: 1.5px;
+}
+.cuss-bag-btn {
+  background: #ffffff; color: #0a0a0d; font-weight: 700;
+  border-style: dotted; border-color: #0a0a0d;
+  box-shadow: 0 0 18px 3px rgba(255, 255, 255, 0.45);
+}
+.cuss-bag-btn:hover { background: #ececec; }
+.cuss-bag-btn:active { background: #dcdcdc; }
+/* Nav-scale Bag stays a touch larger than nav-scale Chat's 14px too, same
+   size relationship as the hero pair above. */
+.nav-cta.cuss-bag-btn { font-size: 15px; }
 
 .cuss-demo {
   background: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
@@ -421,7 +445,7 @@ html { scroll-behavior: smooth; }
   font-family: inherit; font-size: 10.5px; letter-spacing: 0.03em; text-transform: uppercase;
   color: var(--color-accent); background: transparent; cursor: pointer; white-space: nowrap;
   border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent); border-radius: 999px;
-  padding: 3px 9px; transition: background 0.15s ease, opacity 0.15s ease;
+  padding: 3px 9px; transition: background 0.15s ease, opacity 0.15s ease, color 0.2s ease, border-color 0.2s ease;
 }
 .cuss-simplify-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
 .cuss-simplify-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -449,6 +473,12 @@ html { scroll-behavior: smooth; }
   background: linear-gradient(to right, transparent, var(--color-neutral-800) 4px calc(100% - 4px), transparent) no-repeat top / 100% 1px;
 }
 .cuss-judge-item:first-child { background-image: none; padding-top: 0; }
+/* Arena round screen goes fully line-free (unlike the homepage demo card
+   above, which keeps its original look) — the top rule and the fading
+   dividers between Logic/Precision/Delivery are dropped, relying on the
+   existing gap/padding alone for rhythm instead of a drawn line. */
+#cuss-arena-judge { border-top: none; }
+#cuss-arena-judge .cuss-judge-item { background-image: none; }
 .cuss-judge-row { display: flex; align-items: center; gap: 8px; }
 .cuss-judge-row span:first-child { font-size: 12px; width: 64px; flex: none; cursor: help; }
 .cuss-judge-track { flex: 1; height: 6px; border-radius: 99px; background: var(--color-neutral-800); overflow: hidden; }
@@ -461,17 +491,43 @@ html { scroll-behavior: smooth; }
    actually changes. Scoped under .cuss-arena-health so the Judge panel's
    bars (deliberately secondary — "feedback only") stay untouched; they
    share the same .cuss-judge-track/-fill/-val classes otherwise. */
-.cuss-arena-health .cuss-judge-track { height: 12px; }
+/* overflow: visible (overriding the base track's overflow:hidden) so the
+   fill's glow below can actually bleed outward instead of being clipped
+   at the track edge — the fill rounds its own ends to match the track's
+   pill shape instead, so it doesn't need the track to clip it square. */
+.cuss-arena-health .cuss-judge-track { height: 12px; overflow: visible; }
 .cuss-arena-health .cuss-judge-fill {
+  /* overflow:hidden here clips this element's OWN children (the tick
+     marks below) to its rounded shape — it does not clip this element's
+     own box-shadow, which is a paint effect on the border edge, not
+     "content"; only an ancestor's overflow:hidden (the track, now
+     overflow:visible above) could have clipped that. */
+  position: relative; border-radius: 99px; overflow: hidden;
   background: var(--color-accent); color: var(--color-accent);
   transition: width 0.5s cubic-bezier(.22,.61,.36,1), background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
-  /* Soft ambient glow in whichever color the bar currently is (accent,
-     warn, or the hp-warning/hp-critical danger tiers below) — same
-     color-mix-with-currentColor technique as the hit pulse below, just
-     always-on instead of a one-off flash. Kept low-opacity/tight-blur so
-     it still reads clearly once the bar (and its color) is down to a
-     sliver near empty, rather than washing it out. */
-  box-shadow: 0 0 8px 1px color-mix(in srgb, currentColor 50%, transparent);
+  /* Ambient glow in whichever color the bar currently is (accent, warn, or
+     the hp-warning/hp-critical danger tiers below) — same color-mix-with-
+     currentColor technique as the hit pulse below and the same idea as the
+     homepage Chat button's glow, just a symmetric blur rather than that
+     button's directional drop-shadow (a 16px-down shadow reads as a
+     shadow, not a glow, on something this thin). Turned up to be clearly
+     visible at a glance, not just a faint edge softening. */
+  box-shadow: 0 0 22px 4px color-mix(in srgb, currentColor 75%, transparent);
+}
+/* Thin vertical tick marks across the filled portion — a retro/pixel
+   health-bar detail (blocks, not one smooth gradient), in the same spirit
+   as the monospace token counter (.cuss-token-budget). Layered as its own
+   ::after rather than folded into .cuss-judge-fill's own background so it
+   doesn't fight with the solid-color overrides the warn/hp-warning/
+   hp-critical states above already use. .cuss-judge-track's existing
+   overflow:hidden clips this to the current width for free, so the ticks
+   reveal progressively as the bar fills/depletes — no extra JS needed. */
+.cuss-arena-health .cuss-judge-fill::after {
+  content: ''; position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(
+    to right, transparent, transparent 6px,
+    rgba(0, 0, 0, 0.32) 6px, rgba(0, 0, 0, 0.32) 8px
+  );
 }
 .cuss-arena-health .cuss-judge-fill.is-warn { background: var(--color-warn); color: var(--color-warn); }
 .cuss-arena-health .cuss-judge-fill.is-hp-warning { background: oklch(0.78 0.16 80); color: oklch(0.78 0.16 80); }
@@ -638,7 +694,12 @@ html { scroll-behavior: smooth; }
 .cuss-arena.is-open { opacity: 1; pointer-events: auto; }
 .cuss-arena-inner {
   position: relative;
-  width: 100%; max-width: 900px; height: 100%; max-height: 100vh;
+  /* Full-bleed — no centered max-width column. Header, motion, HP bars,
+     transcript and input all fill this the entire way across since none
+     of them set their own width/max-width (only the choose-your-side
+     controls further down keep a centered, narrower measure of their
+     own, deliberately, for readability of that one screen). */
+  width: 100%; height: 100%; max-height: 100vh;
   /* Same gap token as .cuss-arena-transcript's internal gap (see below) —
      one consistent rhythm the whole way down: head → motion → HP bars →
      transcript (→ avatar row → prompt) → legend → input. */
@@ -660,9 +721,20 @@ html { scroll-behavior: smooth; }
    bottom legend row and the avatar row also use — keeps the header from
    reading as left-heavy with a bare close button stranded on the far right. */
 .cuss-arena-head-right { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+/* Guaranteed minimum clearance from the arena's own right edge — without
+   this, the close button sits exactly on the same boundary any inner
+   overlay's scrollbar renders at (e.g. .cuss-result-transition when its
+   content overflows), which reads as the button being flush against the
+   scrollbar and cramped to click. Small and permanent, not conditional on
+   whether a scrollbar actually happens to be showing. */
+#cuss-arena-close { margin-right: 6px; }
 /* Reflects the side the player already picked (see chooseStance()) — hidden
    until then. Same blue/red as the stance-select buttons and pre-round
-   avatars for one consistent affirm/negate color language. */
+   avatars for one consistent affirm/negate color language. Fades in
+   (is-visible, added a frame after unhiding — see chooseStance()) rather
+   than just popping into the header the instant a side is picked. */
+.cuss-arena-side { opacity: 0; transition: opacity 0.2s ease; }
+.cuss-arena-side.is-visible { opacity: 1; }
 .cuss-arena-side.is-affirm { border-color: oklch(0.72 0.15 250); color: oklch(0.72 0.15 250); }
 .cuss-arena-side.is-negate { border-color: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25); }
 .cuss-arena-side[hidden] { display: none; }
@@ -683,23 +755,6 @@ html { scroll-behavior: smooth; }
   flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);
   padding-right: 4px; min-height: 120px; position: relative;
 }
-/* Faint ruled lines behind the empty transcript, before the first message —
-   hints "your argument will appear here" instead of leaving flex:1's
-   leftover space a flat black gap. Same fading-line technique as
-   .cuss-judge-item/.cuss-feature, just repeated down the page like ledger
-   paper. Toggled by .is-empty (see resetRound()/addUserBubbleAnimated() in
-   script.js) so it fades out the moment real content exists, rather than
-   showing behind every message forever. */
-.cuss-arena-transcript::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background-image: repeating-linear-gradient(
-    to bottom, transparent, transparent 30px,
-    color-mix(in srgb, var(--color-neutral-800) 65%, transparent) 30px,
-    color-mix(in srgb, var(--color-neutral-800) 65%, transparent) 31px
-  );
-  opacity: 0; transition: opacity 0.4s ease;
-}
-.cuss-arena-transcript.is-empty::after { opacity: 1; }
 /* Reads as an active prompt, not passive filler copy — the "YOUR TURN"
    badge reuses the exact .tag.tag-outline styling the "LIVE ROUND" badge
    uses, so the two read as the same visual language. */
@@ -730,34 +785,26 @@ html { scroll-behavior: smooth; }
   align-self: flex-end; max-width: 88%; background: var(--color-surface);
   border-radius: var(--radius-md); padding: var(--space-3); font-size: 14px; line-height: 1.5; margin: 0;
 }
-/* Entrance for both message types — a receipt line-item settling into place
-   rather than the generic fade+lift used everywhere else: a quick vertical
-   settle plus a ruled divider line drawing in above it (scaleX, same
-   neutral-800 used for every other ruled line on the site). Shared by
-   .cuss-bubble-user and .cuss-ai-card (aliased .cuss-bubble-ai) so both
-   sides of the exchange read as the same kind of "entry," not two
-   different animation languages. Kept under 250ms total — this fires on
-   every turn, so it needs to feel instant, not decorative. */
-.cuss-bubble-user, .cuss-bubble-ai {
-  position: relative;
+/* Entrance for both message types — no ruled line (the arena is line-free,
+   see .cuss-arena-transcript above), just motion. The player's own bubble
+   gets a plain settle (fade + quick rise) since it's their own words
+   appearing, not a reveal. The AI card (aliased .cuss-bubble-ai) gets a
+   distinct, punchier pop — scaling up from slightly small rather than
+   rising from below — so an incoming rebuttal reads as a different kind of
+   event than the player's own bubble, not the same motion mirrored. Kept
+   short — this fires on every turn, so it needs to feel instant. */
+.cuss-bubble-user {
   opacity: 0; transform: translateY(6px);
   transition: opacity 0.22s ease, transform 0.22s ease;
 }
-.cuss-bubble-user::before, .cuss-bubble-ai::before {
-  content: ''; position: absolute; top: -7px; left: 0; right: 0; height: 1px;
-  background: var(--color-neutral-800);
-  transform: scaleX(0); transform-origin: left;
-  transition: transform 0.25s ease-out 0.04s;
+.cuss-bubble-user.is-visible { opacity: 1; transform: translateY(0); }
+.cuss-ai-card {
+  opacity: 0; transform: scale(0.92);
+  transition: opacity 0.24s ease-out, transform 0.24s cubic-bezier(.2,1.4,.4,1);
 }
-.cuss-bubble-user.is-visible, .cuss-ai-card.is-visible {
-  opacity: 1; transform: translateY(0);
-}
-.cuss-bubble-user.is-visible::before, .cuss-ai-card.is-visible::before {
-  transform: scaleX(1);
-}
+.cuss-ai-card.is-visible { opacity: 1; transform: scale(1); }
 @media (prefers-reduced-motion: reduce) {
-  .cuss-bubble-user, .cuss-bubble-ai { transition: opacity 0.15s ease; transform: none; }
-  .cuss-bubble-user::before, .cuss-bubble-ai::before { transition: none; }
+  .cuss-bubble-user, .cuss-ai-card { transition: opacity 0.15s ease; transform: none; }
 }
 /* Highlight tiers — filler orange, curse red, connective blue, vocab green.
    Each gets a soft text-shadow glow in its own color, same intensity as the
@@ -821,45 +868,75 @@ html { scroll-behavior: smooth; }
 .cuss-legend-dot.is-vocab { background: oklch(0.75 0.13 150); }
 .cuss-legend-dot.is-penalty { background: oklch(0.63 0.22 25); }
 
-/* Word Economy token budget — shares the legend's row, pinned to the right.
-   Ticks down live (see checkTokenBudget() in script.js) as the player
-   types, same event as the highlighter; turns critical-red in the last 10%
-   of the pool as a quiet warning before the auto-loss actually fires. */
+/* Word Economy token budget — pinned in the bottom-right corner of the
+   input bar itself, right where the player is typing. Ticks down live
+   (see checkTokenBudget() in script.js) as they type, same event as the
+   highlighter; turns critical-red in the last 10% of the pool as a quiet
+   warning before the auto-loss actually fires. Styled like a small CLI
+   readout (monospace, muted grey, not accent purple) rather than a
+   game-UI label, with the lips mark recolored to match via currentColor +
+   fill="currentColor" on its paths (the standalone cussator-mark.svg
+   hardcodes purple internally, so an <img> of it couldn't be retinted
+   from CSS). pointer-events:none so it never blocks clicking/selecting
+   the text underneath; .cuss-highlight-input's bottom padding keeps typed
+   text from ever reaching this corner in the first place. */
 .cuss-token-budget {
-  margin-left: auto; font-size: 11px; font-variant-numeric: tabular-nums;
+  position: absolute; right: 10px; bottom: 5px; pointer-events: none; z-index: 1;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  transition: color 0.2s ease;
 }
-.cuss-token-val { font-weight: 700; color: var(--color-text); }
+.cuss-token-mark { width: 13px; height: auto; flex: none; color: inherit; }
+.cuss-token-arrow { font-size: 10px; }
+.cuss-token-val { font-weight: 700; color: var(--color-text); transition: color 0.2s ease; }
 .cuss-token-budget.is-critical, .cuss-token-budget.is-critical .cuss-token-val { color: oklch(0.63 0.22 25); }
 
-/* Ruled line separating the debate above from the input below — same
-   fading-line technique as .cuss-judge-item/.cuss-feature elsewhere on the
-   site, so the input reads as its own zone instead of floating disconnected
-   under the legend row. */
 .cuss-arena-form {
   display: flex; gap: var(--space-3); align-items: flex-end;
   padding-top: var(--space-3);
-  background: linear-gradient(to right, transparent, var(--color-neutral-800) 4px calc(100% - 4px), transparent) no-repeat top / 100% 1px;
 }
 
 .cuss-highlight-wrap {
-  /* Borderless, same --color-bg as the rest of the page — the ruled line
-     on .cuss-arena-form above is the only separation between the round
-     content and the input now, not a boxed panel of its own. */
+  /* Borderless, same --color-bg as the rest of the page — spacing alone
+     (var(--space-4) gap above, from .cuss-arena-inner) separates the round
+     content from the input now, not a ruled line or a boxed panel. */
   position: relative; flex: 1; min-height: 78px; border-radius: var(--radius-md);
   background: var(--color-bg);
 }
-/* Send — a small solid-accent circle with an arrow glyph, chat-app style,
-   deliberately far less visually loud than .cuss-cta-xl (the actual Chat
-   CTA elsewhere on the site) despite sharing the same accent purple. */
+/* Send — styled like a physical keyboard Enter key (rectangular keycap,
+   small corner radius, the return-arrow glyph a real Enter key shows)
+   rather than a circular chat-app send button — reinforces that pressing
+   the actual Enter key does the same thing. Solid accent purple, same
+   color as .cuss-cta-xl (the Chat CTA), but far smaller/quieter. */
 .cuss-send-btn {
-  width: 44px; height: 44px; flex: none; border-radius: 50%; padding: 0;
-  background: var(--color-accent); color: var(--color-bg); border-color: transparent;
+  width: 68px; height: 42px; flex: none; border-radius: var(--radius-sm); padding: 0;
+  background: var(--color-accent); color: var(--color-bg);
+  border: 2px dashed var(--color-bg);
+  box-shadow: 0 0 14px 2px color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 .cuss-send-btn:hover { background: var(--color-accent-2); }
 .cuss-send-btn:active { background: var(--color-accent); }
+.cuss-send-glyph { font-size: 20px; line-height: 1; }
+/* Fires when Enter is pressed on the textarea (see script.js) — the button
+   itself never receives that keystroke, so without this it would sit
+   there inert while a physical key visibly depresses. Also plays on a
+   real mouse click, same class, since :active alone doesn't leave a
+   visible trace once the mouse button is released. Pushed well past a
+   micro-interaction (deep scale-down + a small overshoot on the way back)
+   so it reads unmistakably as "this key was just pressed" even without a
+   mouse involved. Duration must match SEND_KEY_PRESS_DURATION in script.js. */
+@keyframes cuss-send-key-press {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.72); }
+  70% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.cuss-send-btn.is-pressed { animation: cuss-send-key-press 0.32s ease; }
 .cuss-highlight-layer, .cuss-highlight-input {
-  position: absolute; inset: 0; margin: 0; padding: 16px 10px 6px; font: inherit; font-size: 14px; line-height: 1.5;
+  /* Bottom padding reserves room for the token counter chip pinned in this
+     corner (see .cuss-token-budget) so typed text never runs under it. */
+  position: absolute; inset: 0; margin: 0; padding: 16px 10px 22px; font: inherit; font-size: 14px; line-height: 1.5;
 }
 .cuss-highlight-layer {
   white-space: pre-wrap; word-wrap: break-word; overflow: hidden;
@@ -873,13 +950,26 @@ html { scroll-behavior: smooth; }
 
 /* Stance-select screen — covers the arena when a round opens, until the
    player picks a side. Blue for Affirm, red for Negate, matching the same
-   hues used elsewhere (connective blue, curse red) for visual consistency. */
+   hues used elsewhere (connective blue, curse red) for visual consistency.
+   Also hosts "Entering the Chat" (.cuss-enter-stage) now — the two used to
+   be separate overlays that crossfaded (a second screen hand-off, exactly
+   the kind of seam a homepage-flash bug lives in; see playEnterThenOpen()
+   in script.js). The stage animates and fades itself to invisible via its
+   own existing keyframes (unchanged), then .cuss-stance-content fades in
+   on this SAME element — nothing is ever swapped for a different screen. */
 .cuss-stance-select {
-  position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: var(--space-4); text-align: center;
-  padding: var(--space-4); background: var(--color-bg);
+  position: absolute; inset: 0; z-index: 10; background: var(--color-bg);
 }
 .cuss-stance-select[hidden] { display: none; }
+.cuss-stance-content {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--space-4); text-align: center;
+  padding: var(--space-4);
+  opacity: 1; transition: opacity 0.4s ease;
+}
+/* Suppressed (no transition, so it doesn't fade back in mid-animation)
+   for exactly as long as the entrance is playing — see is-entering below. */
+.cuss-stance-select.is-entering .cuss-stance-content { opacity: 0; transition: none; }
 .cuss-stance-eyebrow {
   margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
@@ -902,11 +992,9 @@ html { scroll-behavior: smooth; }
 .cuss-difficulty-btn {
   display: flex; align-items: baseline; gap: var(--space-3); width: 100%; text-align: left;
   padding: var(--space-2) var(--space-2); border: none; border-radius: var(--radius-sm);
-  background: linear-gradient(to right, transparent, var(--color-neutral-800) 6px calc(100% - 6px), transparent) no-repeat top / 100% 1px;
   color: var(--color-text); cursor: pointer; font-family: inherit;
   transition: background-color 0.15s ease;
 }
-.cuss-difficulty-btn:first-child { background-image: none; }
 .cuss-difficulty-btn:hover { background-color: color-mix(in srgb, var(--color-text) 6%, transparent); }
 .cuss-difficulty-num {
   flex: none; width: 20px; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
@@ -964,40 +1052,9 @@ html { scroll-behavior: smooth; }
 .cuss-stance-confirm-row.cuss-text-affirm { color: oklch(0.72 0.15 250); }
 .cuss-stance-confirm-row.cuss-text-negate { color: oklch(0.63 0.22 25); }
 
-/* Round-over overlay — covers the arena when either side's Credibility hits 0. */
-.cuss-gameover {
-  position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: var(--space-4); text-align: center;
-  padding: var(--space-4);
-  background: color-mix(in srgb, var(--color-bg) 94%, transparent);
-  opacity: 0; transform: scale(0.98); transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.cuss-gameover.is-visible { opacity: 1; transform: scale(1); }
-.cuss-gameover[hidden] { display: none; }
-/* Small stamp above the result — the lips mark otherwise only shows up in
-   the nav and the favicon, despite being the site's one distinctive,
-   ownable icon. Muted so it reads as a mark on the page, not a logo lockup
-   competing with the win/lose headline. */
-.cuss-gameover-mark { width: 34px; height: auto; opacity: 0.55; }
-.cuss-gameover-title {
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: clamp(32px, 6vw, 52px); margin: 0;
-}
-.cuss-gameover-title.is-win { color: oklch(0.75 0.13 150); }
-.cuss-gameover-title.is-lose { color: oklch(0.63 0.22 25); }
-/* Fading rule under the headline, same language as the homepage's ledger
-   rows — separates the result from the itemized trend/recap below it
-   regardless of whether either is empty (unlike a divider on .cuss-trend
-   or .cuss-recap themselves, which can be empty and collapse via :empty). */
-.cuss-gameover-sub {
-  margin: 0; max-width: 42ch; padding-bottom: var(--space-4);
-  color: color-mix(in srgb, var(--color-text) 70%, transparent);
-  background: linear-gradient(to right, transparent, var(--color-neutral-800) 15%, var(--color-neutral-800) 85%, transparent) no-repeat bottom / 100% 1px;
-}
-
 /* Post-round filler-word recap — the player's own words from that round
    only, each paired with a stronger alternative. */
-.cuss-recap { display: flex; flex-direction: column; gap: 10px; align-items: center; max-width: 46ch; }
+.cuss-recap { display: flex; flex-direction: column; gap: 6px; align-items: center; max-width: 46ch; }
 .cuss-recap:empty { display: none; }
 .cuss-recap-heading {
   margin: 0; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
@@ -1012,9 +1069,11 @@ html { scroll-behavior: smooth; }
 .cuss-recap-arrow { color: color-mix(in srgb, var(--color-text) 40%, transparent); }
 .cuss-recap-to { color: oklch(0.75 0.13 150); font-weight: 600; }
 
-/* Round-result transition — plays once when a round ends (either side hits
-   0 Credibility), before the existing .cuss-gameover screen reveals. Same
-   ping-pong-volley language as "Entering the Chat" (.cuss-enter-*): the two
+/* Round-result screen — plays once when a round ends (either side hits 0
+   Credibility): the win/lose volley animation, then the round stats and
+   Rematch button fade in on this same screen (see .cuss-result-stats
+   below) rather than handing off to a separate screen. Same ping-pong-
+   volley language as "Entering the Chat" (.cuss-enter-*): the two
    lip halves lifted from the logo mark volley the ball, then on the final
    exchange the winning side's lip returns it (pulses, stays solid) and the
    losing side's lip fades out as the ball flies past. Upper = player, lower
@@ -1023,13 +1082,19 @@ html { scroll-behavior: smooth; }
    factor technique .cuss-enter-stage uses so this also scales down on small
    viewports instead of overflowing the arena card. */
 .cuss-result-transition {
-  position: absolute; inset: 0; z-index: 6; display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; overflow-y: auto; scrollbar-gutter: stable;
   background: var(--color-bg); opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+  padding: 6px var(--edge);
 }
 .cuss-result-transition[hidden] { display: none; }
 .cuss-result-transition.playing-win, .cuss-result-transition.playing-lose { opacity: 1; pointer-events: auto; }
+/* Same 65vmin/420px cap as .cuss-enter-stage ("Entering the Chat") so the
+   lips mark reads as one consistent size everywhere it appears — --u
+   (used by every lip/ball keyframe below) is derived from this the same
+   way there, so matching this one value matches lip and ball size too. */
 .cuss-result-stage {
-  position: relative; width: min(65vmin, 420px); height: min(65vmin, 420px);
+  position: relative; flex: none; width: min(65vmin, 420px); height: min(65vmin, 420px);
   --u: calc(min(65vmin, 420px) / 520px);
 }
 .cuss-result-lip {
@@ -1047,11 +1112,11 @@ html { scroll-behavior: smooth; }
   box-shadow: 0 0 18px 4px rgba(139, 92, 246, 0.6);
   opacity: 0;
 }
-.cuss-result-verdict {
-  position: absolute; left: 0; right: 0; bottom: calc(var(--u) * -110px); text-align: center;
-  opacity: 0;
-}
-.cuss-result-rule-line { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 0 0 12px; }
+/* Sits below the stage in normal flow now (not absolutely hung off it) so
+   the stats block added below it (see .cuss-result-stats) can grow the
+   screen naturally instead of overlapping the lips/ball. */
+.cuss-result-verdict { flex: none; margin-top: -60px; text-align: center; opacity: 0; }
+.cuss-result-rule-line { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 0 0 8px; }
 .cuss-result-rule { display: inline-block; height: 1px; width: 60px; background: currentColor; transform: scaleX(0); transform-origin: center; }
 .cuss-result-verdict.line-drawn .cuss-result-rule { animation: cuss-result-rule-draw 0.5s ease forwards; }
 @keyframes cuss-result-rule-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
@@ -1060,15 +1125,41 @@ html { scroll-behavior: smooth; }
 }
 .cuss-result-headline {
   margin: 0; font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: clamp(30px, 6vw, 44px); letter-spacing: -0.01em;
+  font-size: clamp(26px, 5vw, 36px); letter-spacing: -0.01em;
 }
 .cuss-result-sub {
-  margin: 6px 0 0; font-family: var(--font-heading); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
+  margin: 4px 0 0; font-family: var(--font-heading); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
   color: color-mix(in srgb, var(--color-text) 55%, transparent);
 }
+/* Round stats + Rematch — folded onto this same screen instead of a
+   separate .cuss-gameover screen (removed) that used to take over after
+   this animation finished; that hand-off was itself a second screen
+   transition (its own place for a flash-of-the-wrong-screen glitch, same
+   family as the "Entering the Chat" bug) and read as a different, plainer
+   screen stitched on after a more polished one. Fades in on its own,
+   timed from playRoundResultTransition() to land shortly after the
+   verdict rule-line finishes drawing in, not instantly with everything
+   else. Reuses .cuss-trend/.cuss-recap exactly as before — same data,
+   same markup, just a new parent and entrance. */
+.cuss-result-stats {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-3); opacity: 0; transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.cuss-result-stats.is-visible { opacity: 1; transform: translateY(0); }
+/* Solid accent-purple fill, same recipe as .cuss-cta-xl (the hero Chat
+   button) just sized down for a secondary action on this screen rather
+   than a marketing hero — a clear, unambiguous "this is Cussator" button
+   instead of the previous screen's plain light box. */
+.cuss-result-rematch {
+  margin-top: 2px; font-size: 15px; font-weight: var(--font-heading-weight); padding: 11px 32px;
+  background: var(--color-accent); color: var(--color-bg); border-color: transparent;
+}
+.cuss-result-rematch:hover { background: var(--color-accent-2); }
+.cuss-result-rematch:active { background: var(--color-accent); }
 
 /* Win: upper (player) lip returns the final volley, lower (AI) lip misses —
-   same green/red already used for .cuss-gameover-title, no new colors. */
+   same green already used elsewhere (e.g. .cuss-vocab), no new colors. */
 .cuss-result-transition.playing-win .cuss-result-lip-upper { animation: cuss-result-upper-win 3.6s cubic-bezier(0.4,0,0.2,1) forwards; }
 .cuss-result-transition.playing-win .cuss-result-lip-lower { animation: cuss-result-lower-win 3.6s cubic-bezier(0.4,0,0.2,1) forwards; }
 .cuss-result-transition.playing-win .cuss-result-ball { animation: cuss-result-ball-win 3.6s cubic-bezier(0.45,0,0.55,1) forwards; }
@@ -1144,34 +1235,37 @@ html { scroll-behavior: smooth; }
   100%     { opacity: 1; transform: translateY(0); }
 }
 
-/* "Entering the Chat" — plays once when Chat is clicked, before the round
-   setup (motion/difficulty/side) screen appears; see playEnterThenOpen() in
-   script.js. Built from the same two lip paths as the logo mark
-   (cussator-mark.svg), split so each half can move independently. --u is a
-   unitless scale factor (current stage size ÷ the 520px size the motion was
-   originally tuned at) — every distance below is `var(--u) * <original px>`
-   so the whole animation scales proportionally on small viewports instead
-   of overflowing or feeling out of place. */
-.cuss-enter-overlay {
-  position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
-  background: var(--color-bg); opacity: 0; pointer-events: none; transition: opacity 0.15s ease;
-}
-.cuss-enter-overlay[hidden] { display: none; }
-.cuss-enter-overlay.is-playing { opacity: 1; pointer-events: auto; }
+/* "Entering the Chat" — plays once when Chat is clicked, hosted directly on
+   .cuss-stance-select (see above) rather than a separate overlay that used
+   to crossfade into the round-setup screen underneath. Built from the same
+   two lip paths as the logo mark (cussator-mark.svg), split so each half
+   can move independently. --u is a unitless scale factor (current stage
+   size ÷ the 520px size the motion was originally tuned at) — every
+   distance below is `var(--u) * <original px>` so the whole animation
+   scales proportionally on small viewports instead of overflowing or
+   feeling out of place. Triggered by .is-entering on WHICHEVER container
+   currently hosts a .cuss-enter-stage (see playEnterThenOpen() in
+   script.js for the round entrance, playBagEnterThenOpen() for the Bag
+   drawer's own copy) — the selector below matches any ancestor with that
+   class, not just .cuss-stance-select, so both reuse the exact same
+   animation/timing (ENTER_ANIM_DURATION). */
 .cuss-enter-stage {
-  position: relative; width: min(65vmin, 420px); height: min(65vmin, 420px);
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(65vmin, 420px); height: min(65vmin, 420px);
   --u: calc(min(65vmin, 420px) / 520px);
+  pointer-events: none;
 }
 .cuss-enter-lip {
   position: absolute; left: 50%; top: 50%;
   width: calc(var(--u) * 170px); height: calc(var(--u) * 130px);
   margin-left: calc(var(--u) * -85px); margin-top: calc(var(--u) * -65px);
+  opacity: 0;
 }
 .cuss-enter-lip svg { width: 100%; height: 100%; display: block; }
-.cuss-enter-overlay.is-playing .cuss-enter-lip-upper {
+.is-entering .cuss-enter-lip-upper {
   animation: cuss-enter-upper-lip 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-.cuss-enter-overlay.is-playing .cuss-enter-lip-lower {
+.is-entering .cuss-enter-lip-lower {
   animation: cuss-enter-lower-lip 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 @keyframes cuss-enter-upper-lip {
@@ -1196,7 +1290,7 @@ html { scroll-behavior: smooth; }
   box-shadow: 0 0 18px 4px rgba(139, 92, 246, 0.6);
   opacity: 0;
 }
-.cuss-enter-overlay.is-playing .cuss-enter-ball {
+.is-entering .cuss-enter-ball {
   animation: cuss-enter-ball 2.2s cubic-bezier(0.45, 0, 0.55, 1) forwards;
 }
 @keyframes cuss-enter-ball {
@@ -1215,7 +1309,7 @@ html { scroll-behavior: smooth; }
   color: color-mix(in srgb, var(--color-text) 55%, transparent); opacity: 0;
 }
 .cuss-enter-label b { color: var(--color-text); font-weight: 600; }
-.cuss-enter-overlay.is-playing .cuss-enter-label {
+.is-entering .cuss-enter-label {
   animation: cuss-enter-label-fade 2.2s ease-in-out forwards;
 }
 @keyframes cuss-enter-label-fade {
@@ -1262,26 +1356,47 @@ html { scroll-behavior: smooth; }
 }
 .cuss-bag.is-open { opacity: 1; pointer-events: auto; }
 .cuss-bag-inner {
+  position: relative;
   width: 100%; max-width: 720px; height: 100%; max-height: 100vh;
   display: flex; flex-direction: column; gap: var(--space-3);
   padding: var(--space-4) var(--edge); overflow-y: auto;
 }
+/* Same "Entering the Chat" lips-paddle animation as opening a round (see
+   .cuss-enter-stage above and playBagEnterThenOpen() in script.js), just
+   hosted on this panel instead — the content fades in on this SAME
+   element the instant it finishes, no separate screen to hand off to. */
+.cuss-bag-content { opacity: 1; transition: opacity 0.4s ease; }
+.cuss-bag.is-entering .cuss-bag-content { opacity: 0; transition: none; }
 .cuss-bag-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .cuss-bag-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 20px; }
 .cuss-bag-sub {
   margin: 0; font-size: 13.5px; max-width: 60ch;
   color: color-mix(in srgb, var(--color-text) 65%, transparent);
 }
-.cuss-bag-list { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }
-.cuss-bag-row {
-  display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px;
-  font-size: 15px;
-  background: linear-gradient(to right, transparent, var(--color-neutral-800) 4px calc(100% - 4px), transparent) no-repeat top / 100% 1px;
-  padding-top: var(--space-3);
+/* Collected words as a trading-card lineup — a row/grid of individual
+   cards (word + "level", i.e. how many times it's actually landed) rather
+   than a plain list, so the Bag reads as a collection to show off, not a
+   log. Each card settles in with its own small pop (see .is-visible,
+   staggered from renderBag() in script.js) instead of all appearing at
+   once, echoing dealing out cards one at a time. */
+.cuss-bag-list { display: flex; flex-wrap: wrap; gap: var(--space-3); padding-top: var(--space-2); }
+.cuss-bag-card {
+  width: 136px; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: var(--space-3) var(--space-2); border-radius: var(--radius-md); text-align: center;
+  background: color-mix(in srgb, oklch(0.75 0.13 150) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, oklch(0.75 0.13 150) 35%, transparent);
+  opacity: 0; transform: translateY(10px) scale(0.94);
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(.2, 1.4, .4, 1);
 }
-.cuss-bag-list .cuss-bag-row:first-child { background-image: none; padding-top: 0; }
-.cuss-bag-word { color: oklch(0.75 0.13 150); font-weight: 600; }
-.cuss-bag-def { color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.cuss-bag-card.is-visible { opacity: 1; transform: translateY(0) scale(1); }
+.cuss-bag-card-level {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em;
+  color: color-mix(in srgb, oklch(0.75 0.13 150) 85%, var(--color-text));
+  border: 1px solid color-mix(in srgb, oklch(0.75 0.13 150) 45%, transparent);
+  border-radius: 999px; padding: 1px 8px;
+}
+.cuss-bag-card-word { font-size: 16px; font-weight: 700; color: oklch(0.75 0.13 150); }
+.cuss-bag-card-def { font-size: 11.5px; line-height: 1.35; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
 
 /* Round-end trend — this round's filler count against the player's own
    last-3-rounds average, pulled from the same localStorage history that
