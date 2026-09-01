@@ -860,6 +860,86 @@ html { scroll-behavior: smooth; }
   padding-top: var(--space-3);
 }
 
+/* Insert-from-Bag — a text-insertion shortcut, styled as a quiet square
+   twin of the Enter-key send button so the two read as the input row's
+   pair of controls, not one primary action and one random extra. */
+.cuss-bag-insert-wrap { position: relative; flex: none; }
+.cuss-bag-insert-btn {
+  width: 42px; height: 42px; flex: none; border-radius: var(--radius-sm); padding: 0;
+  background: transparent; color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+.cuss-bag-insert-btn:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
+.cuss-bag-insert-icon { width: 20px; height: auto; }
+.cuss-bag-insert-popover {
+  position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 20;
+  width: 220px; max-height: 260px; overflow-y: auto;
+  background: var(--color-surface); border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  padding: var(--space-2); box-shadow: var(--shadow-lg);
+}
+.cuss-bag-insert-popover-title {
+  margin: 0 0 4px; padding: 0 6px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.cuss-bag-insert-list { display: flex; flex-direction: column; gap: 2px; }
+.cuss-bag-insert-word {
+  display: block; width: 100%; text-align: left; font: inherit; font-size: 13px;
+  background: transparent; border: none; border-radius: var(--radius-sm); padding: 6px 6px;
+  color: oklch(0.75 0.13 150); cursor: pointer;
+}
+.cuss-bag-insert-word:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+
+/* The "pulling a card" animation — a transient, JS-created card (see
+   playCardPullAnimation() in script.js) that appears at the Bag-insert
+   button, flips over like a card being drawn to reveal the word (back
+   face reuses the same lips mark used elsewhere in the app), then flies
+   into the argument input and fades — purely cosmetic, blocks nothing,
+   and the actual word insertion happens right as it finishes. */
+.cuss-card-pull {
+  position: fixed; z-index: 300; pointer-events: none;
+  perspective: 600px;
+  opacity: 0; transform: scale(0.5);
+  transition: transform 0.22s ease, opacity 0.22s ease, left 0.35s cubic-bezier(.4,0,1,1), top 0.35s cubic-bezier(.4,0,1,1);
+}
+.cuss-card-pull.is-visible { opacity: 1; transform: scale(1); }
+/* Matches .cuss-card-pull-inner's own flip duration below so the outer
+   drift-up-and-grow reads as one combined motion with the flip, not two
+   mistimed movements. */
+.cuss-card-pull.is-flipped {
+  transition: transform 0.42s cubic-bezier(.34,1.56,.64,1), opacity 0.22s ease,
+    left 0.35s cubic-bezier(.4,0,1,1), top 0.35s cubic-bezier(.4,0,1,1);
+}
+.cuss-card-pull.is-flying { opacity: 0; transition: transform 0.38s cubic-bezier(.4,0,1,1), opacity 0.32s ease 0.06s, left 0.38s cubic-bezier(.4,0,1,1), top 0.38s cubic-bezier(.4,0,1,1); }
+.cuss-card-pull-inner {
+  position: relative; width: 100%; height: 100%; transform-style: preserve-3d;
+  transition: transform 0.42s cubic-bezier(.34,1.56,.64,1);
+}
+.cuss-card-pull.is-flipped .cuss-card-pull-inner { transform: rotateY(180deg); }
+.cuss-card-pull-face {
+  position: absolute; inset: 0; backface-visibility: hidden;
+  display: flex; align-items: center; justify-content: center; padding: var(--space-3);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+.cuss-card-pull-back {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+.cuss-card-pull-back svg { width: 36px; height: auto; }
+.cuss-card-pull-front {
+  transform: rotateY(180deg);
+  background: color-mix(in srgb, oklch(0.75 0.13 150) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, oklch(0.75 0.13 150) 50%, transparent);
+}
+.cuss-card-pull-front-word {
+  font-size: 15px; font-weight: 700; text-align: center; color: oklch(0.75 0.13 150);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cuss-card-pull, .cuss-card-pull.is-flying, .cuss-card-pull-inner { transition: none; }
+}
+
 .cuss-highlight-wrap {
   /* Borderless, same --color-bg as the rest of the page — spacing alone
      (var(--space-4) gap above, from .cuss-arena-inner) separates the round
@@ -1317,6 +1397,34 @@ html { scroll-behavior: smooth; }
 .cuss-scars-list { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }
 .cuss-scars-list .cuss-recap-row { justify-content: flex-start; font-size: 15px; }
 
+/* Connector Log — same full-screen panel pattern as Vocabulary Scars just
+   above (own class namespace so either can be removed independently), but
+   a positive tracker like the Bag rather than a corrective one: just a
+   running use-count per connector, no suggested alternative. See
+   recordConnectiveWords()/initConnectorLog() in script.js. */
+.cuss-connector-log {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: stretch; justify-content: center;
+  padding: 0; background: var(--color-bg);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+}
+.cuss-connector-log.is-open { opacity: 1; pointer-events: auto; }
+.cuss-connector-log-inner {
+  width: 100%; max-width: 720px; height: 100%; max-height: 100vh;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding: var(--space-4) var(--edge); overflow-y: auto;
+}
+.cuss-connector-log-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.cuss-connector-log-title { font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 20px; }
+.cuss-connector-log-sub {
+  margin: 0; font-size: 13.5px; max-width: 60ch;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.cuss-connector-log-list { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }
+.cuss-connector-log-list .cuss-recap-row { justify-content: flex-start; font-size: 15px; }
+/* Same blue already used for the live .cuss-connective highlight, so the
+   word reads as the same category here as it did mid-round. */
+.cuss-connector-word { color: oklch(0.72 0.15 250); font-weight: 600; }
+
 /* Bag — the positive mirror of Vocabulary Scars just above: identical
    full-screen panel structure, but the word itself is styled in the same
    green already used for the live "vocab" highlight (.cuss-vocab) instead
@@ -1368,6 +1476,27 @@ html { scroll-behavior: smooth; }
   border: 1px solid color-mix(in srgb, oklch(0.75 0.13 150) 45%, transparent);
   border-radius: 999px; padding: 1px 8px;
 }
+/* Purely cosmetic — flags words that are also real MUN/diplomatic
+   vocabulary (see MUN_TERMS in script.js). Accent purple rather than the
+   card's green, so it reads as a distinct second tag next to the CEFR
+   level pill above, not a variant of it. */
+.cuss-bag-card-mun {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: 999px; padding: 1px 8px;
+}
+/* Purely cosmetic, same pattern as .cuss-bag-card-mun above — flags words
+   also on the Academic Word List (see AWL_TERMS in script.js). Its own
+   third color (the site's existing warn/amber token) so a word carrying
+   both tags at once still reads as two distinct badges, not two of the
+   same thing. */
+.cuss-bag-card-awl {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--color-warn);
+  border: 1px solid color-mix(in srgb, var(--color-warn) 45%, transparent);
+  border-radius: 999px; padding: 1px 8px;
+}
 .cuss-bag-card-word { font-size: 16px; font-weight: 700; color: oklch(0.75 0.13 150); }
 .cuss-bag-card-def { font-size: 11.5px; line-height: 1.35; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
 
@@ -1386,5 +1515,6 @@ html { scroll-behavior: smooth; }
   .cuss-arena-inner { padding: var(--space-3); }
   .cuss-arena-form { flex-direction: column; align-items: stretch; }
   .cuss-scars-inner { padding: var(--space-3); }
+  .cuss-connector-log-inner { padding: var(--space-3); }
   .cuss-bag-inner { padding: var(--space-3); }
 }

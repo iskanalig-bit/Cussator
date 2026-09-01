@@ -19,6 +19,7 @@
     <a href="#how">How it works</a>
     <a href="#features">Features</a>
     <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
+    <a href="#" id="cuss-connector-log-link">Connector Log</a>
     <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
     <button type="button" class="btn btn-primary nav-cta" id="cuss-bag-nav">Bag <span id="cuss-bag-nav-count">(0)</span></button>
   </nav>
@@ -303,6 +304,15 @@
     </div>
 
     <form class="cuss-arena-form" id="cuss-arena-form">
+      <div class="cuss-bag-insert-wrap">
+        <button type="button" class="btn cuss-bag-insert-btn" id="cuss-bag-insert-btn" aria-label="Insert a word from your Bag" title="Insert a word from your Bag">
+          <svg class="cuss-bag-insert-icon" viewBox="0 0 160 120" aria-hidden="true"><path d="M16 60 C16 42,48 34,68 36 C74 37,76 42,80 42 C84 42,86 37,92 36 C112 34,144 42,144 60 C144 60,105 50,80 50 C55 50,16 60,16 60 Z" fill="currentColor"/><path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="currentColor"/></svg>
+        </button>
+        <div class="cuss-bag-insert-popover" id="cuss-bag-insert-popover" hidden>
+          <p class="cuss-bag-insert-popover-title">Insert from Bag</p>
+          <div class="cuss-bag-insert-list" id="cuss-bag-insert-list"></div>
+        </div>
+      </div>
       <div class="cuss-highlight-wrap">
         <div class="cuss-highlight-layer" id="cuss-arena-highlight" aria-hidden="true"></div>
         <textarea class="cuss-highlight-input" id="cuss-arena-input" rows="3" placeholder="Your argument..." required></textarea>
@@ -352,6 +362,17 @@
     </div>
     <p class="cuss-scars-sub">Your most repeated filler words across every round you've played, each with a stronger swap.</p>
     <div class="cuss-scars-list" id="cuss-scars-list"></div>
+  </div>
+</div>
+
+<div class="cuss-connector-log" id="cuss-connector-log" aria-hidden="true">
+  <div class="cuss-connector-log-inner">
+    <div class="cuss-connector-log-head">
+      <span class="cuss-connector-log-title">Connector Log</span>
+      <button type="button" class="btn btn-icon" id="cuss-connector-log-close" aria-label="Close">✕</button>
+    </div>
+    <p class="cuss-connector-log-sub">Logical connectors you've actually used to link your arguments, tracked across every round you've played.</p>
+    <div class="cuss-connector-log-list" id="cuss-connector-log-list"></div>
   </div>
 </div>
 

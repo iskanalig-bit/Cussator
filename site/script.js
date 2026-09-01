@@ -271,6 +271,38 @@
     });
   }
 
+  // Connector Log — same pattern again as Bag/Scars above: a persistent
+  // word -> use-count tally in localStorage, no accounts, no separate
+  // detection logic. classifyText()'s existing 'connective' tier (the same
+  // one that already colors these words blue live via .cuss-connective,
+  // and already feeds the Logic score through roundStats.connective) now
+  // also reports which specific words matched via connectiveWordsUsed —
+  // this just folds that into a running total, exactly like
+  // recordFillerWords/recordBagWords do for their own tiers. A positive
+  // tracker like Bag, not corrective like Scars, so there's no
+  // alternatives lookup here.
+  var CONNECTOR_LOG_KEY = 'cussatorConnectorLog';
+
+  function loadConnectorLog() {
+    try {
+      var raw = localStorage.getItem(CONNECTOR_LOG_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function recordConnectiveWords(words) {
+    if (!words.length) return;
+    try {
+      var log = loadConnectorLog();
+      words.forEach(function (w) { log[w] = (log[w] || 0) + 1; });
+      localStorage.setItem(CONNECTOR_LOG_KEY, JSON.stringify(log));
+    } catch (e) {
+      // localStorage unavailable — this round's tally just won't persist.
+    }
+  }
+
   // Per-round total filler-word count, oldest first — a second, smaller
   // localStorage log alongside the Scars word tally above. This is what
   // powers both the round-end "vs your last 3 rounds" trend and the
@@ -763,6 +795,7 @@
     var counts = { curse: 0, filler: 0, fillerLight: 0, connective: 0, vocab: 0 };
     var fillerWordsUsed = [];
     var vocabWordsUsed = [];
+    var connectiveWordsUsed = [];
     var html = escapeHtml(text);
 
     html = html.replace(CLASSIFIER_REGEX, function (m) {
@@ -771,6 +804,9 @@
       counts[entry.kind]++;
       if (entry.kind === 'filler' || entry.kind === 'fillerLight') fillerWordsUsed.push(entry.base);
       if (entry.kind === 'vocab') vocabWordsUsed.push(entry.base);
+      // Persistence-only addition (see recordConnectiveWords/Connector Log)
+      // — the live highlight and counts[entry.kind]++ above are unchanged.
+      if (entry.kind === 'connective') connectiveWordsUsed.push(entry.base);
       return '<span class="' + CLASSIFIER_CLASS[entry.kind] + '">' + m + '</span>';
     });
 
@@ -789,7 +825,8 @@
       vocabCount: counts.vocab,
       wordCount: words.length,
       fillerWordsUsed: fillerWordsUsed,
-      vocabWordsUsed: vocabWordsUsed
+      vocabWordsUsed: vocabWordsUsed,
+      connectiveWordsUsed: connectiveWordsUsed
     };
   }
 
@@ -859,6 +896,9 @@
     var textarea = document.getElementById('cuss-arena-input');
     var highlightLayer = document.getElementById('cuss-arena-highlight');
     var submitBtn = document.getElementById('cuss-arena-submit');
+    var bagInsertBtn = document.getElementById('cuss-bag-insert-btn');
+    var bagInsertPopover = document.getElementById('cuss-bag-insert-popover');
+    var bagInsertList = document.getElementById('cuss-bag-insert-list');
     var typing = document.getElementById('cuss-arena-typing');
     var healthFill = document.getElementById('cuss-health-fill');
     var healthVal = document.getElementById('cuss-health-val');
@@ -1039,6 +1079,7 @@
       // chooseStance(), which re-enables these once the confirm beat ends.
       textarea.disabled = true;
       submitBtn.disabled = true;
+      if (bagInsertBtn) bagInsertBtn.disabled = true;
       textarea.value = '';
       renderHighlight();
 
@@ -1126,6 +1167,7 @@
         stanceSelectEl.hidden = true;
         textarea.disabled = false;
         submitBtn.disabled = false;
+        if (bagInsertBtn) bagInsertBtn.disabled = false;
         textarea.focus();
         startTurnTimer();
       }, 1700);
@@ -1144,6 +1186,7 @@
       roundOver = true;
       textarea.disabled = true;
       submitBtn.disabled = true;
+      if (bagInsertBtn) bagInsertBtn.disabled = true;
       typing.hidden = true;
       typing.classList.remove('is-visible');
       stopTurnTimer();
@@ -1409,6 +1452,161 @@
         form.requestSubmit();
       }
     });
+
+    // Insert-from-Bag — a text-insertion shortcut only, nothing more. This
+    // never touches HP, the timer, or scoring: it just splices the chosen
+    // word into the textarea like a fast typist would, then dispatches a
+    // real 'input' event so the existing renderHighlight()/checkTokenBudget()
+    // listeners above pick it up exactly as if the player had typed it —
+    // no separate detection or scoring path for Bag-inserted words at all.
+    // Uses loadBag() (see Bag's own storage functions higher up) read-only;
+    // never writes to it.
+    if (bagInsertBtn && bagInsertPopover && bagInsertList) {
+      function closeBagInsertPopover() {
+        bagInsertPopover.hidden = true;
+      }
+
+      function renderBagInsertList() {
+        var bag = loadBag();
+        var entries = Object.keys(bag)
+          .map(function (w) { return { word: w, count: bag[w] }; })
+          .sort(function (a, b) { return b.count - a.count; });
+
+        bagInsertList.innerHTML = '';
+
+        if (!entries.length) {
+          var empty = document.createElement('p');
+          empty.className = 'cuss-recap-clean';
+          empty.textContent = 'No words in your Bag yet.';
+          bagInsertList.appendChild(empty);
+          return;
+        }
+
+        entries.forEach(function (entry) {
+          var row = document.createElement('button');
+          row.type = 'button';
+          row.className = 'cuss-bag-insert-word';
+          row.textContent = entry.word + ' ×' + entry.count;
+          row.addEventListener('click', function () {
+            closeBagInsertPopover();
+            playCardPullAnimation(entry.word);
+          });
+          bagInsertList.appendChild(row);
+        });
+      }
+
+      function openBagInsertPopover() {
+        if (textarea.disabled) return;
+        renderBagInsertList();
+        bagInsertPopover.hidden = false;
+      }
+
+      bagInsertBtn.addEventListener('click', function () {
+        if (bagInsertPopover.hidden) openBagInsertPopover();
+        else closeBagInsertPopover();
+      });
+      document.addEventListener('click', function (e) {
+        if (!bagInsertPopover.hidden
+          && !bagInsertPopover.contains(e.target)
+          && e.target !== bagInsertBtn && !bagInsertBtn.contains(e.target)) {
+          closeBagInsertPopover();
+        }
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !bagInsertPopover.hidden) closeBagInsertPopover();
+      });
+
+      // Splices the word in at the cursor (or appends it, if the textarea
+      // never had focus) with natural spacing, then fires the same 'input'
+      // event a real keystroke would — this IS the entire integration
+      // point with round logic; everything downstream (highlighting,
+      // Word Economy, and the classifyText() scoring pass on submit) is
+      // the existing pipeline running unmodified on ordinary text.
+      function insertWordAtCursor(word) {
+        var start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+        var end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : textarea.value.length;
+        var before = textarea.value.slice(0, start);
+        var after = textarea.value.slice(end);
+        var needsLeadingSpace = before.length > 0 && !/\s$/.test(before);
+        var needsTrailingSpace = after.length > 0 && !/^\s/.test(after);
+        var insert = (needsLeadingSpace ? ' ' : '') + word + (needsTrailingSpace ? ' ' : '');
+
+        textarea.value = before + insert + after;
+        var cursor = before.length + insert.length;
+        textarea.focus();
+        textarea.setSelectionRange(cursor, cursor);
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+
+      // The "pulling a card" animation — purely cosmetic, blocks nothing:
+      // the word is only actually inserted once the card finishes flying
+      // into the input. Reuses the same lips mark used for the loading
+      // animation/token counter elsewhere (see cussator-mark.svg) as the
+      // card's face-down back, flipped via a real 3D transform to reveal
+      // the word, then flown into the textarea. A transient DOM node,
+      // built and torn down entirely in JS — nothing persists.
+      var CARD_PULL_APPEAR_MS = 220;
+      var CARD_PULL_FLIP_MS = 420;
+      var CARD_PULL_HOLD_MS = 450;
+      var CARD_PULL_FLY_MS = 380;
+
+      function playCardPullAnimation(word) {
+        var originRect = bagInsertBtn.getBoundingClientRect();
+        var targetRect = textarea.getBoundingClientRect();
+        var cardWidth = 108;
+        var cardHeight = 140;
+        var originX = originRect.left + originRect.width / 2 - cardWidth / 2;
+        var originY = originRect.top + originRect.height / 2 - cardHeight / 2;
+        var targetX = targetRect.left + targetRect.width / 2 - cardWidth / 2;
+        var targetY = targetRect.top + targetRect.height / 2 - cardHeight / 2;
+
+        var card = document.createElement('div');
+        card.className = 'cuss-card-pull';
+        card.style.left = originX + 'px';
+        card.style.top = originY + 'px';
+        card.style.width = cardWidth + 'px';
+        card.style.height = cardHeight + 'px';
+        card.innerHTML =
+          '<div class="cuss-card-pull-inner">' +
+            '<div class="cuss-card-pull-face cuss-card-pull-back">' +
+              '<svg viewBox="0 0 160 120" aria-hidden="true">' +
+                '<path d="M16 60 C16 42,48 34,68 36 C74 37,76 42,80 42 C84 42,86 37,92 36 C112 34,144 42,144 60 C144 60,105 50,80 50 C55 50,16 60,16 60 Z" fill="currentColor"/>' +
+                '<path d="M16 60 C16 82,46 90,80 90 C114 90,144 82,144 60 C144 60,105 70,80 70 C55 70,16 60,16 60 Z" fill="currentColor"/>' +
+              '</svg>' +
+            '</div>' +
+            '<div class="cuss-card-pull-face cuss-card-pull-front">' +
+              '<span class="cuss-card-pull-front-word"></span>' +
+            '</div>' +
+          '</div>';
+        card.querySelector('.cuss-card-pull-front-word').textContent = word;
+        document.body.appendChild(card);
+
+        void card.offsetWidth; // reflow so the appear transition below actually plays
+        card.classList.add('is-visible');
+
+        setTimeout(function () {
+          // Flip to reveal the word while drifting up slightly — the flip
+          // and the move happen together, like the card is being turned
+          // over as it's drawn.
+          card.classList.add('is-flipped');
+          card.style.transform = 'translateY(-14px) scale(1.08)';
+        }, CARD_PULL_APPEAR_MS);
+
+        setTimeout(function () {
+          // Fly into the input and fade — insertion happens right as this
+          // finishes, so the word "arrives" the moment the card vanishes.
+          card.classList.add('is-flying');
+          card.style.left = targetX + 'px';
+          card.style.top = targetY + 'px';
+          card.style.transform = 'translateY(0) scale(0.4)';
+        }, CARD_PULL_APPEAR_MS + CARD_PULL_FLIP_MS + CARD_PULL_HOLD_MS);
+
+        setTimeout(function () {
+          card.remove();
+          insertWordAtCursor(word);
+        }, CARD_PULL_APPEAR_MS + CARD_PULL_FLIP_MS + CARD_PULL_HOLD_MS + CARD_PULL_FLY_MS);
+      }
+    }
 
     // Opens the arena WITHOUT its usual 0.2s opacity fade — the fade is
     // disabled just for this one open (restored right after, so closing
@@ -1702,6 +1900,7 @@
       });
       recordFillerWords(analysis.fillerWordsUsed);
       recordBagWords(analysis.vocabWordsUsed);
+      recordConnectiveWords(analysis.connectiveWordsUsed);
       updateBagBadge();
       tokensUsed += countWordTokens(text);
 
@@ -1710,6 +1909,7 @@
       renderHighlight();
       textarea.disabled = true;
       submitBtn.disabled = true;
+      if (bagInsertBtn) bagInsertBtn.disabled = true;
       stopTurnTimer();
       checkTokenBudget();
 
@@ -1748,6 +1948,7 @@
             addError(result.data.error || 'Failed to get a response from the AI opponent.');
             textarea.disabled = false;
             submitBtn.disabled = false;
+            if (bagInsertBtn) bagInsertBtn.disabled = false;
             textarea.focus();
             startTurnTimer();
             return;
@@ -1783,6 +1984,7 @@
           revealJudge();
           textarea.disabled = false;
           submitBtn.disabled = false;
+          if (bagInsertBtn) bagInsertBtn.disabled = false;
           textarea.focus();
           startTurnTimer();
         });
@@ -1859,6 +2061,128 @@
     });
   }
 
+  // Standalone view of the persistent Connector Log tally — same shape as
+  // initVocabScars() just above, reachable any time from the nav. Purely a
+  // display over data recordConnectiveWords() already accumulated from
+  // classifyText()'s existing connective-detection pass; no detection
+  // logic lives here.
+  function initConnectorLog() {
+    var logEl = document.getElementById('cuss-connector-log');
+    var logList = document.getElementById('cuss-connector-log-list');
+    var logLink = document.getElementById('cuss-connector-log-link');
+    var logCloseBtn = document.getElementById('cuss-connector-log-close');
+    if (!logEl || !logList) return;
+
+    function renderConnectorLog() {
+      var log = loadConnectorLog();
+      var entries = Object.keys(log)
+        .map(function (w) { return { word: w, count: log[w] }; })
+        .sort(function (a, b) { return b.count - a.count; });
+
+      logList.innerHTML = '';
+
+      if (!entries.length) {
+        var empty = document.createElement('p');
+        empty.className = 'cuss-recap-clean';
+        empty.textContent = "No connectors tracked yet — words like \"because\" or \"however\" show up here once you use them in a round.";
+        logList.appendChild(empty);
+        return;
+      }
+
+      entries.forEach(function (entry) {
+        var row = document.createElement('div');
+        row.className = 'cuss-recap-row';
+
+        var word = document.createElement('span');
+        word.className = 'cuss-connector-word';
+        word.textContent = '"' + entry.word + '" ×' + entry.count;
+
+        row.appendChild(word);
+        logList.appendChild(row);
+      });
+    }
+
+    function openConnectorLog() {
+      renderConnectorLog();
+      logEl.classList.add('is-open');
+      logEl.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeConnectorLog() {
+      logEl.classList.remove('is-open');
+      logEl.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    if (logLink) logLink.addEventListener('click', function (e) { e.preventDefault(); openConnectorLog(); });
+    if (logCloseBtn) logCloseBtn.addEventListener('click', closeConnectorLog);
+    logEl.addEventListener('click', function (e) { if (e.target === logEl) closeConnectorLog(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && logEl.classList.contains('is-open')) closeConnectorLog();
+    });
+  }
+
+  // Purely cosmetic tag for Bag cards — flags words that are also genuine
+  // MUN/diplomatic procedural vocabulary, separate from (and unrelated to)
+  // VOCAB_CEFR's real-world difficulty rating above. Read-only against
+  // existing Bag data: this never changes which words get collected, how
+  // they're leveled, or anything about round play — it only decides
+  // whether renderBag() below adds one extra badge to a card. Kept as its
+  // own flat array, deliberately separate from VOCAB_WORDS/VOCAB_CEFR, so
+  // it's trivial to extend or to rip out entirely without touching either
+  // of those.
+  var MUN_TERMS = [
+    'sovereignty', 'resolution', 'caucus', 'moratorium', 'delegation', 'ratify', 'ratification',
+    'consensus', 'mandate', 'sanction', 'sanctions', 'bilateral', 'multilateral', 'precedent',
+    'jurisdiction', 'amendment', 'quorum', 'treaty', 'accord', 'coalition', 'referendum', 'embargo',
+    'plenary', 'abstain', 'communique', 'rapporteur', 'protocol', 'statecraft', 'plebiscite',
+    'unilateral'
+  ];
+
+  // Second, independent Bag tag — same pattern and same constraints as
+  // MUN_TERMS above (purely cosmetic, read-only against existing Bag data,
+  // a word can carry both tags at once since this is checked separately).
+  // Flags words that also appear on Coxhead's Academic Word List (1998),
+  // the standard ~570-word-family list behind most IELTS/TOEFL academic
+  // vocabulary prep. No installable dataset or package for the real AWL
+  // was available to pull in (checked pip; nothing legitimate exists), so
+  // this is a hand-curated subset of its most-cited headwords — sublists
+  // 1 to 3 (its most frequent third) plus a handful of derived family
+  // forms that happen to already appear in VOCAB_WORDS above (e.g.
+  // "methodology", "coherence") — rather than a guess at the full list.
+  var AWL_TERMS = [
+    // sublist 1 (most frequent)
+    'analyze', 'analyse', 'approach', 'area', 'assess', 'assume', 'authority', 'available',
+    'benefit', 'concept', 'consist', 'constitute', 'context', 'contract', 'create', 'data',
+    'define', 'derive', 'distribute', 'economy', 'environment', 'establish', 'estimate', 'evident',
+    'export', 'factor', 'finance', 'formula', 'function', 'identify', 'income', 'indicate',
+    'individual', 'interpret', 'involve', 'issue', 'labor', 'labour', 'legal', 'legislate',
+    'major', 'method', 'occur', 'percent', 'period', 'policy', 'principle', 'proceed', 'process',
+    'require', 'research', 'respond', 'role', 'section', 'sector', 'significant', 'similar',
+    'source', 'specific', 'structure', 'theory', 'vary',
+    // sublist 2
+    'achieve', 'acquire', 'administrate', 'affect', 'appropriate', 'aspect', 'assist', 'category',
+    'chapter', 'commission', 'community', 'complex', 'compute', 'conclude', 'conduct', 'consequent',
+    'construct', 'consume', 'credit', 'culture', 'design', 'distinct', 'element', 'equate',
+    'evaluate', 'feature', 'final', 'focus', 'impact', 'injure', 'institute', 'invest', 'item',
+    'journal', 'maintain', 'normal', 'obtain', 'participate', 'perceive', 'positive', 'potential',
+    'previous', 'primary', 'purchase', 'range', 'region', 'regulate', 'relevant', 'reside',
+    'resource', 'restrict', 'secure', 'seek', 'select', 'site', 'strategy', 'survey', 'text',
+    'tradition', 'transfer',
+    // sublist 3
+    'alternative', 'circumstance', 'comment', 'compensate', 'component', 'consent', 'considerable',
+    'constant', 'constrain', 'contribute', 'convention', 'coordinate', 'core', 'corporate',
+    'correspond', 'criteria', 'deviate', 'displace', 'dynamic', 'eliminate', 'emphasis', 'ensure',
+    'exceed', 'external', 'facilitate', 'fundamental', 'generate', 'generation', 'image', 'liberal',
+    'licence', 'license', 'logic', 'margin', 'medical', 'mental', 'modify', 'monitor', 'network',
+    'notion', 'objective', 'orient', 'perspective', 'precise', 'prime', 'psychology', 'pursue',
+    'ratio', 'reject', 'revenue', 'stable', 'style', 'substitute', 'sustain', 'symbol', 'target',
+    'transit', 'trend', 'version', 'welfare', 'whereas',
+    // named directly by the user as expected matches, plus their family forms
+    'hypothesis', 'methodology', 'methodological', 'coherent', 'coherence', 'consistent',
+    'consistency', 'implement', 'subsequent'
+  ];
+
   // Standalone view of the persistent Bag tally — the positive mirror of
   // Vocabulary Scars above, same structure (full-screen panel, one row per
   // word, sorted by use-count), reachable from either of the two entry
@@ -1904,6 +2228,20 @@
         // player's Bag was last saved).
         level.textContent = VOCAB_CEFR[entry.word] || 'B2';
         card.appendChild(level);
+
+        if (MUN_TERMS.indexOf(entry.word) !== -1) {
+          var munTag = document.createElement('span');
+          munTag.className = 'cuss-bag-card-mun';
+          munTag.textContent = 'MUN term';
+          card.appendChild(munTag);
+        }
+
+        if (AWL_TERMS.indexOf(entry.word) !== -1) {
+          var awlTag = document.createElement('span');
+          awlTag.className = 'cuss-bag-card-awl';
+          awlTag.textContent = 'Academic';
+          card.appendChild(awlTag);
+        }
 
         var word = document.createElement('span');
         word.className = 'cuss-bag-card-word';
@@ -2075,6 +2413,7 @@
     initDemo();
     initArena();
     initVocabScars();
+    initConnectorLog();
     initBag();
     initHomepageStat();
     initWordOfDay();
