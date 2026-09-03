@@ -244,7 +244,8 @@ textarea.input { min-height: 90px; resize: vertical; }
 
 /* — navigation — */
 .nav {
-  display: flex; align-items: center; gap: var(--space-4);
+  display: flex; align-items: center; gap: var(--space-4); row-gap: var(--space-2);
+  flex-wrap: wrap;
   padding: var(--space-3) var(--space-4);
   border-bottom: none;
 }
@@ -387,7 +388,11 @@ html { scroll-behavior: smooth; }
    the same ambient purple glow it always had (an outline can still glow),
    referenced elsewhere in this file as "the homepage Chat button's glow". */
 .cuss-cta-xl {
-  font-size: 24px; padding: 26px 72px; border-width: 1.5px;
+  /* Horizontal padding scales down with the viewport instead of staying a
+     flat 72px a side — at 72px fixed, this plus its own text was tight or
+     overflowing on ~320-375px phones (also applies to Bag, which shares
+     this class — see the comment below). */
+  font-size: 24px; padding: 26px clamp(24px, 8vw, 72px); border-width: 1.5px;
   background: var(--color-bg); color: var(--color-accent); border-color: var(--color-accent);
   box-shadow: 0 16px 40px color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
@@ -872,8 +877,12 @@ html { scroll-behavior: smooth; }
 .cuss-bag-insert-btn:hover { background: color-mix(in srgb, var(--color-accent) 12%, transparent); }
 .cuss-bag-insert-icon { width: 20px; height: auto; }
 .cuss-bag-insert-popover {
+  /* width: min(220px, ...) instead of a flat 220px — anchored at left:0
+     with nothing clamping it to the viewport, a fixed 220px could clip or
+     overflow past the screen edge on narrow layouts depending on where
+     the insert button sits. */
   position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 20;
-  width: 220px; max-height: 260px; overflow-y: auto;
+  width: min(220px, calc(100vw - 2 * var(--space-4))); max-height: 260px; overflow-y: auto;
   background: var(--color-surface); border-radius: var(--radius-md);
   border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
   padding: var(--space-2); box-shadow: var(--shadow-lg);
@@ -1069,7 +1078,13 @@ html { scroll-behavior: smooth; }
    anchor, so the picker, the anchor, and the real transcript all share one
    avatar convention instead of introducing a new shape just for this screen. */
 .cuss-stance-btn {
-  flex-direction: row; align-items: center; width: 240px; height: auto; padding: 22px 22px; gap: var(--space-3);
+  /* min(240px, 100%) instead of a hard 240px — .cuss-stance-buttons already
+     wraps these onto their own line at narrow widths, but the fixed width
+     never actually shrank with the viewport; this caps at 240px on room to
+     spare and fills the available width instead of overflowing it when
+     there isn't. */
+  flex-direction: row; align-items: center; width: min(240px, 100%); height: auto;
+  padding: 22px 22px; gap: var(--space-3);
   border-radius: var(--radius-lg); transition: transform 0.15s ease, background 0.15s ease;
 }
 .cuss-stance-btn:hover { transform: translateY(-2px); }
