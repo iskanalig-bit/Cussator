@@ -1930,9 +1930,25 @@ html { scroll-behavior: smooth; }
   font-family: var(--font-heading); font-variant-numeric: tabular-nums;
   font-size: clamp(56px, 14vw, 96px); font-weight: 700; line-height: 1; color: var(--color-text);
   transition: color 0.2s ease;
+  /* Glowing-clock look: text-shadow keyed to currentColor so it's a soft
+     white halo normally, then automatically follows color into amber
+     (is-warn) and red (is-critical) below with no separate glow color to
+     keep in sync — one declaration, three looks. The breathing animation
+     is the "ticking clock" feel; is-critical layers its own faster opacity
+     pulse on TOP of it (multiple comma-separated animations), rather than
+     replacing it, so the glow keeps breathing even in the urgent state. */
+  text-shadow: 0 0 10px currentColor, 0 0 26px color-mix(in srgb, currentColor 55%, transparent);
+  animation: cuss-pitch-glow-pulse 1.6s ease-in-out infinite;
 }
 .cuss-pitch-timer.is-warn { color: var(--color-warn); }
-.cuss-pitch-timer.is-critical { color: oklch(0.63 0.22 25); animation: cuss-pitch-pulse 1s ease-in-out infinite; }
+.cuss-pitch-timer.is-critical {
+  color: oklch(0.63 0.22 25);
+  animation: cuss-pitch-pulse 1s ease-in-out infinite, cuss-pitch-glow-pulse 1.6s ease-in-out infinite;
+}
+@keyframes cuss-pitch-glow-pulse {
+  0%, 100% { text-shadow: 0 0 8px currentColor, 0 0 20px color-mix(in srgb, currentColor 45%, transparent); }
+  50% { text-shadow: 0 0 16px currentColor, 0 0 34px color-mix(in srgb, currentColor 65%, transparent); }
+}
 .cuss-pitch-timer-track { width: min(360px, 100%); height: 6px; border-radius: 3px; background: var(--color-surface); overflow: hidden; }
 .cuss-pitch-timer-fill {
   height: 100%; width: 100%; border-radius: 3px; background: var(--color-accent);
@@ -1944,7 +1960,9 @@ html { scroll-behavior: smooth; }
   0%, 100% { opacity: 1; } 50% { opacity: 0.55; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cuss-pitch-timer.is-critical { animation: none; }
+  /* Static glow stays (it's just a text-shadow, not motion) — only the
+     breathing/pulsing animations are dropped. */
+  .cuss-pitch-timer, .cuss-pitch-timer.is-critical { animation: none; }
 }
 
 /* Grows to fill the space below the timer, then stretches just the text
