@@ -491,7 +491,18 @@
     <p class="cuss-arena-motion">Motion: &laquo;<span id="cuss-pitch-motion-text"></span>&raquo;</p>
 
     <div class="cuss-pitch-timer-wrap">
-      <p class="cuss-pitch-timer" id="cuss-pitch-timer">60</p>
+      <!-- Pure SVG/CSS clock sweep, no library — a static track circle plus
+           one hand that rotates a full 360° over the 60 seconds (see
+           .cuss-pitch-clock-hand's animation in styles.css), landing back
+           at 12 o'clock exactly as time runs out. The number stays the
+           primary at-a-glance readout; this is a layer around it. -->
+      <div class="cuss-pitch-clock" id="cuss-pitch-clock">
+        <svg class="cuss-pitch-clock-svg" viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="cuss-pitch-clock-track" cx="50" cy="50" r="46"></circle>
+          <line class="cuss-pitch-clock-hand" id="cuss-pitch-clock-hand" x1="50" y1="50" x2="50" y2="10"></line>
+        </svg>
+        <p class="cuss-pitch-timer" id="cuss-pitch-timer">60</p>
+      </div>
       <div class="cuss-pitch-timer-track"><div class="cuss-pitch-timer-fill" id="cuss-pitch-timer-fill"></div></div>
     </div>
 

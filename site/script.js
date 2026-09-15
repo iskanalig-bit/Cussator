@@ -3214,6 +3214,8 @@
     var motionTextEl = document.getElementById('cuss-pitch-motion-text');
     var timerEl = document.getElementById('cuss-pitch-timer');
     var timerFillEl = document.getElementById('cuss-pitch-timer-fill');
+    var clockEl = document.getElementById('cuss-pitch-clock');
+    var clockHandEl = document.getElementById('cuss-pitch-clock-hand');
     var form = document.getElementById('cuss-pitch-form');
     var textarea = document.getElementById('cuss-pitch-input');
     var highlightLayer = document.getElementById('cuss-pitch-highlight');
@@ -3257,6 +3259,18 @@
       timerFillEl.style.width = (secondsLeft / PITCH_DURATION_SECONDS * 100) + '%';
       timerFillEl.classList.toggle('is-warn', warn);
       timerFillEl.classList.toggle('is-critical', critical);
+      if (clockEl) {
+        clockEl.classList.toggle('is-warn', warn);
+        clockEl.classList.toggle('is-critical', critical);
+        // Reduced motion skips the smooth 60s CSS sweep entirely (see the
+        // media query in styles.css) — this is the fallback: the hand still
+        // shows real progress, just as a once-a-second step matching the
+        // digit's own update cadence instead of a continuous animation.
+        if (REDUCED_MOTION && clockHandEl) {
+          var elapsed = PITCH_DURATION_SECONDS - secondsLeft;
+          clockHandEl.style.transform = 'rotate(' + (elapsed / PITCH_DURATION_SECONDS * 360) + 'deg)';
+        }
+      }
     }
 
     function stopTimer() {
@@ -3267,6 +3281,17 @@
       stopTimer();
       secondsLeft = PITCH_DURATION_SECONDS;
       pitchStartTime = Date.now();
+      // Restarts the sweep from 12 o'clock every time — same remove-class,
+      // force-reflow, re-add-class trick triggerScreenShake() uses in the
+      // arena, so a repeat pitch doesn't inherit the previous round's hand
+      // position or skip the animation (re-adding an already-present class
+      // is a no-op in the browser, hence the reflow in between).
+      if (clockEl) {
+        clockEl.classList.remove('is-sweeping', 'is-warn', 'is-critical');
+        if (clockHandEl) clockHandEl.style.transform = '';
+        void clockEl.offsetWidth;
+        clockEl.classList.add('is-sweeping');
+      }
       updateTimerDisplay();
       timerInterval = setInterval(function () {
         secondsLeft = Math.max(0, secondsLeft - 1);
@@ -3287,6 +3312,10 @@
       roundOver = false;
       stopTimer();
       secondsLeft = PITCH_DURATION_SECONDS;
+      if (clockEl) {
+        clockEl.classList.remove('is-sweeping', 'is-warn', 'is-critical');
+        if (clockHandEl) clockHandEl.style.transform = '';
+      }
       updateTimerDisplay();
 
       textarea.value = '';
