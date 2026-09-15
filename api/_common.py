@@ -35,16 +35,19 @@ DIFFICULTY_STYLES = {
         "- Difficulty: Rookie. Use simple, common, everyday words and short, direct sentences. "
         "No idioms, no advanced vocabulary, no dense or compressed phrasing. Stay just as "
         "logically sharp and just as willing to press hard on a weak point — you're simplifying "
-        "the language, never the argument."
+        "the language, never the argument. Keep this reply especially short for the tier: no more "
+        "than 50 words, ideally closer to 30."
     ),
     "delegate": (
         "- Difficulty: Delegate. Normal conversational range for a sharp, well-read debater — "
-        "not simplified, not showing off, just how you'd actually talk."
+        "not simplified, not showing off, just how you'd actually talk. Keep this reply under "
+        "about 75 words."
     ),
     "chair": (
         "- Difficulty: Chair. Deliberately dense, idiomatic, native-level phrasing — advanced "
         "vocabulary, compressed clauses, cultural idioms, no hand-holding. This is opt-in hard "
-        "mode for a player who wants a real challenge just parsing what you're saying."
+        "mode for a player who wants a real challenge just parsing what you're saying. Keep this "
+        "reply under about 75 words even at this density — dense, not sprawling."
     ),
 }
 
@@ -114,7 +117,7 @@ DEBATE_SYSTEM_PROMPT = (
     "- RESPONSE LANGUAGE: always write only in English, no matter what language the user writes "
     "in. Even if the user writes in Russian — you still respond in English. "
     "No exceptions.\n"
-    "- Keep it short: 2-4 sentences.\n"
+    "- Keep it short: 2-4 sentences, within the word cap noted in your difficulty tier above.\n"
     "- Stay substantive and persuasive despite the casual tone: notice vague phrasing, hedges, and "
     "weak claims, and press on them hard — but name the weakness conceptually, in your own words "
     '("that\'s a shrug, not a claim" / "you asserted it, you didn\'t argue it"). Calling back a '
@@ -124,6 +127,13 @@ DEBATE_SYSTEM_PROMPT = (
     "original — putting a flagged hedge word in your own mouth defeats the point of flagging it. "
     "Either way, skip literal quotation marks around anything of theirs (see the no-quotation-marks "
     "rule below) — a callback, not a quoted excerpt.\n"
+    "- If they lean on an evidence anchor (\"studies show\", \"according to the IPCC\", "
+    "\"historically\", a named source, a statistic, a precedent), engage with it directly instead of "
+    "arguing around it as if it weren't there — challenge whether it's actually named, whether it "
+    "says what they claim, or whether it's even relevant to the motion. An anchor that names no real "
+    "source is often the weak point itself.\n"
+    "- If their turn is too short, vague, or empty to contain an actual claim, say so plainly and "
+    "make that absence itself the attack — don't invent a rebuttal to content that was never there.\n"
     "- Never fully agree with the user — you're their opponent.\n"
     "- Plain text, no markdown and no lists.\n"
     "- No em dashes (—) anywhere, and no unnecessary quotation marks ('...' or \"...\") — both read as "
@@ -354,6 +364,193 @@ def simplify_reply(body):
         )
         reply = "".join(b.text for b in response.content if b.type == "text").strip()
         return 200, {"reply": reply or text}
+    except anthropic.AuthenticationError:
+        return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
+    except anthropic.APIStatusError as e:
+        return 500, {"error": f"Claude API error: {e.message}"}
+    except Exception as e:
+        return 500, {"error": f"Server error: {e}"}
+
+
+
+# 60-Second Elevator Pitch mode (see /api/pitch-review) — a single timed
+# pitch with no opponent turn, so it needs its own prompt rather than
+# debate_reply's adversarial one: constructive coaching feedback instead of
+# an in-character rebuttal, but the same solid/neutral/bad rubric as
+# DEBATE_SYSTEM_PROMPT above so scores stay comparable across modes.
+PITCH_SYSTEM_PROMPT = (
+    'You are a sharp, encouraging debate coach reviewing a single 60-second elevator pitch on '
+    'the motion: "{motion}". The speaker was arguing {user_stance}.\n\n'
+    "Give constructive, honest feedback in 2-3 sentences, plain text, no markdown, no em dashes, "
+    "no unnecessary quotation marks. Be specific: name the one thing that most helped or hurt the "
+    "pitch (a vague claim, a strong example, a hedge word, a missing reason), not generic "
+    "encouragement. Warm but direct, like a coach who actually wants them to improve, not a "
+    "customer-service bot.\n\n"
+    "Also judge the pitch's argument quality on this rubric —\n"
+    '- "solid": makes a clear claim AND ties it to a specific reason, mechanism, or example '
+    "relevant to the motion.\n"
+    '- "bad": vague, unsupported, dodges the resolution, or rests on an obvious logical fallacy '
+    "or non-sequitur.\n"
+    '- "neutral": on-topic and coherent but plain — doesn\'t clearly earn "solid" or "bad".\n'
+    'If no real pitch was given (empty, gibberish, or unrelated to the motion), judge it "bad" '
+    "and say so plainly and kindly in the critique.\n\n"
+    "Call the submit_pitch_review tool with your critique and verdict — always use the tool, "
+    "never reply in plain text."
+)
+
+PITCH_TOOL = {
+    "name": "submit_pitch_review",
+    "description": "Submit constructive critique plus a quality verdict on a single elevator pitch.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "critique": {
+                "type": "string",
+                "description": "2-3 sentence constructive critique, plain text, no markdown, no em dashes.",
+            },
+            "argument_verdict": {
+                "type": "string",
+                "enum": ["solid", "neutral", "bad"],
+                "description": "Quality verdict on the pitch, by the rubric.",
+            },
+        },
+        "required": ["critique", "argument_verdict"],
+    },
+}
+
+
+def pitch_review(body):
+    motion = str(body.get("motion", ""))[:500].strip()
+    argument = str(body.get("argument", ""))[:2000].strip()
+    side = str(body.get("side", "affirm")).strip().lower()
+    if side not in ("affirm", "negate"):
+        side = "affirm"
+
+    if not argument:
+        return 400, {"error": "Empty argument."}
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return 500, {"error": "ANTHROPIC_API_KEY is not set."}
+
+    user_stance = "FOR the motion (Prop)" if side == "affirm" else "AGAINST the motion (Opp)"
+
+    try:
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model="claude-opus-5",
+            max_tokens=250,
+            system=PITCH_SYSTEM_PROMPT.format(motion=motion or DEFAULT_MOTION, user_stance=user_stance),
+            output_config={"effort": "low"},
+            tools=[PITCH_TOOL],
+            tool_choice={"type": "tool", "name": "submit_pitch_review"},
+            messages=[{"role": "user", "content": argument}],
+        )
+        tool_use = next((b for b in response.content if b.type == "tool_use"), None)
+        if not tool_use:
+            return 500, {"error": "Model did not return a structured review."}
+
+        data = tool_use.input
+        critique = str(data.get("critique") or "").strip()
+        return 200, {
+            "critique": critique or "No critique was generated for this pitch.",
+            "argument_verdict": data.get("argument_verdict", "neutral"),
+        }
+    except anthropic.AuthenticationError:
+        return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
+    except anthropic.APIStatusError as e:
+        return 500, {"error": f"Claude API error: {e.message}"}
+    except Exception as e:
+        return 500, {"error": f"Server error: {e}"}
+
+
+# Post-round written critique for the arena's Judge panel (see /api/judge-critique).
+# The panel's actual Logic/Precision/Delivery numbers stay exactly what they
+# already were — a deterministic pure function of roundStats, computed
+# client-side in computeJudgeScores() (script.js). Same for Vocabulary Scars
+# and the Connector Log: both persist across every round via localStorage
+# with their own fixed, hand-curated data (FILLER_ALTERNATIVES for swap
+# suggestions), which an LLM re-inventing fresh flavor text per round would
+# make inconsistent round to round for the same word. This call adds ONLY
+# the written explanation the panel never had — it never computes, returns,
+# or influences any score, count, or swap suggestion.
+JUDGE_CRITIQUE_SYSTEM_PROMPT = (
+    'You are an independent, highly critical AI debate judge reviewing a completed round on the '
+    'motion: "{motion}". The user argued {user_stance}.\n\n'
+    "You are given the full text of every argument the user made this round, in order. Write a "
+    "short critique explaining the reasoning a strict judge would give for their performance — "
+    "you do not compute or report any scores or numbers yourself, that is handled elsewhere.\n\n"
+    "Look for: structural logical connectors (\"therefore\", \"furthermore\", etc.) and give real "
+    "credit when a point is grounded in a genuine evidence anchor (a named study, country, or "
+    "historic event) versus left as a bare assertion; logical fallacies (false dilemma, hasty "
+    "generalization, etc.); vocabulary sophistication versus conversational hand-waving and "
+    "repeated simple verbs; and hedging or filler language that undercuts delivery.\n\n"
+    "Rules:\n"
+    "- overall_summary: exactly 2 sentences, plain text.\n"
+    "- logic_breakdown: 2-3 sentences, plain text, citing specific moments where useful.\n"
+    "- Never use em dashes or unnecessary quotation marks.\n"
+    "- No markdown, no lists.\n"
+    "- Call the submit_judge_critique tool with both fields — always use the tool, never reply in "
+    "plain text."
+)
+
+JUDGE_CRITIQUE_TOOL = {
+    "name": "submit_judge_critique",
+    "description": "Submit a written critique of the round's Logic/Precision/Delivery performance.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "overall_summary": {
+                "type": "string",
+                "description": "Exactly 2 sentences, plain text, no em dashes, no unnecessary quotes.",
+            },
+            "logic_breakdown": {
+                "type": "string",
+                "description": "2-3 sentences, plain text, no em dashes, no unnecessary quotes.",
+            },
+        },
+        "required": ["overall_summary", "logic_breakdown"],
+    },
+}
+
+
+def judge_critique(body):
+    motion = str(body.get("motion", ""))[:500].strip()
+    side = str(body.get("side", "affirm")).strip().lower()
+    if side not in ("affirm", "negate"):
+        side = "affirm"
+
+    turns = body.get("turns", [])
+    if not isinstance(turns, list):
+        turns = []
+    turn_texts = [str(t)[:2000].strip() for t in turns if str(t).strip()][:20]
+
+    if not turn_texts:
+        return 400, {"error": "No turns to judge."}
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return 500, {"error": "ANTHROPIC_API_KEY is not set."}
+
+    user_stance = "FOR the motion (Prop)" if side == "affirm" else "AGAINST the motion (Opp)"
+    transcript = "\n".join("Turn %d: %s" % (i + 1, t) for i, t in enumerate(turn_texts))
+
+    try:
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model="claude-opus-5",
+            max_tokens=400,
+            system=JUDGE_CRITIQUE_SYSTEM_PROMPT.format(motion=motion or DEFAULT_MOTION, user_stance=user_stance),
+            output_config={"effort": "low"},
+            tools=[JUDGE_CRITIQUE_TOOL],
+            tool_choice={"type": "tool", "name": "submit_judge_critique"},
+            messages=[{"role": "user", "content": transcript}],
+        )
+        tool_use = next((b for b in response.content if b.type == "tool_use"), None)
+        if not tool_use:
+            return 500, {"error": "Model did not return a structured critique."}
+
+        data = tool_use.input
+        return 200, {
+            "overall_summary": str(data.get("overall_summary") or "").strip(),
+            "logic_breakdown": str(data.get("logic_breakdown") or "").strip(),
+        }
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
     except anthropic.APIStatusError as e:

@@ -8,14 +8,19 @@
     { "src": "site/cussator-mark.svg", "use": "@vercel/static" },
     { "src": "site/favicon-32.png", "use": "@vercel/static" },
     { "src": "site/apple-touch-icon.png", "use": "@vercel/static" },
+    { "src": "site/vendor/chart.umd.min.js", "use": "@vercel/static" },
     { "src": "api/respond.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } },
     { "src": "api/simplify.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } },
-    { "src": "api/support-chat.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } }
+    { "src": "api/support-chat.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } },
+    { "src": "api/pitch-review.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } },
+    { "src": "api/judge-critique.py", "use": "@vercel/python", "config": { "includeFiles": "api/_common.py" } }
   ],
   "routes": [
     { "src": "/api/respond", "dest": "/api/respond.py" },
     { "src": "/api/simplify", "dest": "/api/simplify.py" },
     { "src": "/api/support-chat", "dest": "/api/support-chat.py" },
+    { "src": "/api/pitch-review", "dest": "/api/pitch-review.py" },
+    { "src": "/api/judge-critique", "dest": "/api/judge-critique.py" },
     { "src": "/terms.html", "dest": "/site/terms.html" },
     { "src": "/privacy.html", "dest": "/site/privacy.html" },
     { "src": "/styles.css", "dest": "/site/styles.css" },
@@ -23,6 +28,7 @@
     { "src": "/cussator-mark.svg", "dest": "/site/cussator-mark.svg" },
     { "src": "/favicon-32.png", "dest": "/site/favicon-32.png" },
     { "src": "/apple-touch-icon.png", "dest": "/site/apple-touch-icon.png" },
+    { "src": "/vendor/chart.umd.min.js", "dest": "/site/vendor/chart.umd.min.js" },
     { "src": "/(.*)", "dest": "/site/index.html" }
   ]
 }

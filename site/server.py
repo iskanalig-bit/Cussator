@@ -12,7 +12,7 @@ ENV_FILE = SITE_DIR / ".env"
 # Shared request-handling logic lives in api/_common.py so the local dev
 # server and the Vercel serverless functions can't drift apart.
 sys.path.insert(0, str(ROOT_DIR / "api"))
-from _common import debate_reply, simplify_reply, support_reply  # noqa: E402
+from _common import debate_reply, simplify_reply, support_reply, pitch_review, judge_critique  # noqa: E402
 
 
 def load_env():
@@ -47,6 +47,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._handle(simplify_reply)
         elif self.path == "/api/support-chat":
             self._handle(support_reply)
+        elif self.path == "/api/pitch-review":
+            self._handle(pitch_review)
+        elif self.path == "/api/judge-critique":
+            self._handle(judge_critique)
         else:
             self.send_error(404)
 

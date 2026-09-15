@@ -383,6 +383,13 @@ html { scroll-behavior: smooth; }
    its own row so the big primary CTA still reads as the one dominant
    action, with "How it works" staying on its own line beneath both. */
 .cuss-hero-cta-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+/* Elevator Pitch (Feature 4) sits here, next to "How it works", rather than
+   in .cuss-hero-cta-row with Chat/Bag — that row is already two full-size
+   .cuss-cta-xl buttons wide and mobile-tuned for exactly two (see the
+   comment above); a third of the same size risks the same overflow that
+   row was already fixed for once. A plain .btn-secondary keeps Chat as the
+   one dominant action and costs nothing on narrow screens. */
+.cuss-hero-secondary-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 /* Chat — outlined, not solid: black fill, purple border and text, same
    recipe .btn-primary already uses everywhere else, just scaled up. Keeps
    the same ambient purple glow it always had (an outline can still glow),
@@ -426,6 +433,7 @@ html { scroll-behavior: smooth; }
   background: color-mix(in srgb, var(--color-warn) 14%, var(--color-surface));
   border-radius: var(--radius-md); padding: var(--space-3);
 }
+.cuss-ai-difficulty-tag { margin-bottom: 6px; }
 .cuss-ai-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: 4px; }
 .cuss-ai-label { margin: 0; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-warn); }
 .cuss-ai-card p.cuss-ai-body { margin: 0; font-size: 14px; line-height: 1.5; }
@@ -540,6 +548,23 @@ html { scroll-behavior: smooth; }
 .cuss-judge-hint {
   margin: -3px 0 1px 72px; font-size: 10.5px; line-height: 1.3;
   color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+/* Written explanation for the three scores above — fetched once from
+   /api/judge-critique when the round ends (see endRound() in script.js),
+   never during the round, so it fades in on its own beat rather than
+   popping in with the bars. The numbers it's explaining are untouched: this
+   is purely additive text, same "feedback only" spirit as .cuss-judge-note. */
+.cuss-judge-critique {
+  margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--color-divider);
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.cuss-judge-critique.is-visible { opacity: 1; }
+.cuss-judge-critique-summary {
+  margin: 0 0 4px; font-size: 12.5px; line-height: 1.45; color: var(--color-text);
+}
+.cuss-judge-critique-breakdown {
+  margin: 0; font-size: 11.5px; line-height: 1.4;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
 }
 
 .cuss-eyebrow {
@@ -675,6 +700,21 @@ html { scroll-behavior: smooth; }
   background: var(--color-bg); border-radius: 0; box-shadow: none;
   padding: var(--space-4) var(--edge); overflow: hidden;
 }
+/* Screen shake on penalty — a brief, decaying horizontal rattle when the
+   player's own submitted argument lands a filler/curse hit (see
+   triggerScreenShake() in script.js, called from the submit handler right
+   where the same word-level penalty already docks Credibility). Class-
+   toggle + plain CSS keyframes, not a state-driven re-render. */
+@keyframes cuss-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+.cuss-arena-inner.is-shaking { animation: cuss-shake 0.5s cubic-bezier(.36, .07, .19, .97) both; }
+@media (prefers-reduced-motion: reduce) {
+  .cuss-arena-inner.is-shaking { animation: none; }
+}
 /* Stacked above the stance-select (z-index: 10) and round-over (z-index: 5)
    overlays so the close button stays clickable no matter which screen is
    showing — without this it sits at the default stacking level and the
@@ -751,7 +791,12 @@ html { scroll-behavior: smooth; }
 .cuss-anchor-label { font-size: 12px; letter-spacing: 0.02em; color: color-mix(in srgb, var(--color-text) 50%, transparent); }
 .cuss-bubble-user {
   align-self: flex-end; max-width: 88%; background: var(--color-surface);
-  border-radius: var(--radius-md); padding: var(--space-3); font-size: 14px; line-height: 1.5; margin: 0;
+  /* Flattened top-right corner — the corner nearest the edge the bubble
+     aligns to, standard chat-bubble convention (AI's mirrors this on its
+     own top-left, see .cuss-ai-card.cuss-bubble-ai below). Order is
+     top-left/top-right/bottom-right/bottom-left. */
+  border-radius: var(--radius-md) 0 var(--radius-md) var(--radius-md);
+  padding: var(--space-3); font-size: 14px; line-height: 1.5; margin: 0;
 }
 /* Entrance for both message types — no ruled line (the arena is line-free,
    see .cuss-arena-transcript above), just motion. The player's own bubble
@@ -801,6 +846,14 @@ html { scroll-behavior: smooth; }
   color: oklch(0.75 0.13 150); opacity: 0.8; white-space: nowrap; pointer-events: none;
 }
 .cuss-bubble-ai { align-self: flex-start; max-width: 88%; }
+/* Flattened top-left corner, mirroring .cuss-bubble-user's top-right above
+   — the compound selector (not just .cuss-bubble-ai alone) beats
+   .cuss-ai-card's own border-radius on specificity regardless of source
+   order, so this can't quietly lose the cascade to it. Scoped to the real
+   transcript cards only: the homepage demo's static example and the
+   "AI opponent is responding" indicator use .cuss-ai-card without
+   .cuss-bubble-ai, so neither picks this up. */
+.cuss-ai-card.cuss-bubble-ai { border-radius: 0 var(--radius-md) var(--radius-md) var(--radius-md); }
 .cuss-arena-typing[hidden] { display: none; }
 /* Visible motion for the whole wait — Chair-difficulty replies can take
    15-20+ seconds, and a static "typing…" label with no animation reads as
@@ -835,6 +888,73 @@ html { scroll-behavior: smooth; }
 .cuss-legend-dot.is-filler { background: var(--color-warn); }
 .cuss-legend-dot.is-vocab { background: oklch(0.75 0.13 150); }
 .cuss-legend-dot.is-penalty { background: oklch(0.63 0.22 25); }
+
+/* Point of Order — Interruption Mode. A local, debounced heuristic (no
+   server round-trip): reuses classifyText()'s existing filler/hedge
+   detection against the LIVE draft in the textarea, not the submitted
+   argument — the same signal that already docks Credibility/Logic/
+   Precision on submit, just read a beat early while the player is still
+   composing. Purely advisory — never blocks typing or sending, just flags
+   a hedge-heavy draft. Amber-to-red theme, both existing tokens
+   (--color-warn is the AI card's own amber; the red is the same critical
+   tone .cuss-token-budget.is-critical already uses) so it reads as more
+   urgent than a normal AI bubble without introducing a new color. */
+.cuss-point-of-order:not([hidden]) {
+  display: flex; align-items: flex-start; gap: 10px;
+  margin: 0 0 8px; padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, oklch(0.63 0.22 25) 55%, var(--color-warn));
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-warn) 16%, var(--color-surface)),
+    color-mix(in srgb, oklch(0.63 0.22 25) 14%, var(--color-surface)));
+  opacity: 0; transform: translateY(6px) scale(0.98);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+.cuss-point-of-order.is-visible { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.cuss-poo-avatar {
+  flex: none; width: 22px; height: 22px; margin-top: 1px;
+  color: oklch(0.63 0.22 25);
+  animation: cuss-poo-pulse 1.6s ease-in-out infinite;
+}
+.cuss-poo-avatar svg { width: 100%; height: 100%; }
+.cuss-poo-body { flex: 1; min-width: 0; }
+.cuss-poo-label {
+  margin: 0 0 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: oklch(0.63 0.22 25);
+}
+.cuss-poo-text { margin: 0; font-size: 13px; line-height: 1.4; color: var(--color-text); }
+.cuss-poo-dismiss {
+  flex: none; width: 20px; height: 20px; border: none; background: none; cursor: pointer; padding: 0;
+  font-size: 16px; line-height: 1; color: color-mix(in srgb, var(--color-text) 55%, transparent);
+}
+.cuss-poo-dismiss:hover { color: var(--color-text); }
+@keyframes cuss-poo-pulse {
+  0%, 100% { filter: drop-shadow(0 0 0 transparent); }
+  50% { filter: drop-shadow(0 0 4px oklch(0.63 0.22 25)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cuss-point-of-order { transition: opacity 0.12s ease; transform: none; }
+  .cuss-poo-avatar { animation: none; }
+}
+
+/* Paste-blocked toast — same hidden/is-visible fade mechanism as Point of
+   Order above (see the fix history on that pattern: the display rule below
+   is scoped to :not([hidden]) so JS's hidden=true actually hides it rather
+   than being overridden by an unconditional display declaration). Plain
+   amber text line, no avatar/dismiss button — it's a one-line, self-
+   dismissing notice, not an ongoing state to manage. */
+.cuss-paste-blocked:not([hidden]) {
+  display: block;
+}
+.cuss-paste-blocked {
+  margin: 0 0 8px; font-size: 12.5px; color: var(--color-warn);
+  opacity: 0; transform: translateY(4px); transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.cuss-paste-blocked.is-visible { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .cuss-paste-blocked { transition: opacity 0.12s ease; transform: none; }
+}
 
 /* Word Economy token budget — pinned in the bottom-right corner of the
    input bar itself, right where the player is typing. Ticks down live
@@ -1226,6 +1346,13 @@ html { scroll-behavior: smooth; }
 .cuss-result-rematch:hover { background: var(--color-accent-2); }
 .cuss-result-rematch:active { background: var(--color-accent); }
 
+/* Full Report — opens the Feature 3 post-round dashboard (see the
+   .cuss-dashboard rules near the end of this file). Sits beside Rematch as
+   a plainly secondary action (.btn-secondary, an outline the app already
+   uses elsewhere) so Rematch stays the one loud choice on this screen. */
+.cuss-result-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; justify-content: center; }
+.cuss-result-actions .cuss-result-rematch { margin-top: 0; }
+
 /* Win: upper (player) lip returns the final volley, lower (AI) lip misses —
    same green already used elsewhere (e.g. .cuss-vocab), no new colors. */
 .cuss-result-transition.playing-win .cuss-result-lip-upper { animation: cuss-result-upper-win 3.6s cubic-bezier(0.4,0,0.2,1) forwards; }
@@ -1409,8 +1536,66 @@ html { scroll-behavior: smooth; }
   margin: 0; font-size: 13.5px; max-width: 60ch;
   color: color-mix(in srgb, var(--color-text) 65%, transparent);
 }
-.cuss-scars-list { display: flex; flex-direction: column; gap: var(--space-3); padding-top: var(--space-2); }
-.cuss-scars-list .cuss-recap-row { justify-content: flex-start; font-size: 15px; }
+/* Responsive card grid — one column narrow, two once there's room for a
+   pair of ~260px+ cards, via auto-fit/minmax rather than a hard breakpoint
+   (same technique as the dashboard's chart grid). */
+.cuss-scars-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-3); padding-top: var(--space-2); }
+
+/* Vocabulary Scars debuff card — deliberately its OWN classes, not a reuse
+   of .cuss-recap-row/-from/-to (those are shared with the post-round
+   recap on the result screen; restyling them here would have restyled that
+   screen too). Colors are all existing app tokens, not new ones: amber
+   (--color-warn) for the "debuff" language, matching the filler-word color
+   already used everywhere else in the app (the live highlighter, the
+   result-screen recap, the color legend); green (the same oklch(0.75 0.13
+   150) already used for "vocab"/the recap's swap-to color) for the
+   recommended-swap pill. */
+.cuss-scar-card {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  background: var(--color-surface); border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--color-warn) 30%, var(--color-divider));
+  padding: var(--space-3);
+}
+.cuss-scar-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
+.cuss-scar-badge-label {
+  margin: 0 0 2px; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-warn);
+}
+.cuss-scar-badge-title {
+  margin: 0; font-family: var(--font-heading); font-weight: 700; font-size: 17px;
+  letter-spacing: -0.01em; color: var(--color-text);
+}
+.cuss-scar-count {
+  flex: none; font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+  padding: 2px 7px; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-warn) 18%, var(--color-surface));
+  color: var(--color-warn); border: 1px solid color-mix(in srgb, var(--color-warn) 45%, transparent);
+}
+.cuss-scar-desc {
+  margin: 0; font-size: 13px; line-height: 1.5;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+.cuss-scar-word-pill {
+  font-family: var(--font-mono); font-weight: 600; color: var(--color-warn);
+  background: color-mix(in srgb, var(--color-warn) 16%, transparent);
+  padding: 1px 5px; border-radius: 4px;
+}
+.cuss-scar-swap-row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  margin-top: 2px; padding-top: var(--space-2); border-top: 1px solid var(--color-divider);
+}
+.cuss-scar-swap-label {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 50%, transparent);
+}
+.cuss-scar-swap-pill {
+  font-family: var(--font-mono); font-weight: 700; font-size: 13px;
+  color: oklch(0.75 0.13 150); background: color-mix(in srgb, oklch(0.75 0.13 150) 14%, transparent);
+  border: 1px solid color-mix(in srgb, oklch(0.75 0.13 150) 40%, transparent);
+  padding: 4px 9px; border-radius: var(--radius-sm);
+  transition: transform 0.15s ease;
+}
+.cuss-scar-swap-pill:hover { transform: scale(1.05); }
 
 /* Connector Log — same full-screen panel pattern as Vocabulary Scars just
    above (own class namespace so either can be removed independently), but
@@ -1532,4 +1717,238 @@ html { scroll-behavior: smooth; }
   .cuss-scars-inner { padding: var(--space-3); }
   .cuss-connector-log-inner { padding: var(--space-3); }
   .cuss-bag-inner { padding: var(--space-3); }
+}
+
+/* =========================================================================
+   Post-round dashboard (Feature 3) — a full-screen report opened from the
+   result screen's "Full Report" button (see .cuss-result-actions above),
+   or opened directly by Elevator Pitch mode (Feature 4), bypassing the
+   win/lose screen entirely. Same fixed-overlay + is-open mechanism as
+   .cuss-arena (see above), stacked one z-index above it (101 vs 100) so it
+   can layer over an arena that's still open underneath.
+
+   Deliberately its own visual language ("Dark Snapchat-style": near-black
+   surfaces, neon yellow/green accents, high-contrast text) rather than the
+   site's purple/lavender accent system — scoped entirely to custom
+   properties on .cuss-dashboard so nothing here leaks into the rest of the
+   app. The two accents (--dash-you / --dash-ai) were run through the
+   dataviz skill's palette validator: chroma floor, CVD separation (worst
+   adjacent ΔE 16.7 protan) and the normal-vision floor (ΔE 22.6, well
+   above the 15 floor) all pass against this surface. They sit well above
+   the validator's dark-mode lightness band (~0.48-0.67 L) — an accepted,
+   deliberate tradeoff for the neon look the brief specifically asked for,
+   not an oversight — so identity is never left to hue alone anyway: every
+   chart below also keys "You" vs "AI opponent" by a legend, distinct point
+   shapes, and direct end-labels, never color by itself. */
+.cuss-dashboard {
+  --dash-bg: #050506;
+  --dash-panel: #131316;
+  --dash-panel-2: #1a1a1e;
+  --dash-border: #2c2c31;
+  --dash-you: #eaff00;
+  --dash-ai: #00e0a8;
+  --dash-text: #f5f5f7;
+  --dash-text-dim: #9a9aa2;
+
+  position: fixed; inset: 0; z-index: 101; display: flex; justify-content: center;
+  background: var(--dash-bg);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+  overflow-y: auto;
+}
+.cuss-dashboard.is-open { opacity: 1; pointer-events: auto; }
+.cuss-dash-inner {
+  width: 100%; max-width: 1040px;
+  padding: var(--space-4) var(--edge) calc(var(--space-4) * 2);
+  display: flex; flex-direction: column; gap: var(--space-4);
+  color: var(--dash-text);
+  font-family: var(--font-body, inherit);
+}
+
+.cuss-dash-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.cuss-dash-head-info { display: flex; flex-direction: column; gap: 4px; }
+.cuss-dash-eyebrow {
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight);
+  font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dash-you);
+}
+.cuss-dash-motion { margin: 0; font-size: 13px; color: var(--dash-text-dim); max-width: 56ch; }
+.cuss-dash-head-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
+.cuss-dash-rematch {
+  font-size: 14px; font-weight: var(--font-heading-weight); padding: 9px 20px;
+  background: var(--dash-you); color: #0b0b0c; border-color: transparent;
+}
+.cuss-dash-rematch:hover { background: color-mix(in srgb, var(--dash-you) 85%, white); }
+.cuss-dash-rematch:active { background: color-mix(in srgb, var(--dash-you) 80%, black); }
+.cuss-dash-close {
+  color: var(--dash-text); border: 1px solid var(--dash-border); background: var(--dash-panel);
+}
+.cuss-dash-close:hover { background: var(--dash-panel-2); }
+
+/* Elevator Pitch mode (Feature 4) populates and unhides this; a normal
+   round never touches it, so it stays hidden. Left-rule in the "You"
+   accent for a clean two-tone dashboard, not a third color. */
+.cuss-dash-critique {
+  border: 1px solid var(--dash-border); border-left: 3px solid var(--dash-you);
+  background: var(--dash-panel); border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.cuss-dash-critique-label {
+  margin: 0 0 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--dash-you);
+}
+.cuss-dash-critique-text { margin: 0; font-size: 15px; line-height: 1.5; color: var(--dash-text); }
+
+/* Charting-library-missing banner (see the CDN-then-vendor-fallback loader
+   in index.html's <head> and initDashboard() below) — red-bordered rather
+   than the critique block's "You" yellow, so it reads as a warning, not
+   feedback. Rare in practice (the vendored copy only misses if both it and
+   the CDN fail), but silent nothing was the actual bug being fixed here. */
+.cuss-dash-lib-error {
+  border: 1px solid oklch(0.63 0.22 25 / 55%); border-left: 3px solid oklch(0.63 0.22 25);
+  background: var(--dash-panel); border-radius: var(--radius-md);
+  padding: 10px 14px; font-size: 13px; line-height: 1.5; color: var(--dash-text);
+}
+
+.cuss-dash-quickstats { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.cuss-dash-stat {
+  flex: 1 1 130px; border: 1px solid var(--dash-border); background: var(--dash-panel);
+  border-radius: var(--radius-md); padding: 10px 14px;
+}
+.cuss-dash-stat-label { margin: 0 0 2px; font-size: 11px; color: var(--dash-text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.cuss-dash-stat-value { margin: 0; font-size: 22px; font-weight: 700; color: var(--dash-text); font-variant-numeric: proportional-nums; }
+
+.cuss-dash-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--space-3);
+}
+.cuss-dash-panel {
+  border: 1px solid var(--dash-border); background: var(--dash-panel);
+  border-radius: var(--radius-lg); padding: var(--space-3) var(--space-3) var(--space-4);
+  display: flex; flex-direction: column; gap: var(--space-2); min-width: 0;
+}
+.cuss-dash-panel-title { margin: 0; font-size: 13px; font-weight: 600; color: var(--dash-text-dim); }
+.cuss-dash-chart-wrap { position: relative; height: 220px; width: 100%; }
+/* :not([hidden]) is deliberate — an unconditional display:flex here would
+   override the browser's own [hidden]{display:none} default (author styles
+   always win over the UA stylesheet regardless of specificity), so the
+   fallback text would render on top of a successfully-drawn chart any time
+   JS sets hidden=true on it instead of actually disappearing. Same class of
+   bug already caught once on .cuss-point-of-order — scoping the display
+   declaration to :not([hidden]) is the fix both times. */
+.cuss-dash-chart-fallback:not([hidden]) {
+  position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--dash-text-dim);
+}
+
+/* WPM pacing sparkline — pure inline SVG, zero library dependency, so this
+   one panel can never hit the "Chart unavailable" state the other two can.
+   Monochrome in --dash-you (not a new emerald/green): the sparkline is
+   always about the player's own pace, same entity the yellow line/bars
+   already mean everywhere else on this dashboard, so a second color here
+   would mean two different things by the same rule that keeps --dash-you
+   meaning "You" and --dash-ai meaning "AI opponent" everywhere else. */
+.cuss-spark-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.cuss-spark-badge {
+  flex: none; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: var(--radius-sm);
+  color: var(--dash-you); background: color-mix(in srgb, var(--dash-you) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dash-you) 40%, transparent);
+}
+.cuss-spark-wrap {
+  height: 220px; margin-top: var(--space-2); padding: var(--space-2);
+  background: var(--dash-panel-2); border: 1px solid var(--dash-border); border-radius: var(--radius-md);
+}
+.cuss-spark-svg { width: 100%; height: 100%; overflow: visible; }
+.cuss-spark-grid { stroke: var(--dash-border); stroke-width: 0.5; stroke-dasharray: 2; }
+.cuss-spark-line { fill: none; stroke: var(--dash-you); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.cuss-spark-labels {
+  display: flex; justify-content: space-between; margin-top: var(--space-2);
+  font-family: var(--font-mono); font-size: 10px; color: var(--dash-text-dim);
+}
+
+@media (max-width: 640px) {
+  .cuss-spark-wrap { height: 200px; }
+}
+
+.cuss-dash-scores { justify-content: flex-start; }
+.cuss-dash-score-cards { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.cuss-dash-score-card { flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px; }
+.cuss-dash-score-label { margin: 0; font-size: 12px; color: var(--dash-text-dim); }
+.cuss-dash-score-value { margin: 0; font-size: 34px; font-weight: 700; color: var(--dash-text); line-height: 1; }
+.cuss-dash-score-track { height: 4px; border-radius: 2px; background: var(--dash-panel-2); overflow: hidden; }
+.cuss-dash-score-fill { height: 100%; border-radius: 2px; background: var(--dash-you); transition: width 0.6s ease; }
+
+@media (max-width: 640px) {
+  .cuss-dash-inner { padding: var(--space-3) var(--edge) calc(var(--space-4) * 2); }
+  .cuss-dash-grid { grid-template-columns: 1fr; }
+  .cuss-dash-chart-wrap { height: 200px; }
+  .cuss-dash-head-actions { width: 100%; justify-content: space-between; }
+}
+
+/* =========================================================================
+   60-Second Elevator Pitch (Feature 4) — its own overlay, same fixed +
+   is-open mechanism as .cuss-arena (see above), so it can be opened
+   straight from the home screen as an alternative round type rather than
+   living inside the normal turn-based arena's state machine (HP bars, per-
+   turn timer, Word Economy, Point of Order — none of that fits a single
+   60-second solo pitch with no opponent turn). Reuses .cuss-stance-select/
+   .cuss-stance-content/.cuss-stance-buttons as-is for the side picker (see
+   the stance-select rules earlier in this file) — same visual language,
+   new ids, no new CSS needed for that part. */
+.cuss-pitch {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: stretch; justify-content: center;
+  background: var(--color-bg);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+}
+.cuss-pitch.is-open { opacity: 1; pointer-events: auto; }
+.cuss-pitch-inner {
+  position: relative; width: 100%; height: 100%; max-height: 100vh;
+  display: flex; flex-direction: column; gap: var(--space-4);
+  background: var(--color-bg); padding: var(--space-4) var(--edge); overflow: hidden;
+}
+.cuss-pitch-intro { max-width: 46ch; margin: 0; font-size: 14px; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.cuss-pitch-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.cuss-pitch-head-info { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+
+/* The "prominent, hard 60-second visual countdown" the brief asks for —
+   deliberately much larger than the arena's small timer chip (that one is
+   a background pressure cue for a multi-turn round; this is the entire
+   point of this mode). Same amber-at-10s / red-at-5s escalation language
+   as the rest of the app (--color-warn, then the critical red already used
+   by .cuss-token-budget.is-critical), just scaled way up. */
+.cuss-pitch-timer-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.cuss-pitch-timer {
+  margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: clamp(56px, 14vw, 96px); font-weight: 700; line-height: 1; color: var(--color-text);
+  transition: color 0.2s ease;
+}
+.cuss-pitch-timer.is-warn { color: var(--color-warn); }
+.cuss-pitch-timer.is-critical { color: oklch(0.63 0.22 25); animation: cuss-pitch-pulse 1s ease-in-out infinite; }
+.cuss-pitch-timer-track { width: min(360px, 100%); height: 6px; border-radius: 3px; background: var(--color-surface); overflow: hidden; }
+.cuss-pitch-timer-fill {
+  height: 100%; width: 100%; border-radius: 3px; background: var(--color-accent);
+  transform-origin: left; transition: width 1s linear, background-color 0.2s ease;
+}
+.cuss-pitch-timer-fill.is-warn { background: var(--color-warn); }
+.cuss-pitch-timer-fill.is-critical { background: oklch(0.63 0.22 25); }
+@keyframes cuss-pitch-pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cuss-pitch-timer.is-critical { animation: none; }
+}
+
+/* Grows to fill the space below the timer, then stretches just the text
+   box to fill IT — align-self:stretch on .cuss-highlight-wrap alone,
+   not align-items on the whole row, so the Send button keeps
+   .cuss-arena-form's own flex-end (bottom-anchored keycap) instead of
+   being stretched tall itself. flex:1 on .cuss-pitch-form gives it a real
+   used-value height from the outer column layout, which is what makes
+   height:100% on .cuss-highlight-wrap and the textarea inside it resolve
+   to something meaningful instead of collapsing. */
+.cuss-pitch-form { flex: 1; min-height: 0; }
+.cuss-pitch-form .cuss-highlight-wrap { align-self: stretch; height: auto; }
+
+@media (max-width: 640px) {
+  .cuss-pitch-inner { padding: var(--space-3); }
+  .cuss-pitch-form { flex-direction: column; align-items: stretch; }
 }

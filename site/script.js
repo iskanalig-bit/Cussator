@@ -5,6 +5,13 @@
   var WARN = 'oklch(0.74 0.15 55)';
   var REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // Set by initDashboard() below once the post-round dashboard is wired up.
+  // initArena() (and, in Feature 4, Elevator Pitch mode) call dashboardApi.open()
+  // to hand off a round's collected data — declared up here, at the shared
+  // top-level scope every init*() function runs in, since the two modules
+  // are otherwise independent closures with no other way to reach each other.
+  var dashboardApi = null;
+
   var tokens = [
     { t: 'I', s: 'n' }, { t: 'believe', s: 'n' }, { t: 'nuclear', s: 's' }, { t: 'power', s: 's' },
     { t: 'is', s: 'n' }, { t: 'kind', s: 'w' }, { t: 'of', s: 'w' }, { t: 'the', s: 'n' },
@@ -162,42 +169,84 @@
   // the underlying weak-speech pattern rather than written one by one —
   // every FILLER_WORDS / FILLER_WORDS_LIGHT entry belongs to exactly one
   // group below, so every filler the player actually used has a suggestion.
+  //
+  // title/desc are the Vocabulary Scars card's flavor text (see
+  // initVocabScars() below) — one fixed, hand-written pair per GROUP, not
+  // per word or per instance, so "kind of" reads the exact same "Hedge
+  // Merchant" card every time you open Scars, this round or ten rounds from
+  // now. Deliberately not AI-generated, for the same reason the swap
+  // suggestions above aren't: consistency across visits matters more here
+  // than variety. desc uses %WORD% as a placeholder — renderScars() splits
+  // on it to slot the actual offending word in as its own highlighted pill
+  // rather than baking it into the string.
   var FILLER_ALTERNATIVE_GROUPS = [
     { words: ['kind of', 'kinda', 'sort of', 'sorta', 'kind of like', 'sort of like', 'somewhat',
         'more or less', 'pretty much', 'in a way', 'in some way', 'basically', 'whatever'],
-      alternatives: ['specifically', 'precisely'] },
+      alternatives: ['specifically', 'precisely'],
+      title: "The Hedge Merchant",
+      desc: "You reached for %WORD% instead of naming the actual mechanism, leaving the claim vague enough to dodge scrutiny." },
     { words: ['i think', 'i guess', 'i feel like', 'i would say', 'i suppose', 'i would guess', 'imo'],
-      alternatives: ['I would argue', 'the evidence suggests'] },
+      alternatives: ['I would argue', 'the evidence suggests'],
+      title: "The Unclaimed Opinion",
+      desc: "%WORD% frames your claim as a feeling instead of a position, so the judge never has to take it seriously." },
     { words: ['maybe', 'probably', 'possibly'],
-      alternatives: ['likely', 'the data indicates'] },
+      alternatives: ['likely', 'the data indicates'],
+      title: "The Coin Flip",
+      desc: "%WORD% hedges the claim before you've even finished making it, handing your opponent the confidence you gave up." },
     { words: ['like', 'um', 'uh', 'umm', 'uhh', 'erm', 'hmm', 'so yeah', 'okay so', 'anyway',
         'anyways', 'well', 'so', 'i mean'],
-      alternatives: ['(cut it, lead with the claim)', 'therefore'] },
+      alternatives: ['(cut it, lead with the claim)', 'therefore'],
+      title: "The Stall Tactic",
+      desc: "%WORD% buys you a beat to think, but it costs you momentum the judge actually notices." },
     { words: ['or something', 'or whatever', 'and stuff', 'and things', 'stuff like that',
         'whatnot', 'and whatnot', 'or anything', 'and everything', 'just saying',
         'not gonna lie', 'sum'],
-      alternatives: ['for example', 'specifically'] },
+      alternatives: ['for example', 'specifically'],
+      title: "The Trailing Off",
+      desc: "%WORD% lets the point end wherever you ran out of examples, instead of ending on the strongest one." },
     { words: ['you know', 'you know what i mean', 'like i said', 'as i said'],
-      alternatives: ['to be clear', 'specifically'] },
+      alternatives: ['to be clear', 'specifically'],
+      title: "The Borrowed Nod",
+      desc: "%WORD% asks the room to already agree, instead of re-making the case that actually earns it." },
     { words: ['to be honest', 'honestly speaking', 'tbh', 'honestly'],
-      alternatives: ['in fact', 'clearly'] },
+      alternatives: ['in fact', 'clearly'],
+      title: "The Credibility Tax",
+      desc: "%WORD% quietly implies your other sentences weren't honest, which is not the read you want a judge to walk away with." },
     { words: ['actually'],
-      alternatives: ['in fact', 'notably'] },
+      alternatives: ['in fact', 'notably'],
+      title: "The Reflex Correction",
+      desc: "%WORD% works when you're correcting something real; used as a reflex, it just softens the point that follows it." },
     { words: ['literally', 'like literally', 'super literally'],
-      alternatives: ['precisely', '(cut it)'] },
+      alternatives: ['precisely', '(cut it)'],
+      title: "The Overstatement",
+      desc: "%WORD% is usually covering for a claim that isn't literal at all, and the judge knows it." },
     { words: ['i dunno', "i don't know", 'dunno', 'idk'],
-      alternatives: ["I'm not certain, but", 'further evidence would clarify'] },
+      alternatives: ["I'm not certain, but", 'further evidence would clarify'],
+      title: "The Open Concession",
+      desc: "%WORD% hands the point to your opponent before they even had to argue for it." },
     { words: ['tryna', 'finna', 'gonna', 'wanna', 'gotta', "ain't", "y'all", 'yall', 'pmo',
         'trna', 'dat', 'typa', 'ima', 'lwk', 'js', 'ts', 'lowkey', 'highkey'],
-      alternatives: ['(use the formal phrasing)', 'trying to / going to'] },
+      alternatives: ['(use the formal phrasing)', 'trying to / going to'],
+      title: "The Register Slip",
+      desc: "%WORD% reads as casual speech dropped into a formal round, and it costs you Delivery even when the logic underneath is fine." },
     { words: ['at the end of the day', 'technically speaking'],
-      alternatives: ['ultimately', 'in practice'] },
+      alternatives: ['ultimately', 'in practice'],
+      title: "The Long Way Around",
+      desc: "%WORD% spends a whole clause getting to the point instead of just making it." },
     { words: ['if that makes sense'],
-      alternatives: ['(cut it, trust your claim)', 'specifically'] }
+      alternatives: ['(cut it, trust your claim)', 'specifically'],
+      title: "The Permission Check",
+      desc: "%WORD% asks whether your own claim landed, planting the doubt yourself before anyone else has to." }
   ];
   var FILLER_ALTERNATIVES = {};
+  var FILLER_BADGE_TITLES = {};
+  var FILLER_DESCRIPTIONS = {};
   FILLER_ALTERNATIVE_GROUPS.forEach(function (group) {
-    group.words.forEach(function (w) { FILLER_ALTERNATIVES[w] = group.alternatives; });
+    group.words.forEach(function (w) {
+      FILLER_ALTERNATIVES[w] = group.alternatives;
+      FILLER_BADGE_TITLES[w] = group.title;
+      FILLER_DESCRIPTIONS[w] = group.desc;
+    });
   });
 
   // Vocabulary Scars — a persistent, cross-round tally of the same
@@ -834,6 +883,28 @@
     return Math.max(min, Math.min(max, v));
   }
 
+  // The Logic/Precision/Delivery scoring formula — shared, top-level, and
+  // pure (takes a stats object, returns a stats object) so both the normal
+  // multi-turn arena (initArena()'s computeJudgeTargets(), which just calls
+  // this with roundStats) and Elevator Pitch mode (initPitch(), a single
+  // synthetic one-turn stats object) score off the exact same formula
+  // rather than two copies that could quietly drift apart. See the
+  // comments this used to carry inline in computeJudgeTargets() for the
+  // reasoning behind each term — unchanged here, just relocated.
+  function computeJudgeScores(stats) {
+    var turns = stats.solid + stats.neutral + stats.bad;
+    if (!turns) return { logic: 0, precision: 0, delivery: 0 };
+
+    var verdictAvg = (stats.solid * 90 + stats.neutral * 50 - stats.bad * 20) / turns;
+    var avgWords = stats.words / turns;
+
+    return {
+      logic: Math.round(clamp(verdictAvg + stats.connective * 3 - stats.filler * 2, 0, 100)),
+      precision: Math.round(clamp(verdictAvg * 0.4 + stats.vocab * 9 - stats.filler * 6 - stats.curse * 5, 0, 100)),
+      delivery: Math.round(clamp(Math.min(avgWords, 25) * 2.4 - stats.filler * 9 - stats.curse * 10, 0, 100))
+    };
+  }
+
   // Word Economy's "token" budget is a plain word count, not a BPE/subword
   // tokenizer — real subword tokenization is reserved for the future
   // AI-vs-AI Research Mode, not human rounds. A whitespace-delimited chunk
@@ -871,8 +942,23 @@
 
   function initArena() {
     var arena = document.getElementById('cuss-arena');
+    var arenaInner = arena.querySelector('.cuss-arena-inner');
     var form = document.getElementById('cuss-arena-form');
     if (!arena || !form) return;
+
+    // Screen shake on penalty — plain class-toggle + CSS keyframes (see
+    // .cuss-arena-inner.is-shaking in styles.css), not a timed state flag.
+    // Removing the class and forcing a reflow before re-adding it means a
+    // second penalty landing before the first shake finishes restarts the
+    // animation from frame 0 instead of doing nothing (a repeat class add
+    // with no change is a no-op in the browser).
+    function triggerScreenShake() {
+      if (!arenaInner) return;
+      arenaInner.classList.remove('is-shaking');
+      void arenaInner.offsetWidth;
+      arenaInner.classList.add('is-shaking');
+      setTimeout(function () { arenaInner.classList.remove('is-shaking'); }, 500);
+    }
 
     // Per-turn countdown — ticks only while it's actually the player's turn
     // (textarea enabled), pausing during the AI's response, the stance-select
@@ -886,6 +972,29 @@
     // running out ends the round through the same Credibility-loss path
     // as any other auto-loss (see checkTokenBudget()).
     var TOKEN_POOL_SIZE = 300;
+
+    // Interruption Mode ("Point of Order") — the architecture is strict
+    // request/response with no streaming at any layer (see api/_common.py:
+    // the Claude call itself is non-streaming, and the server never sees a
+    // keystroke, only a fully submitted argument), so a literal mid-keystroke
+    // read isn't possible. This is the debounced client-side stand-in: it
+    // waits for a pause in typing, then runs the SAME local classifyText()
+    // filler/hedge detection that already docks Credibility/Logic/Precision
+    // on submit against the live, not-yet-sent draft. Purely advisory —
+    // never blocks typing or sending — and reuses existing judging signal
+    // rather than adding a second detector.
+    var POINT_OF_ORDER_DEBOUNCE_MS = 650;
+    // Below this, a single hedge word (e.g. an opening "I feel like") reads
+    // as a false-positive interruption before the player has said anything
+    // to actually judge yet.
+    var POINT_OF_ORDER_MIN_WORDS = 7;
+    var POINT_OF_ORDER_MESSAGES = [
+      'Point of order. That is an assertion, not an argument, back it with a mechanism or example.',
+      'Point of order. The delegate is hedging. Say what you actually mean and defend it.',
+      'Point of order. Vague phrasing on the floor, the committee needs a specific claim to respond to.',
+      'Point of order. That is a shrug dressed up as a point, tighten it before you send it.',
+      'Point of order. Unsupported claim developing, a reason or example would make this land.'
+    ];
 
     var openBtns = [document.getElementById('cuss-start-hero'), document.getElementById('cuss-start-nav')];
     var ENTER_ANIM_DURATION = 2200; // must match the CSS keyframes' 2.2s duration
@@ -912,7 +1021,11 @@
     var judgePrecisionVal = document.getElementById('cuss-judge-precision-val');
     var judgeDeliveryFill = document.getElementById('cuss-judge-delivery-fill');
     var judgeDeliveryVal = document.getElementById('cuss-judge-delivery-val');
+    var judgeCritiqueEl = document.getElementById('cuss-judge-critique');
+    var judgeCritiqueSummaryEl = document.getElementById('cuss-judge-critique-summary');
+    var judgeCritiqueBreakdownEl = document.getElementById('cuss-judge-critique-breakdown');
     var gameoverRestartBtn = document.getElementById('cuss-gameover-restart');
+    var gameoverReportBtn = document.getElementById('cuss-gameover-report');
     var resultOverlay = document.getElementById('cuss-result-transition');
     var resultVerdict = document.getElementById('cuss-result-verdict');
     var resultHeadline = document.getElementById('cuss-result-headline');
@@ -938,6 +1051,10 @@
     var tokenValEl = document.getElementById('cuss-token-val');
     var tokenBudgetEl = document.getElementById('cuss-token-budget');
     var difficultyBtns = Array.prototype.slice.call(document.querySelectorAll('.cuss-difficulty-btn'));
+    var pointOfOrderEl = document.getElementById('cuss-point-of-order');
+    var pointOfOrderTextEl = document.getElementById('cuss-poo-text');
+    var pointOfOrderDismissBtn = document.getElementById('cuss-poo-dismiss');
+    var pasteBlockedEl = document.getElementById('cuss-paste-blocked');
 
     // Cost of one Simplify action, deducted from the same Word Economy pool
     // as everything else (see checkTokenBudget()) — comprehension help isn't
@@ -950,7 +1067,34 @@
     var aiHealth = 100;
     var history = [];
     var roundStats = { filler: 0, curse: 0, connective: 0, vocab: 0, words: 0, solid: 0, neutral: 0, bad: 0 };
+    // Same shape as roundStats' word-category fields, but for the AI's own
+    // replies — roundStats only ever tracked the player's words (it feeds
+    // the player-facing Judge panel), so this is a new, parallel tally kept
+    // purely for the post-round dashboard's "you vs AI opponent" breakdown
+    // chart. Accumulated from the same classifyText() call already made on
+    // every AI reply (see aiAnalysis in the submit handler) — no new
+    // classification pass, just a second running total from data already
+    // computed.
+    var aiRoundStats = { filler: 0, curse: 0, connective: 0, vocab: 0 };
     var roundFillerWords = {};
+    // Post-round dashboard data (Feature 3) — timestamps and a per-turn log
+    // the app never tracked before. turnStartTime marks the moment the
+    // textarea was last handed back to the player (set in startTurnTimer(),
+    // the single point where that happens, whether that's the top of the
+    // round or right after an AI reply); WPM is computed from the gap
+    // between that moment and the next submit, floored at 1s so a
+    // near-instant send (e.g. an Insert-from-Bag word immediately sent)
+    // can't produce an absurd spike. turnLog holds one entry per player
+    // submission built up via finalizeTurn() (see the submit handler) so it
+    // still records a partial entry even if the round ends mid-exchange
+    // (self-KO, or a KO landing before the AI's own reply is judged).
+    // hpHistory is a parallel timeline of {turnIndex, health, aiHealth}
+    // snapshots for the dashboard's HP-over-time chart, seeded with the
+    // 100/100 starting point so the line has a real start, not a jump.
+    var turnStartTime = null;
+    var turnLog = [];
+    var hpHistory = [{ turnIndex: 0, health: 100, aiHealth: 100 }];
+    var lastRoundPlayerWon = null; // read by buildDashboardPayload() for the report's "Result" stat
     var judgeAnimTimer = null;
     var roundOver = false;
     var stanceTimer = null;
@@ -961,6 +1105,15 @@
     var turnTimer = null;
     var turnSecondsLeft = TURN_DURATION_SECONDS;
     var tokensUsed = 0;
+    var poiTimer = null;
+    var poiVisible = false;
+    // Signature of the last draft the player explicitly dismissed a Point of
+    // Order for (see dismissPointOfOrder()) — re-arms itself once the draft's
+    // own filler fingerprint changes (new/different hedge word added), so a
+    // dismiss doesn't just get instantly re-triggered by the next debounce
+    // tick, but also doesn't suppress a genuinely new weak spot for the rest
+    // of the turn.
+    var poiDismissedSignature = null;
 
     function formatTurnTime(s) {
       var m = Math.floor(s / 60);
@@ -968,10 +1121,25 @@
       return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
     }
 
+    // Reused by the placeholder swap below, so the "hurry up" copy and the
+    // timer chip's own amber warning always agree on what "running out"
+    // means, rather than tracking two separate thresholds.
+    var NORMAL_PLACEHOLDER = 'Your argument...';
+    var URGENT_PLACEHOLDER = "Time's almost up. Argue now!";
+
     function updateTurnTimerDisplay() {
       if (!turnTimerEl) return;
       turnTimerEl.textContent = formatTurnTime(turnSecondsLeft);
-      turnTimerEl.classList.toggle('is-warn', turnSecondsLeft > 0 && turnSecondsLeft <= 10);
+      var isWarn = turnSecondsLeft > 0 && turnSecondsLeft <= 10;
+      turnTimerEl.classList.toggle('is-warn', isWarn);
+      // Dynamic placeholder — deliberately NOT a new idle timer: this rides
+      // the same per-second tick (and the same 10s threshold) the countdown
+      // chip already runs on. Only visible while the box is actually empty
+      // anyway, and only touched while the player can type, so it can't
+      // clobber a disabled textarea's state between turns.
+      if (textarea && !textarea.disabled) {
+        textarea.placeholder = isWarn ? URGENT_PLACEHOLDER : NORMAL_PLACEHOLDER;
+      }
     }
 
     function stopTurnTimer() {
@@ -982,6 +1150,10 @@
       stopTurnTimer();
       turnSecondsLeft = TURN_DURATION_SECONDS;
       updateTurnTimerDisplay();
+      // The one point where the textarea is actually handed back to the
+      // player (round start and after every AI reply) — see the WPM note
+      // on turnStartTime above.
+      turnStartTime = Date.now();
       turnTimer = setInterval(function () {
         turnSecondsLeft = Math.max(0, turnSecondsLeft - 1);
         updateTurnTimerDisplay();
@@ -1019,7 +1191,12 @@
 
       history = [];
       roundStats = { filler: 0, curse: 0, connective: 0, vocab: 0, words: 0, solid: 0, neutral: 0, bad: 0 };
+      aiRoundStats = { filler: 0, curse: 0, connective: 0, vocab: 0 };
       roundFillerWords = {};
+      turnStartTime = null;
+      turnLog = [];
+      hpHistory = [{ turnIndex: 0, health: 100, aiHealth: 100 }];
+      lastRoundPlayerWon = null;
       recapEl.innerHTML = '';
       trendEl.innerHTML = '';
       if (judgeAnimTimer) { clearTimeout(judgeAnimTimer); judgeAnimTimer = null; }
@@ -1035,6 +1212,9 @@
       stopTurnTimer();
       turnSecondsLeft = TURN_DURATION_SECONDS;
       updateTurnTimerDisplay();
+      stopInterruptionCheck();
+      hidePointOfOrder();
+      poiDismissedSignature = null;
       tokensUsed = 0;
       if (tokenBudgetEl) tokenBudgetEl.classList.remove('is-critical');
       updateTokenDisplay(TOKEN_POOL_SIZE);
@@ -1049,6 +1229,10 @@
       setJudgeBar(judgeLogicFill, judgeLogicVal, 0);
       setJudgeBar(judgePrecisionFill, judgePrecisionVal, 0);
       setJudgeBar(judgeDeliveryFill, judgeDeliveryVal, 0);
+      if (judgeCritiqueEl) {
+        judgeCritiqueEl.classList.remove('is-visible');
+        judgeCritiqueEl.hidden = true;
+      }
 
       // Light pre-round anchor — sits where the first AI card / user bubble
       // will land (left/right, same as .cuss-bubble-ai / .cuss-bubble-user)
@@ -1081,6 +1265,7 @@
       submitBtn.disabled = true;
       if (bagInsertBtn) bagInsertBtn.disabled = true;
       textarea.value = '';
+      textarea.placeholder = 'Your argument...'; // in case the last round ended on the urgent variant
       renderHighlight();
 
       playerSide = null;
@@ -1184,12 +1369,15 @@
 
     function endRound(playerWon) {
       roundOver = true;
+      lastRoundPlayerWon = playerWon;
       textarea.disabled = true;
       submitBtn.disabled = true;
       if (bagInsertBtn) bagInsertBtn.disabled = true;
       typing.hidden = true;
       typing.classList.remove('is-visible');
       stopTurnTimer();
+      stopInterruptionCheck();
+      hidePointOfOrder();
 
       // The turn that ends the round can return before the normal
       // post-turn reveal path reaches revealJudge() (see the submit
@@ -1206,6 +1394,38 @@
       renderFillerRecap();
 
       playRoundResultTransition(playerWon);
+      fetchJudgeCritique();
+    }
+
+    // Written explanation for the Judge panel's three scores, fetched once
+    // the round is actually over — never mid-round, both because it's a
+    // whole-round critique and because there's no reason to spend a call on
+    // a round that isn't finished yet. Purely additive: the scores
+    // themselves (judgeLogicVal etc., already set by revealJudge() above)
+    // are never touched by this or by anything this call returns. Silently
+    // does nothing if the round ended with zero real turns (e.g. the token
+    // budget ran out on an unsent draft) or if the request fails — a round
+    // report missing this one paragraph isn't worth surfacing an error for.
+    function fetchJudgeCritique() {
+      var userTurns = history
+        .filter(function (turn) { return turn.role === 'user'; })
+        .map(function (turn) { return turn.content; });
+      if (!userTurns.length) return;
+
+      fetch('/api/judge-critique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motion: MOTION, side: playerSide, turns: userTurns })
+      })
+        .then(function (res) { return res.ok ? res.json() : null; })
+        .catch(function () { return null; })
+        .then(function (data) {
+          if (!data || !data.overall_summary || !judgeCritiqueEl) return;
+          judgeCritiqueSummaryEl.textContent = data.overall_summary;
+          judgeCritiqueBreakdownEl.textContent = data.logic_breakdown || '';
+          judgeCritiqueEl.hidden = false;
+          requestAnimationFrame(function () { judgeCritiqueEl.classList.add('is-visible'); });
+        });
     }
 
     // Ping-pong-volley win/lose transition — plays, then the SAME screen
@@ -1425,6 +1645,74 @@
     }
     textarea.addEventListener('input', renderHighlight);
     textarea.addEventListener('input', checkTokenBudget);
+
+    // Point of Order — see the constants above for why this is a debounced
+    // local check rather than a real mid-keystroke read. showPointOfOrder()/
+    // hidePointOfOrder() follow the exact same hidden+is-visible pattern as
+    // the AI "is responding" indicator (`typing`) elsewhere in this file.
+    function showPointOfOrder(message) {
+      if (!pointOfOrderEl) return;
+      pointOfOrderTextEl.textContent = message;
+      pointOfOrderEl.hidden = false;
+      requestAnimationFrame(function () { pointOfOrderEl.classList.add('is-visible'); });
+      poiVisible = true;
+    }
+
+    function hidePointOfOrder() {
+      if (!pointOfOrderEl || !poiVisible) return;
+      pointOfOrderEl.classList.remove('is-visible');
+      pointOfOrderEl.hidden = true;
+      poiVisible = false;
+    }
+
+    function dismissPointOfOrder(signature) {
+      poiDismissedSignature = signature;
+      hidePointOfOrder();
+    }
+
+    function stopInterruptionCheck() {
+      if (poiTimer) { clearTimeout(poiTimer); poiTimer = null; }
+    }
+
+    // Reads the draft currently sitting in the textarea (never the submitted
+    // history) through the same classifyText() used for the live highlighter
+    // and the real scoring path — a hedge-heavy, still-short-of-a-reason
+    // draft is exactly what already costs Credibility/Logic/Precision on
+    // submit, this just surfaces that a beat before the player sends it.
+    function runInterruptionCheck() {
+      poiTimer = null;
+      if (roundOver || !playerSide || textarea.disabled) { hidePointOfOrder(); return; }
+
+      var analysis = classifyText(textarea.value);
+      var fillerHits = analysis.fillerCount + analysis.fillerLightCount;
+      var signature = analysis.fillerWordsUsed.join(',') + '|' + analysis.wordCount;
+
+      if (analysis.wordCount < POINT_OF_ORDER_MIN_WORDS || fillerHits === 0) {
+        poiDismissedSignature = null; // the flagged draft got edited away, re-arm for next time
+        hidePointOfOrder();
+        return;
+      }
+      if (signature === poiDismissedSignature) return; // player already dismissed this exact draft
+
+      if (!poiVisible) {
+        var message = POINT_OF_ORDER_MESSAGES[Math.floor(Math.random() * POINT_OF_ORDER_MESSAGES.length)];
+        showPointOfOrder(message);
+      }
+    }
+
+    function scheduleInterruptionCheck() {
+      stopInterruptionCheck();
+      poiTimer = setTimeout(runInterruptionCheck, POINT_OF_ORDER_DEBOUNCE_MS);
+    }
+
+    textarea.addEventListener('input', scheduleInterruptionCheck);
+    if (pointOfOrderDismissBtn) {
+      pointOfOrderDismissBtn.addEventListener('click', function () {
+        var analysis = classifyText(textarea.value);
+        dismissPointOfOrder(analysis.fillerWordsUsed.join(',') + '|' + analysis.wordCount);
+      });
+    }
+
     textarea.addEventListener('scroll', function () {
       highlightLayer.scrollTop = textarea.scrollTop;
     });
@@ -1452,6 +1740,26 @@
         form.requestSubmit();
       }
     });
+
+    // Blocks pasting into the argument box specifically — the whole point
+    // of the round is typing under pressure, so a pasted paragraph would
+    // skip that entirely. Scoped to this one textarea only (Pitch mode's
+    // own input is untouched). A plain 'paste' listener + preventDefault,
+    // with a brief toast explaining why nothing happened rather than
+    // failing silently.
+    var pasteBlockedTimer = null;
+    if (pasteBlockedEl) {
+      textarea.addEventListener('paste', function (e) {
+        e.preventDefault();
+        clearTimeout(pasteBlockedTimer);
+        pasteBlockedEl.hidden = false;
+        requestAnimationFrame(function () { pasteBlockedEl.classList.add('is-visible'); });
+        pasteBlockedTimer = setTimeout(function () {
+          pasteBlockedEl.classList.remove('is-visible');
+          pasteBlockedTimer = setTimeout(function () { pasteBlockedEl.hidden = true; }, 200);
+        }, 2000);
+      });
+    }
 
     // Insert-from-Bag — a text-insertion shortcut only, nothing more. This
     // never touches HP, the timer, or scoring: it just splices the chosen
@@ -1514,6 +1822,19 @@
       });
       document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && !bagInsertPopover.hidden) closeBagInsertPopover();
+      });
+      // Tab toggles the same Insert-from-Bag popover the button opens —
+      // an additional shortcut, not a replacement. Scoped to the textarea
+      // itself (not document-wide) so Tab still does normal focus
+      // navigation everywhere else on the page, and only hijacked here
+      // while the input is actually usable (textarea.disabled covers both
+      // "round hasn't started" and "waiting on the AI").
+      textarea.addEventListener('keydown', function (e) {
+        if (e.key === 'Tab' && !textarea.disabled) {
+          e.preventDefault();
+          if (bagInsertPopover.hidden) openBagInsertPopover();
+          else closeBagInsertPopover();
+        }
       });
 
       // Splices the word in at the cursor (or appends it, if the textarea
@@ -1719,6 +2040,19 @@
 
       transcript.scrollTop = transcript.scrollHeight;
 
+      // Total reveal budget capped low regardless of argument length. The
+      // old fixed 160ms-per-token step scaled unboundedly with a longer
+      // argument (~4.5s for a normal 28-word one) — the bubble is already
+      // laid out at its full, final size from the moment it's appended
+      // (every span is in the DOM up front, just at opacity 0, so wrapping
+      // and box height are already correct), but for that whole multi-
+      // second stretch most of it sits blank, which reads as the argument
+      // being cut off rather than a quick reveal. Clamped per-step so a
+      // short argument still gets a visible stagger (floor) and a long one
+      // never drags on (ceiling).
+      var REVEAL_BUDGET_MS = 450;
+      var stepMs = revealEls.length ? clamp(REVEAL_BUDGET_MS / revealEls.length, 15, 60) : 0;
+
       var i = 0;
       function reveal() {
         if (i >= revealEls.length) {
@@ -1728,7 +2062,7 @@
         revealEls[i].style.opacity = '1';
         i++;
         transcript.scrollTop = transcript.scrollHeight;
-        setTimeout(reveal, 160);
+        setTimeout(reveal, stepMs);
       }
       reveal();
     }
@@ -1740,6 +2074,15 @@
     function addAiCard(html, label, rawText) {
       var card = document.createElement('div');
       card.className = 'cuss-ai-card cuss-bubble-ai';
+
+      // Reminds the player which difficulty tier they're actually facing —
+      // reuses the app's existing .tag/.tag-outline look (same classes as
+      // the arena header's LIVE ROUND / timer tags) rather than a new tag
+      // style, so it reads as part of the same visual language.
+      var difficultyTag = document.createElement('span');
+      difficultyTag.className = 'tag tag-outline cuss-ai-difficulty-tag';
+      difficultyTag.textContent = 'AI ' + difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+      card.appendChild(difficultyTag);
 
       var head = document.createElement('div');
       head.className = 'cuss-ai-card-head';
@@ -1843,17 +2186,7 @@
     // so using tracked terms is still rewarded, just no longer the only way
     // to avoid a near-zero score for filler-free, on-topic precision.
     function computeJudgeTargets() {
-      var turns = roundStats.solid + roundStats.neutral + roundStats.bad;
-      if (!turns) return { logic: 0, precision: 0, delivery: 0 };
-
-      var verdictAvg = (roundStats.solid * 90 + roundStats.neutral * 50 - roundStats.bad * 20) / turns;
-      var avgWords = roundStats.words / turns;
-
-      return {
-        logic: Math.round(clamp(verdictAvg + roundStats.connective * 3 - roundStats.filler * 2, 0, 100)),
-        precision: Math.round(clamp(verdictAvg * 0.4 + roundStats.vocab * 9 - roundStats.filler * 6 - roundStats.curse * 5, 0, 100)),
-        delivery: Math.round(clamp(Math.min(avgWords, 25) * 2.4 - roundStats.filler * 9 - roundStats.curse * 10, 0, 100))
-      };
+      return computeJudgeScores(roundStats);
     }
 
     function setJudgeBar(fillEl, valEl, v) {
@@ -1882,14 +2215,82 @@
       tick();
     }
 
+    // Hands a plain snapshot of this round's data to the standalone
+    // dashboard module (see initDashboard() / dashboardApi) — everything
+    // it needs to render the HP/WPM/word-category charts and score cards,
+    // gathered from state this closure already tracks (turnLog, hpHistory,
+    // roundStats/aiRoundStats, computeJudgeTargets()). critique is left out
+    // here; only Elevator Pitch mode (Feature 4) sets it.
+    function buildDashboardPayload() {
+      return {
+        motion: MOTION,
+        playerWon: lastRoundPlayerWon,
+        hpHistory: hpHistory,
+        turnLog: turnLog,
+        wordCategories: {
+          you: { filler: roundStats.filler, connective: roundStats.connective, vocab: roundStats.vocab },
+          ai: { filler: aiRoundStats.filler, connective: aiRoundStats.connective, vocab: aiRoundStats.vocab }
+        },
+        scores: computeJudgeTargets(),
+        critique: null
+      };
+    }
+
+    if (gameoverReportBtn) {
+      gameoverReportBtn.addEventListener('click', function () {
+        if (!dashboardApi) return;
+        dashboardApi.open(buildDashboardPayload(), { onRematch: resetRound });
+      });
+    }
+
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       if (roundOver || !playerSide) return;
       var text = textarea.value.trim();
       if (!text) return;
 
+      stopInterruptionCheck();
+      hidePointOfOrder();
+      poiDismissedSignature = null;
+
+      // WPM for this turn — elapsed time since the textarea was last handed
+      // back to the player (see turnStartTime/startTurnTimer above), floored
+      // at 1s so a near-instant send can't read as an absurd words-per-minute
+      // spike. Computed here, before setHealth() below changes anything,
+      // purely from the timestamp and the word count classifyText() already
+      // produces for the highlighter/scoring.
+      var elapsedMs = Math.max(Date.now() - (turnStartTime || Date.now()), 1000);
+
       var analysis = classifyText(text);
+      var userWpm = Math.round(analysis.wordCount / (elapsedMs / 60000));
+
+      // Records exactly one dashboard entry for this submission, whatever
+      // the closure's health/aiHealth/turnLog.length happen to be at the
+      // moment it's called — called from every exit point below (self-KO,
+      // a KO landing mid-exchange, or full normal completion) so the
+      // post-round dashboard still has real data even for a round that
+      // ended abruptly.
+      function finalizeTurn(aiWords, userVerdict, aiVerdict) {
+        turnLog.push({
+          index: turnLog.length + 1,
+          userWords: analysis.wordCount,
+          userWpm: userWpm,
+          userVerdict: userVerdict,
+          aiVerdict: aiVerdict,
+          aiWords: aiWords,
+          health: health,
+          aiHealth: aiHealth
+        });
+        hpHistory.push({ turnIndex: turnLog.length, health: health, aiHealth: aiHealth });
+      }
+
       setHealth(health + analysis.delta);
+      // Same signal that just docked Credibility above — a filler/curse hit
+      // in the player's own submitted argument — triggers the shake, not a
+      // separate detection pass.
+      if (analysis.fillerCount + analysis.fillerLightCount + analysis.curseCount > 0) {
+        triggerScreenShake();
+      }
       roundStats.filler += analysis.fillerCount + analysis.fillerLightCount;
       roundStats.curse += analysis.curseCount;
       roundStats.connective += analysis.connectiveCount;
@@ -1916,6 +2317,7 @@
       // A speaker can only self-KO from their own word-level hits, so this
       // can already be decided before the AI is even asked to respond.
       if (checkGameOver()) {
+        finalizeTurn(0, null, null);
         addUserBubbleAnimated(analysis.html, function () {});
         return;
       }
@@ -1964,18 +2366,30 @@
           else if (result.data.user_argument_verdict === 'bad') roundStats.bad++;
           else roundStats.neutral++;
           applyVerdict(result.data.user_argument_verdict, true);
-          if (checkGameOver()) return;
+          if (checkGameOver()) { finalizeTurn(0, result.data.user_argument_verdict, null); return; }
 
           var aiAnalysis = classifyText(result.data.reply);
+          // Parallel tally to roundStats, but for the AI's own words — see
+          // aiRoundStats' declaration above. Same classifyText() output
+          // already computed for the reply's highlight/HP delta, just
+          // folded into a second running total.
+          aiRoundStats.filler += aiAnalysis.fillerCount + aiAnalysis.fillerLightCount;
+          aiRoundStats.curse += aiAnalysis.curseCount;
+          aiRoundStats.connective += aiAnalysis.connectiveCount;
+          aiRoundStats.vocab += aiAnalysis.vocabCount;
           addAiCard(aiAnalysis.html, 'AI opponent rebuts', result.data.reply);
           setAiHealth(aiHealth + aiAnalysis.delta);
           history.push({ role: 'assistant', content: result.data.reply });
-          if (checkGameOver()) return;
+          if (checkGameOver()) { finalizeTurn(aiAnalysis.wordCount, result.data.user_argument_verdict, null); return; }
 
           // Same verdict treatment, mirrored onto the AI's own rebuttal —
           // a lazy reply hurts the AI, a sharp one hurts the player back.
           applyVerdict(result.data.ai_reply_verdict, false);
-          if (checkGameOver()) return;
+          if (checkGameOver()) {
+            finalizeTurn(aiAnalysis.wordCount, result.data.user_argument_verdict, result.data.ai_reply_verdict);
+            return;
+          }
+          finalizeTurn(aiAnalysis.wordCount, result.data.user_argument_verdict, result.data.ai_reply_verdict);
 
           // Update the Judge panel BEFORE unlocking the input — otherwise a
           // fast player can submit the next argument while this turn's
@@ -2019,25 +2433,60 @@
 
       entries.forEach(function (entry) {
         var alternatives = FILLER_ALTERNATIVES[entry.word] || ['specifically', 'precisely'];
-        var row = document.createElement('div');
-        row.className = 'cuss-recap-row';
+        var title = FILLER_BADGE_TITLES[entry.word] || 'The Repeat Offender';
+        var descTemplate = FILLER_DESCRIPTIONS[entry.word] || "You leaned on %WORD% more than once this round.";
 
-        var from = document.createElement('span');
-        from.className = 'cuss-recap-from';
-        from.textContent = '"' + entry.word + '" ×' + entry.count;
+        var card = document.createElement('div');
+        card.className = 'cuss-scar-card';
 
-        var arrow = document.createElement('span');
-        arrow.className = 'cuss-recap-arrow';
-        arrow.textContent = '→';
+        // Top row: badge label + title on the left, count pill on the right.
+        var top = document.createElement('div');
+        top.className = 'cuss-scar-card-top';
+        var badge = document.createElement('div');
+        var badgeLabel = document.createElement('p');
+        badgeLabel.className = 'cuss-scar-badge-label';
+        badgeLabel.textContent = 'Debuff Active';
+        var badgeTitle = document.createElement('h4');
+        badgeTitle.className = 'cuss-scar-badge-title';
+        badgeTitle.textContent = title;
+        badge.appendChild(badgeLabel);
+        badge.appendChild(badgeTitle);
+        var count = document.createElement('span');
+        count.className = 'cuss-scar-count';
+        count.textContent = '×' + entry.count;
+        top.appendChild(badge);
+        top.appendChild(count);
 
-        var to = document.createElement('span');
-        to.className = 'cuss-recap-to';
-        to.textContent = alternatives.join(' / ');
+        // Middle: the flavor sentence, with the offending word itself
+        // broken out into its own highlighted pill (see FILLER_DESCRIPTIONS'
+        // %WORD% placeholder above) rather than baked into the string.
+        var desc = document.createElement('p');
+        desc.className = 'cuss-scar-desc';
+        var descParts = descTemplate.split('%WORD%');
+        desc.appendChild(document.createTextNode(descParts[0]));
+        var wordPill = document.createElement('span');
+        wordPill.className = 'cuss-scar-word-pill';
+        wordPill.textContent = '"' + entry.word + '"';
+        desc.appendChild(wordPill);
+        desc.appendChild(document.createTextNode(descParts[1] || ''));
 
-        row.appendChild(from);
-        row.appendChild(arrow);
-        row.appendChild(to);
-        scarsList.appendChild(row);
+        // Bottom row: recommended swap — just the first alternative, to
+        // match a single clear suggestion rather than the full list.
+        var swapRow = document.createElement('div');
+        swapRow.className = 'cuss-scar-swap-row';
+        var swapLabel = document.createElement('span');
+        swapLabel.className = 'cuss-scar-swap-label';
+        swapLabel.textContent = 'Recommended swap:';
+        var swapPill = document.createElement('span');
+        swapPill.className = 'cuss-scar-swap-pill';
+        swapPill.textContent = '💡 ' + alternatives[0];
+        swapRow.appendChild(swapLabel);
+        swapRow.appendChild(swapPill);
+
+        card.appendChild(top);
+        card.appendChild(desc);
+        card.appendChild(swapRow);
+        scarsList.appendChild(card);
       });
     }
 
@@ -2409,9 +2858,581 @@
     }, WOTD_SPIN_SECONDS * 1000);
   }
 
+  // Post-round dashboard (Feature 3) — a standalone full-screen report,
+  // deliberately independent of initArena()'s own closure (see dashboardApi
+  // above) so it can be opened two ways: from the result screen's "Full
+  // Report" button once a normal round ends, or opened directly by
+  // Elevator Pitch mode (Feature 4) with a critique string attached,
+  // bypassing the win/lose screen entirely. Either caller hands it a plain
+  // data object (see buildDashboardPayload() in initArena()) plus
+  // {onRematch, onClose} callbacks — this module renders whatever it's
+  // given and never reaches back into arena internals itself.
+  function initDashboard() {
+    var dashEl = document.getElementById('cuss-dashboard');
+    var motionEl = document.getElementById('cuss-dash-motion');
+    var critiqueEl = document.getElementById('cuss-dash-critique');
+    var critiqueTextEl = document.getElementById('cuss-dash-critique-text');
+    var quickstatsEl = document.getElementById('cuss-dash-quickstats');
+    var scoreCardsEl = document.getElementById('cuss-dash-score-cards');
+    var rematchBtn = document.getElementById('cuss-dash-rematch');
+    var closeBtn = document.getElementById('cuss-dash-close');
+    var hpCanvas = document.getElementById('cuss-dash-hp-chart');
+    var wordsCanvas = document.getElementById('cuss-dash-words-chart');
+    var libErrorEl = document.getElementById('cuss-dash-lib-error');
+    // WPM is pure inline SVG (see the reference-design conversation) — no
+    // canvas, no Chart.js, no fallback state, so it's deliberately excluded
+    // from chartFallbacks/chartsAvailable below: it renders unconditionally.
+    var wpmBadgeEl = document.getElementById('cuss-dash-wpm-badge');
+    var wpmLineEl = document.getElementById('cuss-dash-wpm-line');
+    var wpmLabelsEl = document.getElementById('cuss-dash-wpm-labels');
+    var chartFallbacks = [hpCanvas, wordsCanvas].map(function (canvas) {
+      return canvas && canvas.parentElement ? canvas.parentElement.querySelector('.cuss-dash-chart-fallback') : null;
+    });
+    if (!dashEl) return;
+
+    // Chart.js should always be defined by now — index.html's <head> loads
+    // it from the CDN, falling back to a vendored local copy (byte-for-byte
+    // identical, verified by SHA-512) via a synchronous document.write if
+    // the CDN is unreachable. This flag is the last line of defense: if
+    // somehow BOTH sources failed, the dashboard still opens and still
+    // shows real numbers — it just skips chart creation and says why
+    // (#cuss-dash-lib-error) instead of the previous behavior, which was
+    // this whole function returning early and dashboardApi staying null —
+    // silently doing nothing when "Full Report" or a finished Pitch round
+    // tried to open it.
+    var chartsAvailable = typeof Chart !== 'undefined';
+
+    // Both run the same validated pass from the dataviz skill against this
+    // panel's near-black surface: chroma floor, CVD separation (worst
+    // adjacent ΔE 16.7 protan) and the normal-vision floor (ΔE 22.6, floor
+    // is 15) all clear. Never the only way the two are told apart though —
+    // every chart below also varies point shape and line style (solid vs
+    // dashed) between them, so identity never rests on hue alone.
+    var YOU_COLOR = '#eaff00';
+    var AI_COLOR = '#00e0a8';
+    var PANEL_COLOR = '#131316';
+    var BORDER_COLOR = '#2c2c31';
+    var TEXT_DIM = '#9a9aa2';
+    var TEXT_MAIN = '#f5f5f7';
+
+    function withAlpha(hex, alpha) {
+      var r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+    }
+
+    var hpChart = null, wordsChart = null;
+    var onRematch = null, onClose = null;
+
+    function destroyCharts() {
+      if (hpChart) { hpChart.destroy(); hpChart = null; }
+      if (wordsChart) { wordsChart.destroy(); wordsChart = null; }
+    }
+
+    function baseScales(extra) {
+      var scales = {
+        x: { grid: { display: false }, ticks: { color: TEXT_DIM, font: { size: 11 } } },
+        y: { grid: { color: BORDER_COLOR }, ticks: { color: TEXT_DIM, font: { size: 11 } } }
+      };
+      if (extra) {
+        if (extra.y) Object.assign(scales.y, extra.y);
+      }
+      return scales;
+    }
+
+    function tooltipBase() {
+      return {
+        backgroundColor: PANEL_COLOR, borderColor: BORDER_COLOR, borderWidth: 1,
+        titleColor: TEXT_MAIN, bodyColor: TEXT_MAIN, padding: 10, boxPadding: 4,
+        usePointStyle: true
+      };
+    }
+
+    function renderHpChart(hpHistory) {
+      var labels = hpHistory.map(function (h) { return h.turnIndex === 0 ? 'Start' : 'Turn ' + h.turnIndex; });
+      hpChart = new Chart(hpCanvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'You', data: hpHistory.map(function (h) { return h.health; }),
+              borderColor: YOU_COLOR, backgroundColor: withAlpha(YOU_COLOR, 0.1), fill: true,
+              borderWidth: 2, tension: 0.25, pointStyle: 'circle',
+              pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: YOU_COLOR,
+              pointBorderColor: PANEL_COLOR, pointBorderWidth: 2
+            },
+            {
+              label: 'AI opponent', data: hpHistory.map(function (h) { return h.aiHealth; }),
+              borderColor: AI_COLOR, backgroundColor: withAlpha(AI_COLOR, 0.1), fill: true,
+              borderWidth: 2, borderDash: [6, 4], tension: 0.25, pointStyle: 'triangle',
+              pointRadius: 5, pointHoverRadius: 7, pointBackgroundColor: AI_COLOR,
+              pointBorderColor: PANEL_COLOR, pointBorderWidth: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: baseScales({ y: { min: 0, max: 100, ticks: { stepSize: 25, color: TEXT_DIM } } }),
+          plugins: {
+            legend: { display: true, position: 'top', align: 'end', labels: { color: TEXT_DIM, usePointStyle: true, boxWidth: 8, font: { size: 12 } } },
+            tooltip: Object.assign(tooltipBase(), {
+              callbacks: { label: function (ctx) { return ctx.dataset.label + ': ' + ctx.parsed.y + ' HP'; } }
+            })
+          }
+        }
+      });
+    }
+
+    // Pure inline SVG sparkline — no Chart.js, no canvas, so this one panel
+    // never depends on the CDN (or its local vendor fallback) at all, unlike
+    // renderHpChart/renderWordsChart above and below. Normalizes each turn's
+    // userWpm into the 0-30 viewBox height (SVG y grows downward, so a
+    // faster pace needs a SMALLER y — inverted here), spaces points evenly
+    // across the 0-100 width, and derives a simple three-state trend badge
+    // from the first vs. last point rather than anything fancier. Monochrome
+    // in --dash-you, same reasoning as the CSS: this is always "your" pace,
+    // same entity that color already means everywhere else on this screen.
+    function renderWpmSpark(turnLog) {
+      if (!turnLog.length) {
+        wpmLineEl.setAttribute('points', '');
+        wpmBadgeEl.textContent = 'NO DATA';
+        wpmLabelsEl.innerHTML = '';
+        return;
+      }
+
+      var wpms = turnLog.map(function (t) { return t.userWpm; });
+      var minWpm = Math.min.apply(null, wpms);
+      var maxWpm = Math.max.apply(null, wpms);
+      var range = maxWpm - minWpm || 1;
+      var PAD = 3; // keeps the line off the grid's very top/bottom edge
+
+      var points = wpms.map(function (wpm, i) {
+        var x = wpms.length > 1 ? (i / (wpms.length - 1)) * 100 : 50;
+        var y = PAD + (1 - (wpm - minWpm) / range) * (30 - PAD * 2);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+      });
+      // One turn has no second point to draw a line to — duplicate it across
+      // the full width so there's still a visible flat line, not a blank chart.
+      if (points.length === 1) {
+        var flatY = points[0].split(',')[1];
+        points = ['0,' + flatY, '100,' + flatY];
+      }
+      wpmLineEl.setAttribute('points', points.join(' '));
+
+      var badge = 'STABLE';
+      if (wpms.length > 1) {
+        var first = wpms[0], last = wpms[wpms.length - 1];
+        if (last > first * 1.15) badge = 'SPEEDING UP';
+        else if (last < first * 0.85) badge = 'SLOWING DOWN';
+      }
+      wpmBadgeEl.textContent = badge;
+
+      wpmLabelsEl.innerHTML = '';
+      var labelTurns = [turnLog[0]];
+      if (turnLog.length >= 3) labelTurns.push(turnLog[Math.floor((turnLog.length - 1) / 2)]);
+      if (turnLog.length >= 2) labelTurns.push(turnLog[turnLog.length - 1]);
+      labelTurns.forEach(function (t, i) {
+        var span = document.createElement('span');
+        var isLast = i === labelTurns.length - 1 && turnLog.length > 1;
+        span.textContent = 'Turn ' + t.index + (isLast ? ' (End)' : '');
+        wpmLabelsEl.appendChild(span);
+      });
+    }
+
+    function renderWordsChart(you, ai) {
+      wordsChart = new Chart(wordsCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: ['Filler', 'Connectors', 'High-tier vocab'],
+          datasets: [
+            {
+              label: 'You', data: [you.filler, you.connective, you.vocab],
+              backgroundColor: YOU_COLOR, borderRadius: 4, maxBarThickness: 24,
+              categoryPercentage: 0.6, barPercentage: 0.85
+            },
+            {
+              label: 'AI opponent', data: [ai.filler, ai.connective, ai.vocab],
+              backgroundColor: AI_COLOR, borderRadius: 4, maxBarThickness: 24,
+              categoryPercentage: 0.6, barPercentage: 0.85
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: baseScales({ y: { beginAtZero: true, ticks: { precision: 0, color: TEXT_DIM } } }),
+          plugins: {
+            legend: { display: true, position: 'top', align: 'end', labels: { color: TEXT_DIM, usePointStyle: true, boxWidth: 8, font: { size: 12 } } },
+            tooltip: tooltipBase()
+          }
+        }
+      });
+    }
+
+    function statTile(label, value) {
+      var tile = document.createElement('div');
+      tile.className = 'cuss-dash-stat';
+      var labelEl = document.createElement('p');
+      labelEl.className = 'cuss-dash-stat-label';
+      labelEl.textContent = label;
+      var valueEl = document.createElement('p');
+      valueEl.className = 'cuss-dash-stat-value';
+      valueEl.textContent = value;
+      tile.appendChild(labelEl);
+      tile.appendChild(valueEl);
+      return tile;
+    }
+
+    function scoreCard(label, value) {
+      var card = document.createElement('div');
+      card.className = 'cuss-dash-score-card';
+      var labelEl = document.createElement('p');
+      labelEl.className = 'cuss-dash-score-label';
+      labelEl.textContent = label;
+      var valueEl = document.createElement('p');
+      valueEl.className = 'cuss-dash-score-value';
+      valueEl.textContent = value;
+      var track = document.createElement('div');
+      track.className = 'cuss-dash-score-track';
+      var fill = document.createElement('div');
+      fill.className = 'cuss-dash-score-fill';
+      fill.style.width = clamp(value, 0, 100) + '%';
+      track.appendChild(fill);
+      card.appendChild(labelEl);
+      card.appendChild(valueEl);
+      card.appendChild(track);
+      return card;
+    }
+
+    function render(data) {
+      motionEl.textContent = data.motion ? 'Motion: «' + data.motion + '»' : '';
+
+      if (data.critique) {
+        critiqueTextEl.textContent = data.critique;
+        critiqueEl.hidden = false;
+      } else {
+        critiqueEl.hidden = true;
+      }
+
+      var turnLog = data.turnLog || [];
+      var hpHistory = (data.hpHistory && data.hpHistory.length) ? data.hpHistory : [{ turnIndex: 0, health: 100, aiHealth: 100 }];
+      var totalWords = turnLog.reduce(function (sum, t) { return sum + t.userWords; }, 0);
+      var avgWpm = turnLog.length ? Math.round(turnLog.reduce(function (sum, t) { return sum + t.userWpm; }, 0) / turnLog.length) : 0;
+
+      quickstatsEl.innerHTML = '';
+      quickstatsEl.appendChild(statTile('Result', data.playerWon === true ? 'Win' : data.playerWon === false ? 'Loss' : '—'));
+      quickstatsEl.appendChild(statTile('Turns', String(turnLog.length)));
+      quickstatsEl.appendChild(statTile('Words spoken', String(totalWords)));
+      quickstatsEl.appendChild(statTile('Avg pace', avgWpm + ' wpm'));
+
+      // Unconditional — the SVG sparkline has no library dependency to fail.
+      renderWpmSpark(turnLog);
+
+      if (libErrorEl) libErrorEl.hidden = chartsAvailable;
+      destroyCharts();
+
+      if (!chartsAvailable) {
+        // Numbers above (quick stats, and scores below) are unaffected —
+        // only the 2 remaining canvas-based charts are skipped. Hide each
+        // empty canvas and show its fallback line instead of leaving a
+        // blank black box with no explanation beyond the one banner at top.
+        [hpCanvas, wordsCanvas].forEach(function (canvas, i) {
+          if (canvas) canvas.hidden = true;
+          if (chartFallbacks[i]) chartFallbacks[i].hidden = false;
+        });
+      } else {
+        chartFallbacks.forEach(function (el) { if (el) el.hidden = true; });
+        hpCanvas.hidden = false;
+        renderHpChart(hpHistory);
+        wordsCanvas.hidden = false;
+        renderWordsChart(
+          data.wordCategories ? data.wordCategories.you : { filler: 0, connective: 0, vocab: 0 },
+          data.wordCategories ? data.wordCategories.ai : { filler: 0, connective: 0, vocab: 0 }
+        );
+      }
+
+      var scores = data.scores || { logic: 0, precision: 0, delivery: 0 };
+      scoreCardsEl.innerHTML = '';
+      scoreCardsEl.appendChild(scoreCard('Logic', scores.logic));
+      scoreCardsEl.appendChild(scoreCard('Precision', scores.precision));
+      scoreCardsEl.appendChild(scoreCard('Delivery', scores.delivery));
+    }
+
+    function open(data, opts) {
+      opts = opts || {};
+      onRematch = typeof opts.onRematch === 'function' ? opts.onRematch : null;
+      onClose = typeof opts.onClose === 'function' ? opts.onClose : null;
+      render(data || {});
+      dashEl.classList.add('is-open');
+      dashEl.setAttribute('aria-hidden', 'false');
+      dashEl.scrollTop = 0;
+    }
+
+    function close() {
+      dashEl.classList.remove('is-open');
+      dashEl.setAttribute('aria-hidden', 'true');
+    }
+
+    if (rematchBtn) {
+      rematchBtn.addEventListener('click', function () {
+        close();
+        if (onRematch) onRematch();
+      });
+    }
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        close();
+        if (onClose) onClose();
+      });
+    }
+    dashEl.addEventListener('click', function (e) {
+      if (e.target === dashEl) { close(); if (onClose) onClose(); }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && dashEl.classList.contains('is-open')) { close(); if (onClose) onClose(); }
+    });
+
+    dashboardApi = { open: open, close: close };
+  }
+
+  // 60-Second Elevator Pitch (Feature 4) — a standalone alternative round
+  // type, selectable from the home screen, deliberately NOT built inside
+  // initArena()'s state machine: this is one continuous timed pitch with no
+  // opponent turn, so the arena's HP bars, per-turn timer, Word Economy
+  // budget and Point of Order heuristic don't apply here. Shares the
+  // scoring formula (computeJudgeScores) and the report screen
+  // (dashboardApi) with the normal round, and nothing else.
+  function initPitch() {
+    var pitchEl = document.getElementById('cuss-pitch');
+    var stanceSelectEl = document.getElementById('cuss-pitch-stance-select');
+    var stanceMotionText = document.getElementById('cuss-pitch-stance-motion-text');
+    var affirmBtn = document.getElementById('cuss-pitch-affirm');
+    var negateBtn = document.getElementById('cuss-pitch-negate');
+    var closeBtn = document.getElementById('cuss-pitch-close');
+    var sideEl = document.getElementById('cuss-pitch-side');
+    var motionTextEl = document.getElementById('cuss-pitch-motion-text');
+    var timerEl = document.getElementById('cuss-pitch-timer');
+    var timerFillEl = document.getElementById('cuss-pitch-timer-fill');
+    var form = document.getElementById('cuss-pitch-form');
+    var textarea = document.getElementById('cuss-pitch-input');
+    var highlightLayer = document.getElementById('cuss-pitch-highlight');
+    var submitBtn = document.getElementById('cuss-pitch-submit');
+    var openBtns = [document.getElementById('cuss-start-pitch-hero')];
+    if (!pitchEl || !form || !textarea) return;
+
+    // A hard 60 seconds for the whole pitch, not a per-turn allowance like
+    // the normal arena's TURN_DURATION_SECONDS — this mode has exactly one
+    // turn. Countdown ticks visibly (see .cuss-pitch-timer/-fill in
+    // styles.css) and auto-submits whatever's in the textarea at 0,
+    // whether that's a finished pitch or nothing at all.
+    var PITCH_DURATION_SECONDS = 60;
+    var WARN_AT = 15;
+    var CRITICAL_AT = 5;
+
+    var MOTION = '';
+    var playerSide = null;
+    var roundOver = false;
+    var timerInterval = null;
+    var secondsLeft = PITCH_DURATION_SECONDS;
+    var pitchStartTime = null;
+
+    function renderHighlight() {
+      var value = textarea.value;
+      highlightLayer.innerHTML = value ? classifyText(value).html : '';
+      highlightLayer.scrollTop = textarea.scrollTop;
+    }
+    textarea.addEventListener('input', renderHighlight);
+    textarea.addEventListener('scroll', function () { highlightLayer.scrollTop = textarea.scrollTop; });
+    textarea.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+    });
+
+    function updateTimerDisplay() {
+      timerEl.textContent = String(secondsLeft);
+      var warn = secondsLeft <= WARN_AT && secondsLeft > CRITICAL_AT;
+      var critical = secondsLeft <= CRITICAL_AT;
+      timerEl.classList.toggle('is-warn', warn);
+      timerEl.classList.toggle('is-critical', critical);
+      timerFillEl.style.width = (secondsLeft / PITCH_DURATION_SECONDS * 100) + '%';
+      timerFillEl.classList.toggle('is-warn', warn);
+      timerFillEl.classList.toggle('is-critical', critical);
+    }
+
+    function stopTimer() {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    function startTimer() {
+      stopTimer();
+      secondsLeft = PITCH_DURATION_SECONDS;
+      pitchStartTime = Date.now();
+      updateTimerDisplay();
+      timerInterval = setInterval(function () {
+        secondsLeft = Math.max(0, secondsLeft - 1);
+        updateTimerDisplay();
+        if (secondsLeft === 0) {
+          stopTimer();
+          submitPitch(); // hard cutoff — locks input and auto-submits whatever's there
+        }
+      }, 1000);
+    }
+
+    function resetPitch() {
+      MOTION = pickMotion();
+      if (motionTextEl) motionTextEl.textContent = MOTION;
+      if (stanceMotionText) stanceMotionText.textContent = MOTION;
+
+      playerSide = null;
+      roundOver = false;
+      stopTimer();
+      secondsLeft = PITCH_DURATION_SECONDS;
+      updateTimerDisplay();
+
+      textarea.value = '';
+      textarea.disabled = true;
+      submitBtn.disabled = true;
+      renderHighlight();
+
+      if (sideEl) {
+        sideEl.hidden = true;
+        sideEl.classList.remove('is-visible', 'is-affirm', 'is-negate');
+      }
+      affirmBtn.disabled = false;
+      negateBtn.disabled = false;
+      stanceSelectEl.hidden = false;
+    }
+
+    function chooseSide(side) {
+      if (playerSide) return;
+      playerSide = side;
+      stanceSelectEl.hidden = true;
+
+      if (sideEl) {
+        sideEl.hidden = false;
+        sideEl.textContent = side === 'affirm' ? 'AFFIRM' : 'NEGATE';
+        sideEl.classList.add(side === 'affirm' ? 'is-affirm' : 'is-negate');
+        requestAnimationFrame(function () { sideEl.classList.add('is-visible'); });
+      }
+
+      textarea.disabled = false;
+      submitBtn.disabled = false;
+      textarea.focus();
+      startTimer();
+    }
+
+    function openPitch() {
+      resetPitch();
+      pitchEl.classList.add('is-open');
+      pitchEl.setAttribute('aria-hidden', 'false');
+    }
+
+    function closePitch() {
+      stopTimer();
+      pitchEl.classList.remove('is-open');
+      pitchEl.setAttribute('aria-hidden', 'true');
+    }
+
+    // Hands off to the same dashboard Feature 3 built (dashboardApi),
+    // bypassing the normal arena's win/lose screen entirely — there is no
+    // win/lose in a solo pitch. Rematch from here opens a fresh pitch
+    // (not the debate arena), so a pitch-mode round always leads back into
+    // pitch mode, matching what the player actually chose.
+    function goToDashboard(payload) {
+      closePitch();
+      if (dashboardApi) {
+        dashboardApi.open(payload, { onRematch: openPitch, onClose: function () {} });
+      }
+    }
+
+    function submitPitch() {
+      if (roundOver || !playerSide) return;
+      roundOver = true;
+      stopTimer();
+      textarea.disabled = true;
+      submitBtn.disabled = true;
+
+      var text = textarea.value.trim();
+
+      if (!text) {
+        // Time ran out (or Send was hit) with nothing written — skip the
+        // API call (an empty argument would just 400) and go straight to
+        // the report with zero real turns, same empty-state the dashboard
+        // already renders correctly for a self-KO with no completed turns.
+        goToDashboard({
+          motion: MOTION, playerWon: null,
+          hpHistory: [{ turnIndex: 0, health: 100, aiHealth: 100 }],
+          turnLog: [],
+          wordCategories: { you: { filler: 0, connective: 0, vocab: 0 }, ai: { filler: 0, connective: 0, vocab: 0 } },
+          scores: { logic: 0, precision: 0, delivery: 0 },
+          critique: "Time ran out before you started your pitch. Next time, lead with your strongest claim first so you always land at least one real point before the clock runs out."
+        });
+        return;
+      }
+
+      fetch('/api/pitch-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motion: MOTION, argument: text, side: playerSide })
+      })
+        .then(function (res) {
+          return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+        })
+        .catch(function () {
+          return { ok: false, data: { error: 'Failed to reach the server.' } };
+        })
+        .then(function (result) {
+          var critique = result.ok ? result.data.critique : (result.data.error || 'Could not generate a critique for this pitch.');
+          var verdict = result.ok ? (result.data.argument_verdict || 'neutral') : 'neutral';
+
+          var analysis = classifyText(text);
+          var health = clamp(100 + analysis.delta, 0, 100);
+          var stats = {
+            solid: verdict === 'solid' ? 1 : 0, neutral: verdict === 'neutral' ? 1 : 0, bad: verdict === 'bad' ? 1 : 0,
+            connective: analysis.connectiveCount,
+            filler: analysis.fillerCount + analysis.fillerLightCount,
+            vocab: analysis.vocabCount, curse: analysis.curseCount, words: analysis.wordCount
+          };
+          var elapsedMs = Math.max(Date.now() - (pitchStartTime || Date.now()), 1000);
+          var wpm = Math.round(analysis.wordCount / (elapsedMs / 60000));
+
+          goToDashboard({
+            motion: MOTION, playerWon: null,
+            hpHistory: [{ turnIndex: 0, health: 100, aiHealth: 100 }, { turnIndex: 1, health: health, aiHealth: 100 }],
+            turnLog: [{
+              index: 1, userWords: analysis.wordCount, userWpm: wpm,
+              userVerdict: verdict, aiVerdict: null, aiWords: 0, health: health, aiHealth: 100
+            }],
+            wordCategories: {
+              you: { filler: stats.filler, connective: stats.connective, vocab: stats.vocab },
+              ai: { filler: 0, connective: 0, vocab: 0 }
+            },
+            scores: computeJudgeScores(stats),
+            critique: critique
+          });
+        });
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      submitPitch();
+    });
+
+    if (affirmBtn) affirmBtn.addEventListener('click', function () { chooseSide('affirm'); });
+    if (negateBtn) negateBtn.addEventListener('click', function () { chooseSide('negate'); });
+    if (closeBtn) closeBtn.addEventListener('click', closePitch);
+    openBtns.forEach(function (btn) { if (btn) btn.addEventListener('click', openPitch); });
+    pitchEl.addEventListener('click', function (e) { if (e.target === pitchEl) closePitch(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && pitchEl.classList.contains('is-open')) closePitch();
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initDemo();
     initArena();
+    initDashboard();
+    initPitch();
     initVocabScars();
     initConnectorLog();
     initBag();
