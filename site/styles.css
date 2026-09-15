@@ -1917,7 +1917,17 @@ html { scroll-behavior: smooth; }
    by .cuss-token-budget.is-critical), just scaled way up. */
 .cuss-pitch-timer-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .cuss-pitch-timer {
-  margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  margin: 0;
+  /* Brand font, not the generic system-monospace stack — every other
+     numeral/heading in the app (the wordmark, the arena's own small turn
+     timer, headings) already renders in Inter; this was the one outlier
+     reaching for var(--font-mono) instead. Inter's own tabular figures
+     (font-variant-numeric: tabular-nums) keep digit width stable as the
+     count changes, same stability a monospace stack would give, so
+     nothing is lost switching away from it — already loaded at this
+     weight too (see the Inter import at the top of this file), no new
+     font request. */
+  font-family: var(--font-heading); font-variant-numeric: tabular-nums;
   font-size: clamp(56px, 14vw, 96px); font-weight: 700; line-height: 1; color: var(--color-text);
   transition: color 0.2s ease;
 }
