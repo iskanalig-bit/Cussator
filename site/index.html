@@ -358,7 +358,13 @@
           <div class="cuss-bag-insert-list" id="cuss-bag-insert-list"></div>
         </div>
       </div>
-      <div class="cuss-highlight-wrap">
+      <div class="cuss-highlight-wrap" id="cuss-arena-input-wrap">
+        <!-- Floating penalty pill (post-submit only, see
+             showFillerPenaltyPill() in script.js) — anchored to this same
+             wrapper as the gradient border below, purely cosmetic on top
+             of the HP bar drop that already happens; never the only place
+             the penalty is reflected. -->
+        <div class="cuss-filler-pill" id="cuss-filler-pill" hidden aria-live="polite"></div>
         <div class="cuss-highlight-layer" id="cuss-arena-highlight" aria-hidden="true"></div>
         <textarea class="cuss-highlight-input" id="cuss-arena-input" rows="3" placeholder="Your argument..." required></textarea>
         <span class="cuss-token-budget" id="cuss-token-budget" title="Word Economy budget — 1 token = 1 word. Running out ends the round.">

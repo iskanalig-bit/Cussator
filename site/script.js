@@ -1116,6 +1116,64 @@
       return getDifficultyTier().maxTokensAllowed;
     }
 
+    // Budget-aware gradient border (the ring around #cuss-arena-input-wrap,
+    // see styles.css) — tracks whichever of the two limits is more
+    // depleted right now (tokens remaining vs. time remaining), since
+    // either one running out ends the turn the same way. The 50%/20% band
+    // edges are this component's own UI thresholds, not part of
+    // CUSSATOR_CONFIG — that config only defines the per-tier maxima
+    // (maxTokensAllowed/timerSeconds) these percentages are computed
+    // against, so nothing about a specific tier's numbers is hardcoded
+    // here. Called on every timer tick (startTurnTimer()) and every
+    // token-budget recheck (checkTokenBudget()), not per animation frame —
+    // the underlying values only change on those two events anyway, and
+    // the CSS transition on the border itself (see styles.css) is what
+    // keeps the change from reading as an instant snap.
+    var INPUT_BORDER_WARNING_PCT = 0.5;
+    var INPUT_BORDER_CRITICAL_PCT = 0.2;
+    function updateInputBorderState() {
+      if (!inputWrapEl) return;
+      var draftCount = countWordTokens(textarea.value);
+      var tokenPct = clamp((getTokenPoolSize() - tokensUsed - draftCount) / getTokenPoolSize(), 0, 1);
+      var timePct = clamp(turnSecondsLeft / getTurnDurationSeconds(), 0, 1);
+      var worstPct = Math.min(tokenPct, timePct);
+      var band = worstPct > INPUT_BORDER_WARNING_PCT ? 'safe'
+        : worstPct > INPUT_BORDER_CRITICAL_PCT ? 'warning' : 'critical';
+      inputWrapEl.classList.toggle('cuss-budget-warning', band === 'warning');
+      inputWrapEl.classList.toggle('cuss-budget-critical', band === 'critical');
+    }
+
+    // Floating filler-penalty pill — fires once per submit (see the call
+    // site in the form handler below), never per keystroke. Combines every
+    // filler hit from this one submission into a single pill rather than
+    // stacking one per word, since a single-shot submit flow (unlike a
+    // live chat where words land one at a time) can easily produce 3+ hits
+    // in the same instant. count/totalDamage are passed in already
+    // computed from the same classifyText() output driving the real HP
+    // deduction — see the call site — so this can never show a number that
+    // doesn't match what the HP bar just did.
+    var fillerPillTimer = null;
+    var FILLER_PILL_FADE_IN_MS = 150;
+    var FILLER_PILL_HOLD_MS = 350;
+    var FILLER_PILL_FADE_OUT_MS = 300; // must match .cuss-filler-pill's base transition duration
+    function showFillerPenaltyPill(count, totalDamage) {
+      if (!fillerPillEl || count <= 0) return;
+      fillerPillEl.textContent = '-' + totalDamage + ' HP: ' + count + (count === 1 ? ' FILLER WORD' : ' FILLER WORDS');
+
+      clearTimeout(fillerPillTimer);
+      fillerPillEl.classList.remove('is-visible');
+      fillerPillEl.hidden = false;
+      void fillerPillEl.offsetWidth; // reflow so back-to-back submits each replay the animation
+      requestAnimationFrame(function () { fillerPillEl.classList.add('is-visible'); });
+
+      fillerPillTimer = setTimeout(function () {
+        fillerPillEl.classList.remove('is-visible');
+        fillerPillTimer = setTimeout(function () {
+          fillerPillEl.hidden = true;
+        }, FILLER_PILL_FADE_OUT_MS);
+      }, FILLER_PILL_FADE_IN_MS + FILLER_PILL_HOLD_MS);
+    }
+
     // Interruption Mode ("Point of Order") — the architecture is strict
     // request/response with no streaming at any layer (see api/_common.py:
     // the Claude call itself is non-streaming, and the server never sees a
@@ -1154,6 +1212,8 @@
     var bagShelfEl = document.getElementById('cuss-bag-shelf');
     var liveScarsEl = document.getElementById('cuss-live-scars');
     var motionEl = document.getElementById('cuss-arena-motion');
+    var inputWrapEl = document.getElementById('cuss-arena-input-wrap');
+    var fillerPillEl = document.getElementById('cuss-filler-pill');
     // Assigned inside the Insert-from-Bag block below (only when its DOM
     // refs all exist) — declared as a plain var up here, rather than a
     // block-scoped function declaration, so resetRound() below can call it
@@ -1279,6 +1339,7 @@
     var URGENT_PLACEHOLDER = "Time's almost up. Argue now!";
 
     function updateTurnTimerDisplay() {
+      updateInputBorderState();
       if (!turnTimerEl) return;
       turnTimerEl.textContent = formatTurnTime(turnSecondsLeft);
       var isWarn = turnSecondsLeft > 0 && turnSecondsLeft <= 10;
@@ -1329,6 +1390,7 @@
       var draftCount = countWordTokens(textarea.value);
       var remaining = getTokenPoolSize() - tokensUsed - draftCount;
       updateTokenDisplay(Math.max(0, remaining));
+      updateInputBorderState();
       if (remaining <= 0) {
         setHealth(0);
         checkGameOver();
@@ -1348,6 +1410,8 @@
       renderLiveScars();
       if (renderBagShelf) renderBagShelf();
       if (motionEl) motionEl.classList.remove('is-expanded');
+      if (fillerPillEl) { clearTimeout(fillerPillTimer); fillerPillEl.classList.remove('is-visible'); fillerPillEl.hidden = true; }
+      if (inputWrapEl) inputWrapEl.classList.remove('cuss-budget-warning', 'cuss-budget-critical');
       turnStartTime = null;
       turnLog = [];
       hpHistory = [{ turnIndex: 0, health: 100, aiHealth: 100 }];
@@ -2570,6 +2634,16 @@
 
       var analysis = classifyText(text);
       var userWpm = Math.round(analysis.wordCount / (elapsedMs / 60000));
+
+      // Floating penalty pill — the exact same fillerCount/fillerLightCount
+      // classifyText() already produced above (no second detection pass),
+      // priced with the same FILLER_PENALTY/FILLER_PENALTY_LIGHT constants
+      // setHealth() below actually deducts with, so the number shown here
+      // can never drift from what really happened to the HP bar.
+      showFillerPenaltyPill(
+        analysis.fillerCount + analysis.fillerLightCount,
+        analysis.fillerCount * FILLER_PENALTY + analysis.fillerLightCount * FILLER_PENALTY_LIGHT
+      );
 
       // Split Battle Engine's local filter — see scanForFillers() above.
       // Sent up with the request below so the server can decide whether

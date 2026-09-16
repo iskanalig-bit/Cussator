@@ -1193,9 +1193,77 @@ html { scroll-behavior: smooth; }
 .cuss-highlight-wrap {
   /* Borderless, same --color-bg as the rest of the page — spacing alone
      (var(--space-4) gap above, from .cuss-arena-inner) separates the round
-     content from the input now, not a ruled line or a boxed panel. */
+     content from the input now, not a ruled line or a boxed panel. The
+     one exception is the arena's own #cuss-arena-input-wrap below, which
+     gets a budget-aware gradient ring via ::before — scoped to that id
+     alone so Pitch mode's own .cuss-highlight-wrap (no difficulty tier,
+     no token/turn budget to react to) stays exactly as borderless as
+     before. */
   position: relative; flex: 1; min-height: 78px; border-radius: var(--radius-md);
   background: var(--color-bg);
+}
+/* Budget-aware gradient border — a ::before ring (inset:-2px, drawn behind
+   via z-index:-1) rather than a real `border`, so it can be a genuine
+   two-tone gradient with the container's own border-radius intact (a
+   plain `border-image` gradient ignores border-radius and would square
+   off these already-rounded corners). Driven by updateInputBorderState()
+   in script.js, called on every timer tick and Word Economy change —
+   tracks whichever of tokens-remaining / time-remaining is more depleted
+   (the "worse of the two", since running out of either ends the turn).
+   All three gradients share the same shape (90deg, two stops) specifically
+   so the `background` transition below actually animates smoothly between
+   them in evergreen browsers, instead of hard-cutting from one gradient to
+   another. Colors reuse existing tokens already meaningful elsewhere
+   (Affirm blue, the app's own warn amber, the existing critical red) —
+   no new palette. */
+#cuss-arena-input-wrap::before {
+  content: "";
+  position: absolute; inset: -2px; z-index: -1; border-radius: inherit;
+  transition: background 300ms ease, opacity 300ms ease;
+  background: linear-gradient(90deg, oklch(0.72 0.15 250), color-mix(in srgb, oklch(0.72 0.15 250) 55%, transparent));
+}
+#cuss-arena-input-wrap.cuss-budget-warning::before {
+  background: linear-gradient(90deg, var(--color-warn), color-mix(in srgb, var(--color-warn) 55%, transparent));
+}
+#cuss-arena-input-wrap.cuss-budget-critical::before {
+  background: linear-gradient(90deg, oklch(0.63 0.22 25), color-mix(in srgb, oklch(0.63 0.22 25) 55%, transparent));
+  animation: cuss-input-border-pulse 1.1s ease-in-out infinite;
+}
+@keyframes cuss-input-border-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #cuss-arena-input-wrap.cuss-budget-critical::before { animation: none; }
+}
+
+/* Floating filler-penalty pill — post-submit only (see
+   showFillerPenaltyPill() in script.js), purely cosmetic feedback layered
+   on top of the HP bar drop that already happens; the HP bar itself
+   remains the source of truth for the actual penalty. Positioned above
+   the input, anchored to the same #cuss-arena-input-wrap as the gradient
+   border above. Longer transition on the base rule (fade-out) than on
+   .is-visible (fade-in) so the two legs of the lifecycle read as a quick
+   pop in, held, then a slower settle out — same base+modifier pattern as
+   .cuss-paste-blocked's own show/hide timing elsewhere in this file. */
+.cuss-filler-pill {
+  position: absolute; top: -24px; left: 8px; z-index: 5;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+  padding: 4px 10px; border-radius: 999px; white-space: nowrap; pointer-events: none;
+  color: oklch(0.63 0.22 25);
+  background: color-mix(in srgb, oklch(0.63 0.22 25) 16%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, oklch(0.63 0.22 25) 45%, transparent);
+  opacity: 0; transform: translateY(4px);
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+.cuss-filler-pill[hidden] { display: none; }
+.cuss-filler-pill.is-visible {
+  opacity: 1; transform: translateY(0);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cuss-filler-pill { transition: opacity 150ms ease; transform: none; }
+  .cuss-filler-pill.is-visible { transition: opacity 150ms ease; }
 }
 /* Send — styled like a physical keyboard Enter key (rectangular keycap,
    small corner radius, the return-arrow glyph a real Enter key shows)
