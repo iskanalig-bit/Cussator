@@ -128,7 +128,12 @@ DEBATE_SYSTEM_PROMPT = (
     "general weak-point rule above; this is specifically for an appeal to an unnamed authority or "
     "consensus).\n"
     "- Yielding: after landing a strong point, occasionally closing with a short floor-yielding "
-    "line like \"We yield the remainder of our time to the floor.\" before handing back.\n\n"
+    "line like \"We yield the remainder of our time to the floor.\" before handing back.\n"
+    "- Point of Order interruption: when \"This turn\" below tells you to, open by quoting their "
+    "exact flagged phrase back at them and mocking it in one sharp line, then flow straight into "
+    "your normal rebuttal in the same reply. This is triggered by the app itself (their submitted "
+    "argument was heavy with filler words) — only do this when explicitly instructed below, never "
+    "on your own initiative.\n\n"
     "This turn:\n"
     "{turn_directive}\n\n"
     "Content rules:\n"
@@ -172,11 +177,14 @@ DEBATE_SYSTEM_PROMPT = (
     'question, by nature, doesn\'t make a claim or add a reason itself — judge it "neutral" unless it '
     "is unusually sharp and well-aimed.\n\n"
     "Fallacy naming: when the USER's argument earns \"bad\" specifically because it commits a "
-    "recognizable named fallacy (a strawman, an ad hominem, a slippery slope, or another clear "
-    "one), set fallacy_type to name it. Most \"bad\" verdicts are just vague, unsupported, or off-"
-    'topic rather than a specific named fallacy — set fallacy_type to "none" in that ordinary '
-    "case, and always when the verdict isn't \"bad\" at all. Never set it for your own rebuttal, "
-    "only the user's argument.\n\n"
+    "recognizable named fallacy (a strawman, an ad hominem, a slippery slope, a false dilemma, or "
+    "another clear one), set fallacy_type to name it. Most \"bad\" verdicts are just vague, "
+    'unsupported, or off-topic rather than a specific named fallacy — set fallacy_type to "none" '
+    "in that ordinary case, and always when the verdict isn't \"bad\" at all. Never set it for "
+    "your own rebuttal, only the user's argument. Whenever you do set a real fallacy_type, also "
+    "open your reply with the same Point of Order quote-and-mock style described in the toolkit "
+    "above, using the specific fallacious phrase from their argument, even if \"This turn\" below "
+    "doesn't separately instruct you to — you don't need to be told twice.\n\n"
     "Bag Evaluator (a separate, smaller task — this feeds the player's vocabulary collection, not "
     "their score):\n"
     "Scan the user's LATEST argument only (not earlier history) for genuinely advanced vocabulary — "
@@ -223,13 +231,14 @@ DEBATE_TOOL = {
             },
             "fallacy_type": {
                 "type": "string",
-                "enum": ["none", "strawman", "ad_hominem", "slippery_slope", "other"],
+                "enum": ["none", "strawman", "ad_hominem", "slippery_slope", "false_dilemma", "other"],
                 "description": (
                     "Only set when user_argument_verdict is 'bad' AND the specific flaw is a "
                     "named logical fallacy, not just vague or unsupported. 'strawman' for "
                     "rebutting a distorted version of their claim, 'ad_hominem' for attacking the "
                     "arguer instead of the argument, 'slippery_slope' for assuming one step "
-                    "guarantees an extreme outcome with no supporting mechanism, 'other' for a "
+                    "guarantees an extreme outcome with no supporting mechanism, 'false_dilemma' "
+                    "for presenting only two options when others clearly exist, 'other' for a "
                     "clear but differently-named fallacy. 'none' otherwise - that is the common, "
                     "correct result for most 'bad' verdicts, which are just vague or unsupported "
                     "rather than a specific named fallacy."
@@ -299,7 +308,23 @@ def _pick_primary_mode():
     return PRIMARY_MODE_WEIGHTS[-1][0]
 
 
-def _build_turn_directive(word_of_day, word_of_day_def):
+def _build_turn_directive(word_of_day, word_of_day_def, interruption_phrase=None):
+    # interruption_phrase is set (see debate_reply()) when the client's own
+    # local filler scan already flagged this turn as filler-heavy (see
+    # scanForFillers()/CUSSATOR_CONFIG.INTERRUPTION_THRESHOLD in
+    # script.js), sent up as part of the request rather than re-detected
+    # here. Forces standard mode (skips compromise/clarification) so the
+    # mock line leads straight into a real attack, not a soft ask.
+    if interruption_phrase:
+        lines = [
+            'Open this reply with one sharp, in-character line that quotes their exact phrase '
+            '"%s" back at them and mocks it for what it is (a hedge, a stall, a shrug), then '
+            "continue directly into your normal rebuttal in the same reply - one continuous "
+            "reply, not two separate messages. Don't soften this into a Point of Clarification "
+            "question; this is a direct interruption, not a request for more information." % interruption_phrase
+        ]
+        return " ".join(lines)
+
     mode = _pick_primary_mode()
 
     if mode == "compromise":
@@ -382,6 +407,24 @@ def debate_reply(body):
     messages = _history_messages(body.get("history", []))
     messages.append({"role": "user", "content": argument})
 
+    # Split Battle Engine's local filter (see scanForFillers() in
+    # script.js) already ran client-side before this request was even
+    # sent — its fillers are already scored (HP math happens entirely in
+    # the client, this call never touches it), so this is read only to
+    # decide whether the reply should open with a Point of Order-style
+    # quote-and-mock, not to re-detect or re-score anything.
+    local_filler = body.get("localFillerResult")
+    interruption_phrase = None
+    if isinstance(local_filler, dict) and local_filler.get("triggerInterruption"):
+        detected = local_filler.get("detectedFillers")
+        if isinstance(detected, list) and detected:
+            # Longest phrase first — a multi-word hedge ("if that makes
+            # sense") makes a sharper, more specific quote to mock than a
+            # one-word filler ("um") when both are present.
+            candidates = [str(w)[:60] for w in detected if isinstance(w, str) and w.strip()]
+            if candidates:
+                interruption_phrase = max(candidates, key=len)
+
     try:
         client = anthropic.Anthropic()
         response = client.messages.create(
@@ -390,7 +433,7 @@ def debate_reply(body):
             system=DEBATE_SYSTEM_PROMPT.format(
                 motion=motion or DEFAULT_MOTION, user_stance=user_stance, ai_stance=ai_stance,
                 difficulty_style=DIFFICULTY_STYLES[difficulty],
-                turn_directive=_build_turn_directive(word_of_day, word_of_day_def)
+                turn_directive=_build_turn_directive(word_of_day, word_of_day_def, interruption_phrase)
             ),
             output_config={"effort": "low"},
             tools=[DEBATE_TOOL],
@@ -415,7 +458,7 @@ def debate_reply(body):
             reply = " ".join(reply_words[:REBUTTAL_WORD_CAP]).rstrip(",;:") + "…"
 
         fallacy_type = str(data.get("fallacy_type") or "none").strip().lower()
-        if fallacy_type not in ("none", "strawman", "ad_hominem", "slippery_slope", "other"):
+        if fallacy_type not in ("none", "strawman", "ad_hominem", "slippery_slope", "false_dilemma", "other"):
             fallacy_type = "none"
 
         # Defensively rebuilt rather than passed through — never trust a

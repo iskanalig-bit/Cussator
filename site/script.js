@@ -865,6 +865,44 @@
   var STRONG_ARGUMENT_SELF_HEAL = 20;
   var STRONG_ARGUMENT_OPPONENT_DAMAGE = 20;
 
+  // Split Battle Engine's local filter — runs client-side, no AI call,
+  // before the submitted argument is ever sent to /api/respond. Its
+  // result feeds two things: the request payload's localFillerResult
+  // (so the server can decide whether the AI's reply should open with a
+  // Point of Order quote-and-mock, see debate_reply() in api/_common.py),
+  // and — since CUSSATOR_CONFIG.HP_PENALTIES.filler and
+  // .INTERRUPTION_THRESHOLD.fillerCount already exactly match what
+  // classifyText()'s own filler tier and the live draft checker
+  // (runInterruptionCheck()) already use — this deliberately does NOT
+  // apply a second, separate HP deduction of its own: classifyText()'s
+  // word-level delta (applied once, on submit, via setHealth() in the
+  // form handler below) already is the filler damage for this turn. This
+  // function's hpDamage field is informational/for parity with the spec's
+  // own shape, not a value the client actually subtracts anywhere.
+  //
+  // Deliberately simpler than classifyText(): a flat word-boundary scan
+  // against one list, no light tier, no HTML output, no word-count floor
+  // — a fast, single-purpose check, not a replacement for the full
+  // classifier that still drives real scoring/highlighting.
+  function scanForFillers(text, fillerList) {
+    // Defaults to the app's own full FILLER_WORDS (declared just above —
+    // already a superset of CUSSATOR_CONFIG.FILLER_WORDS's 8-word
+    // baseline, see the comment there), not the bare config list, so this
+    // actually catches the same fillers classifyText() would — the config
+    // list alone would under-detect real filler-heavy turns and rarely
+    // trigger the interruption it's meant to feed. Pass an explicit list
+    // to override.
+    var list = fillerList || FILLER_WORDS;
+    var found = list.filter(function (word) {
+      return new RegExp('\\b' + escapeRegex(word) + '\\b', 'i').test(text);
+    });
+    return {
+      detectedFillers: found,
+      hpDamage: found.length * CUSSATOR_CONFIG.HP_PENALTIES.filler,
+      triggerInterruption: found.length > CUSSATOR_CONFIG.INTERRUPTION_THRESHOLD.fillerCount,
+    };
+  }
+
   // All five tiers are matched in a single combined pass, longest phrase
   // first, instead of five sequential regex-and-replace passes. With lists
   // this size, several phrases in one tier contain a whole word from another
@@ -2533,6 +2571,12 @@
       var analysis = classifyText(text);
       var userWpm = Math.round(analysis.wordCount / (elapsedMs / 60000));
 
+      // Split Battle Engine's local filter — see scanForFillers() above.
+      // Sent up with the request below so the server can decide whether
+      // the AI's reply should open with a quote-and-mock, without paying
+      // for a second round of filler detection there.
+      var localFillerResult = scanForFillers(text);
+
       // Records exactly one dashboard entry for this submission, whatever
       // the closure's health/aiHealth/turnLog.length happen to be at the
       // moment it's called — called from every exit point below (self-KO,
@@ -2614,7 +2658,8 @@
         body: JSON.stringify({
           motion: MOTION, argument: text, history: history, side: playerSide, difficulty: difficulty,
           wordOfDay: currentWordOfDay ? currentWordOfDay.word : '',
-          wordOfDayDef: currentWordOfDay ? currentWordOfDay.def : ''
+          wordOfDayDef: currentWordOfDay ? currentWordOfDay.def : '',
+          localFillerResult: localFillerResult
         })
       })
         .then(function (res) {
