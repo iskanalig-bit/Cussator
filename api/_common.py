@@ -159,9 +159,23 @@ DEBATE_SYSTEM_PROMPT = (
     'honestly — most rebuttals are "neutral"; reserve "solid" for ones that actually add a real reason '
     "or mechanism, not just a sharp tone. Don't inflate either verdict. A Point of Clarification "
     'question, by nature, doesn\'t make a claim or add a reason itself — judge it "neutral" unless it '
-    "is unusually sharp and well-aimed.\n"
-    "Call the submit_round_turn tool with your rebuttal and both verdicts — always use the tool, never "
-    "reply in plain text."
+    "is unusually sharp and well-aimed.\n\n"
+    "Bag Evaluator (a separate, smaller task — this feeds the player's vocabulary collection, not "
+    "their score):\n"
+    "Scan the user's LATEST argument only (not earlier history) for genuinely advanced vocabulary — "
+    "B2/C1/C2 nouns, precise verbs, or rhetorical connectors — that is ALSO used correctly and "
+    "meaningfully in context, not just present in the sentence. Hold a high bar: think of words like "
+    '"ubiquitous", "notwithstanding", "ostensible", "mitigate", "discrepancy", "unequivocally" — not '
+    'ordinary topical nouns that merely sound relevant ("regulators", "government", "climate", '
+    '"energy" are not advanced, even in an energy-policy debate). A technically advanced word used in '
+    "a confused or semantically incoherent way earns nothing — reject it and say why in the "
+    "definition field's absence, i.e. just leave it out. If genuinely nothing in this turn clears the "
+    "bar, return an empty list; that is the common, correct result, not a failure to find something. "
+    "For each word that does qualify, give its exact form as it appears in the text (lowercase), a "
+    "concise one-sentence definition, and its own CEFR level (B2/C1/C2) — independent of the other "
+    "vocabulary bank the app already tracks, so a word can qualify here even if it isn't on that list.\n\n"
+    "Call the submit_round_turn tool with your rebuttal, both verdicts, and vocab_words_used — always "
+    "use the tool, never reply in plain text."
 )
 
 DEBATE_TOOL = {
@@ -189,6 +203,34 @@ DEBATE_TOOL = {
                 "type": "string",
                 "enum": ["solid", "neutral", "bad"],
                 "description": "Quality verdict on your own rebuttal, by the same rubric.",
+            },
+            "vocab_words_used": {
+                "type": "array",
+                "description": (
+                    "Advanced (B2/C1/C2) vocabulary from the user's LATEST argument only, used "
+                    "correctly and meaningfully in context - not just present in the sentence. "
+                    "See the Bag Evaluator rules in the system prompt. Empty array if nothing "
+                    "qualifies - that is a normal, common result, not a fallback to avoid."
+                ),
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "word": {
+                            "type": "string",
+                            "description": "The exact word or short phrase as it appears in the user's text, lowercase.",
+                        },
+                        "definition": {
+                            "type": "string",
+                            "description": "A concise one-sentence definition, plain text.",
+                        },
+                        "cefr": {
+                            "type": "string",
+                            "enum": ["B2", "C1", "C2"],
+                            "description": "CEFR level of the word itself, not how well it was used.",
+                        },
+                    },
+                    "required": ["word", "definition", "cefr"],
+                },
             },
         },
         "required": ["reply", "user_argument_verdict", "ai_reply_verdict"],
@@ -330,10 +372,32 @@ def debate_reply(body):
 
         data = tool_use.input
         reply = str(data.get("reply") or "").strip()
+
+        # Defensively rebuilt rather than passed through — never trust a
+        # tool call's shape blindly. Always returns a real (possibly empty)
+        # list rather than omitting the key, so the client's Array.isArray
+        # check reliably distinguishes "the model found nothing this turn"
+        # from "this server response predates the field existing at all".
+        vocab_words_used = []
+        raw_vocab = data.get("vocab_words_used")
+        if isinstance(raw_vocab, list):
+            for item in raw_vocab[:8]:
+                if not isinstance(item, dict):
+                    continue
+                word = str(item.get("word") or "").strip().lower()[:60]
+                if not word:
+                    continue
+                definition = str(item.get("definition") or "").strip()[:200]
+                cefr = str(item.get("cefr") or "").strip().upper()
+                if cefr not in ("B2", "C1", "C2"):
+                    cefr = ""
+                vocab_words_used.append({"word": word, "definition": definition, "cefr": cefr})
+
         return 200, {
             "reply": reply or "…",
             "user_argument_verdict": data.get("user_argument_verdict", "neutral"),
             "ai_reply_verdict": data.get("ai_reply_verdict", "neutral"),
+            "vocab_words_used": vocab_words_used,
         }
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}

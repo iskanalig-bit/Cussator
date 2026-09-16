@@ -320,6 +320,66 @@
     });
   }
 
+  // Definition/CEFR for Bag words the AI's contextual check (see
+  // vocab_words_used on /api/respond) discovers OUTSIDE the curated
+  // VOCAB_WORDS list — renderBag() already falls back to 'B2' for an
+  // unknown CEFR and simply omits the definition line for an unknown word,
+  // so this is additive: it only fills in what the static tables (VOCAB_CEFR,
+  // WORD_OF_DAY_DEFS) don't already have, never overrides them. Persisted
+  // separately from the word/count tally itself (BAG_KEY above) since it's
+  // a different shape of data with a different lifetime concern - a word's
+  // definition doesn't change if you land it three more times.
+  var BAG_WORD_INFO_KEY = 'cussatorBagWordInfo';
+
+  function loadBagWordInfo() {
+    try {
+      var raw = localStorage.getItem(BAG_WORD_INFO_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveBagWordInfo(word, info) {
+    try {
+      var all = loadBagWordInfo();
+      all[word] = info;
+      localStorage.setItem(BAG_WORD_INFO_KEY, JSON.stringify(all));
+    } catch (e) {
+      // localStorage unavailable — the word still gets collected via
+      // recordBagWords, it just won't show a definition/real CEFR later.
+    }
+  }
+
+  // Thin wrapper so every Bag-crediting call site also refreshes the badge,
+  // instead of each one remembering to call updateBagBadge() separately.
+  function creditBagWords(words) {
+    if (!words || !words.length) return;
+    recordBagWords(words);
+    updateBagBadge();
+  }
+
+  // Authoritative path: the AI's own contextual read on the player's LATEST
+  // argument (see the "Judging" section of DEBATE_SYSTEM_PROMPT in
+  // api/_common.py) — a word only reaches here if it was both advanced
+  // AND used correctly in context, unlike the plain exact-match list this
+  // replaces as the primary source. Curated data always wins over the AI's
+  // own guess: saveBagWordInfo() is only ever read as a fallback in
+  // renderBag() when VOCAB_CEFR/WORD_OF_DAY_DEFS have nothing for that word.
+  function creditBagWordsWithInfo(entries) {
+    if (!Array.isArray(entries) || !entries.length) return;
+    var words = [];
+    entries.forEach(function (entry) {
+      var word = String((entry && entry.word) || '').trim().toLowerCase();
+      if (!word) return;
+      words.push(word);
+      var cefr = entry && ['B2', 'C1', 'C2'].indexOf(entry.cefr) !== -1 ? entry.cefr : undefined;
+      var def = entry && typeof entry.definition === 'string' ? entry.definition.slice(0, 200) : undefined;
+      if (cefr || def) saveBagWordInfo(word, { cefr: cefr, def: def });
+    });
+    creditBagWords(words);
+  }
+
   // Connector Log — same pattern again as Bag/Scars above: a persistent
   // word -> use-count tally in localStorage, no accounts, no separate
   // detection logic. classifyText()'s existing 'connective' tier (the same
@@ -2300,9 +2360,19 @@
         roundFillerWords[w] = (roundFillerWords[w] || 0) + 1;
       });
       recordFillerWords(analysis.fillerWordsUsed);
-      recordBagWords(analysis.vocabWordsUsed);
+      // Bag crediting is deliberately NOT instant anymore — it used to fire
+      // right here off the same exact-match list that's still used for
+      // live highlighting and the round's own Precision score (that part
+      // is untouched; roundStats.vocab above still comes from this local
+      // match, same as always). The persistent Bag collection now waits
+      // for the AI's contextual read on THIS argument (see
+      // vocab_words_used in the /api/respond response, credited in the
+      // success handler below) so a word only gets collected if it was
+      // actually used correctly, not just present in the sentence. See
+      // creditBagWords()/creditBagWordsWithInfo() and their call sites for
+      // the fallback paths (self-KO, API failure) that still use this
+      // local list when no AI judgment is coming.
       recordConnectiveWords(analysis.connectiveWordsUsed);
-      updateBagBadge();
       tokensUsed += countWordTokens(text);
 
       history.push({ role: 'user', content: text });
@@ -2318,6 +2388,10 @@
       // can already be decided before the AI is even asked to respond.
       if (checkGameOver()) {
         finalizeTurn(0, null, null);
+        // No AI response is ever coming for this turn, so there's no
+        // contextual read to wait for — fall back to the local exact-match
+        // list rather than losing Bag credit entirely on a self-KO.
+        creditBagWords(analysis.vocabWordsUsed);
         addUserBubbleAnimated(analysis.html, function () {});
         return;
       }
@@ -2353,7 +2427,24 @@
             if (bagInsertBtn) bagInsertBtn.disabled = false;
             textarea.focus();
             startTurnTimer();
+            // The request failed outright, so there's no contextual read
+            // coming for this turn either — same fallback as the self-KO
+            // path above, rather than losing the credit to a network blip.
+            creditBagWords(analysis.vocabWordsUsed);
             return;
+          }
+
+          // Bag crediting for THIS turn, now that the AI has actually
+          // weighed in — vocab_words_used is only present when the model
+          // returned it (older/degraded responses might not), so an array
+          // check rather than a truthiness check distinguishes "the AI
+          // legitimately found nothing this turn" (a real, correct empty
+          // array — credit nothing) from "this field isn't there at all"
+          // (fall back to the local list rather than losing credit).
+          if (Array.isArray(result.data.vocab_words_used)) {
+            creditBagWordsWithInfo(result.data.vocab_words_used);
+          } else {
+            creditBagWords(analysis.vocabWordsUsed);
           }
 
           // The AI's holistic verdict on the user's own turn — can push the
@@ -2651,6 +2742,7 @@
 
     function renderBag() {
       var bag = loadBag();
+      var wordInfo = loadBagWordInfo(); // AI-discovered words outside VOCAB_WORDS, see creditBagWordsWithInfo()
       var entries = Object.keys(bag)
         .map(function (w) { return { word: w, count: bag[w] }; })
         .sort(function (a, b) { return b.count - a.count; });
@@ -2672,10 +2764,12 @@
         var level = document.createElement('span');
         level.className = 'cuss-bag-card-level';
         // Real CEFR level (see VOCAB_CEFR above), not a made-up tier tied
-        // to use count — 'B2' is the documented fallback for any word
-        // that somehow isn't in the table (e.g. VOCAB_WORDS grew since a
-        // player's Bag was last saved).
-        level.textContent = VOCAB_CEFR[entry.word] || 'B2';
+        // to use count. Falls back to the AI's own estimate (see
+        // creditBagWordsWithInfo()) for a word outside the curated list,
+        // then to 'B2' if even that's missing (e.g. VOCAB_WORDS grew since
+        // a player's Bag was last saved, or the word predates this fallback
+        // existing at all).
+        level.textContent = VOCAB_CEFR[entry.word] || (wordInfo[entry.word] && wordInfo[entry.word].cefr) || 'B2';
         card.appendChild(level);
 
         if (MUN_TERMS.indexOf(entry.word) !== -1) {
@@ -2697,7 +2791,7 @@
         word.textContent = entry.word + (entry.count > 1 ? ' ×' + entry.count : '');
         card.appendChild(word);
 
-        var def = WORD_OF_DAY_DEFS[entry.word];
+        var def = WORD_OF_DAY_DEFS[entry.word] || (wordInfo[entry.word] && wordInfo[entry.word].def);
         if (def) {
           var defEl = document.createElement('span');
           defEl.className = 'cuss-bag-card-def';
