@@ -1222,8 +1222,10 @@
     var typing = document.getElementById('cuss-arena-typing');
     var healthFill = document.getElementById('cuss-health-fill');
     var healthVal = document.getElementById('cuss-health-val');
+    var healthTrail = document.getElementById('cuss-health-trail');
     var aiHealthFill = document.getElementById('cuss-ai-health-fill');
     var aiHealthVal = document.getElementById('cuss-ai-health-val');
+    var aiHealthTrail = document.getElementById('cuss-ai-health-trail');
     var motionTextEl = document.getElementById('cuss-arena-motion-text');
     var judgePanel = document.getElementById('cuss-arena-judge');
     var judgeLogicFill = document.getElementById('cuss-judge-logic-fill');
@@ -1867,9 +1869,33 @@
       el.classList.add('is-flash');
     }
 
-    function updateHealthDisplay(fillEl, valEl, value, previous) {
+    // Trailing depletion streak (see .cuss-judge-trail in styles.css) — on
+    // a drop, the trail snaps to the OLD (higher) width with no
+    // transition, then a forced reflow + class-driven transition eases it
+    // down to the new width on its own slower, delayed schedule, so it
+    // visibly "catches up" after the real fill has already moved. A heal
+    // just collapses the trail to the same value instantly — there's
+    // nothing to trail on a gain.
+    function setHpTrail(trailEl, value, previous) {
+      if (!trailEl) return;
+      if (value < previous) {
+        trailEl.style.transition = 'none';
+        trailEl.style.width = previous + '%';
+        void trailEl.offsetWidth; // reflow so the width below doesn't just no-op
+        trailEl.style.transition = '';
+        trailEl.style.width = value + '%';
+      } else {
+        trailEl.style.transition = 'none';
+        trailEl.style.width = value + '%';
+        void trailEl.offsetWidth;
+        trailEl.style.transition = '';
+      }
+    }
+
+    function updateHealthDisplay(fillEl, valEl, trailEl, value, previous) {
       fillEl.style.width = value + '%';
       valEl.textContent = value;
+      setHpTrail(trailEl, value, previous);
 
       var isCritical = value <= 25;
       var isWarning = !isCritical && value <= 50;
@@ -1889,13 +1915,13 @@
 
     function setHealth(v) {
       var next = clamp(v, 0, 100);
-      updateHealthDisplay(healthFill, healthVal, next, health);
+      updateHealthDisplay(healthFill, healthVal, healthTrail, next, health);
       health = next;
     }
 
     function setAiHealth(v) {
       var next = clamp(v, 0, 100);
-      updateHealthDisplay(aiHealthFill, aiHealthVal, next, aiHealth);
+      updateHealthDisplay(aiHealthFill, aiHealthVal, aiHealthTrail, next, aiHealth);
       aiHealth = next;
     }
 
@@ -2635,14 +2661,20 @@
       var analysis = classifyText(text);
       var userWpm = Math.round(analysis.wordCount / (elapsedMs / 60000));
 
-      // Floating penalty pill — the exact same fillerCount/fillerLightCount
-      // classifyText() already produced above (no second detection pass),
-      // priced with the same FILLER_PENALTY/FILLER_PENALTY_LIGHT constants
-      // setHealth() below actually deducts with, so the number shown here
-      // can never drift from what really happened to the HP bar.
+      // Floating penalty pill — same fillerCount/fillerLightCount
+      // classifyText() already produced above (no second detection pass).
+      // Priced flat at CUSSATOR_CONFIG.HP_PENALTIES.filler per word, not a
+      // blend with the light tier's own lower FILLER_PENALTY_LIGHT rate —
+      // the shared config only defines one filler severity, and this is
+      // the one place that number must never drift from it. The
+      // light-tier words (see FILLER_WORDS_LIGHT) still cost their own
+      // lower amount on the actual HP bar below, same as always; on a
+      // turn that mixes a light-tier word in with real fillers, this
+      // pill's total can read slightly higher than that exact deduction —
+      // an accepted tradeoff for a single, never-hardcoded number here.
       showFillerPenaltyPill(
         analysis.fillerCount + analysis.fillerLightCount,
-        analysis.fillerCount * FILLER_PENALTY + analysis.fillerLightCount * FILLER_PENALTY_LIGHT
+        (analysis.fillerCount + analysis.fillerLightCount) * FILLER_PENALTY
       );
 
       // Split Battle Engine's local filter — see scanForFillers() above.
@@ -2672,10 +2704,14 @@
       }
 
       setHealth(health + analysis.delta);
-      // Same signal that just docked Credibility above — a filler/curse hit
-      // in the player's own submitted argument — triggers the shake, not a
-      // separate detection pass.
-      if (analysis.fillerCount + analysis.fillerLightCount + analysis.curseCount > 0) {
+      // Reserved for an actual interruption-level hit (the same
+      // CUSSATOR_CONFIG.INTERRUPTION_THRESHOLD.fillerCount threshold
+      // scanForFillers() already checked above, or any curse word — a
+      // curse is always interruption-worthy regardless of count), not
+      // fired on every single filler word the way it used to be. A lone
+      // filler still docks Credibility and shows the penalty pill above;
+      // it just doesn't rattle the whole screen for one word anymore.
+      if (localFillerResult.triggerInterruption || analysis.curseCount > 0) {
         triggerScreenShake();
       }
       roundStats.filler += analysis.fillerCount + analysis.fillerLightCount;

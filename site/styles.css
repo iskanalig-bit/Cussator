@@ -490,24 +490,54 @@ html { scroll-behavior: smooth; }
 /* overflow: visible (overriding the base track's overflow:hidden) so the
    fill's glow below can actually bleed outward instead of being clipped
    at the track edge — the fill rounds its own ends to match the track's
-   pill shape instead, so it doesn't need the track to clip it square. */
-.cuss-arena-health .cuss-judge-track { height: 12px; overflow: visible; }
+   pill shape instead, so it doesn't need the track to clip it square.
+   position:relative anchors the trailing-streak element below.
+   Frosted-glass capsule treatment — a translucent white wash over the
+   dark track plus a soft inset shadow for depth, closer to an Apple
+   Fitness ring's material than the old flat --color-neutral-800 fill. */
+.cuss-arena-health .cuss-judge-track {
+  position: relative; height: 12px; overflow: visible;
+  background: color-mix(in srgb, white 10%, var(--color-neutral-800));
+  box-shadow: inset 0 1px 3px color-mix(in srgb, black 35%, transparent);
+}
 .cuss-arena-health .cuss-judge-fill {
-  position: relative; border-radius: 99px;
-  background: var(--color-accent); color: var(--color-accent);
+  position: relative; z-index: 1; border-radius: 99px;
+  /* Healthy = green, not the ordinary accent purple — this bar now reads
+     as a real health system (green/amber/red) rather than reusing the
+     app's generic accent color for "full", matching is-hp-warning/
+     is-hp-critical below as one continuous green->amber->red progression
+     instead of a purple->amber->red one. Both HP bars (You and Opponent)
+     share this same danger-based tiering now — see the removed
+     .cuss-hud-hp-fill-you/-opponent fixed-color overrides below; the two
+     bars are already distinguished by their labels and position, not by
+     a fixed color, so this can track actual danger instead of identity. */
+  background: oklch(0.75 0.13 150); color: oklch(0.75 0.13 150);
   transition: width 0.5s cubic-bezier(.22,.61,.36,1), background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
-  /* Ambient glow in whichever color the bar currently is (accent, warn, or
-     the hp-warning/hp-critical danger tiers below) — same color-mix-with-
-     currentColor technique as the hit pulse below and the same idea as the
-     homepage Chat button's glow, just a symmetric blur rather than that
-     button's directional drop-shadow (a 16px-down shadow reads as a
-     shadow, not a glow, on something this thin). Turned up to be clearly
-     visible at a glance, not just a faint edge softening. */
+  /* Ambient glow in whichever color the bar currently is (healthy green,
+     warning, or critical) — same color-mix-with-currentColor technique as
+     the hit pulse below and the same idea as the homepage Chat button's
+     glow, just a symmetric blur rather than that button's directional
+     drop-shadow (a 16px-down shadow reads as a shadow, not a glow, on
+     something this thin). Turned up to be clearly visible at a glance,
+     not just a faint edge softening. */
   box-shadow: 0 0 22px 4px color-mix(in srgb, currentColor 75%, transparent);
 }
 .cuss-arena-health .cuss-judge-fill.is-warn { background: var(--color-warn); color: var(--color-warn); }
 .cuss-arena-health .cuss-judge-fill.is-hp-warning { background: oklch(0.78 0.16 80); color: oklch(0.78 0.16 80); }
 .cuss-arena-health .cuss-judge-fill.is-hp-critical { background: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25); }
+/* Trailing depletion streak — a second bar sitting behind the real fill
+   (z-index:0 vs. the fill's 1) that snaps to the OLD width the instant HP
+   drops, then eases down to the new width on a slower, slightly delayed
+   transition (see setHpTrail() in script.js) — the fill has already
+   "landed" at the new value by the time this catches up, reading as a
+   trailing streak the way a game HUD health bar depletes, rather than
+   the whole bar just shrinking as one flat block. Stays hidden (width:0)
+   on a heal, since there's nothing to trail there. */
+.cuss-arena-health .cuss-judge-trail {
+  position: absolute; inset: 0; z-index: 0; border-radius: 99px; width: 0%;
+  background: color-mix(in srgb, oklch(0.63 0.22 25) 65%, transparent);
+  transition: width 0.6s ease-out 0.15s;
+}
 .cuss-arena-health .cuss-judge-val { font-size: 13px; font-weight: 700; transition: color 0.3s ease; }
 .cuss-arena-health .cuss-judge-val.is-hp-warning { color: oklch(0.78 0.16 80); }
 .cuss-arena-health .cuss-judge-val.is-hp-critical { color: oklch(0.63 0.22 25); }
@@ -538,13 +568,16 @@ html { scroll-behavior: smooth; }
 }
 .cuss-arena-health .cuss-judge-val.is-flash { display: inline-block; animation: cuss-hp-val-pulse 0.5s ease-out; }
 
-/* HUD dual HP bars — same .cuss-judge-track/-fill/-val mechanics and
-   .is-flash/.is-hit pulse above (fixHealth()/updateHealthDisplay() in
-   script.js don't change at all), just laid out side by side instead of
-   stacked, and hard-pinned to green(you)/red(opponent) instead of the
-   danger-escalation tiering .cuss-arena-health normally does on its own.
-   Reuses the exact greens/reds already in the palette (.cuss-vocab's green,
-   .cuss-curse/.is-hp-critical's red) rather than introducing new colors. */
+/* HUD dual HP bars — same .cuss-judge-track/-fill/-val mechanics above,
+   laid out side by side instead of stacked. Previously hard-pinned to a
+   fixed green(you)/red(opponent) identity color, overriding the shared
+   danger-escalation tiering; reversed per the "premium health system"
+   redesign (Apple Fitness rings, not a fixed-color fighting-game HUD) —
+   both bars now use the same green->amber->red tiering as every other
+   .cuss-arena-health bar, since the labels and left/right position above
+   already make it unambiguous whose bar is whose without a fixed color
+   too. See the removed .cuss-hud-hp-fill-you/-opponent overrides (git
+   history) if that identity coloring is ever wanted back. */
 .cuss-hud-hp-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .cuss-hud-hp { display: flex; align-items: center; gap: 8px; flex: 1 1 160px; min-width: 0; }
 .cuss-hud-hp-label {
@@ -552,28 +585,6 @@ html { scroll-behavior: smooth; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   color: color-mix(in srgb, var(--color-text) 70%, transparent);
 }
-/* Scoped under .cuss-arena-health (matching that ancestor's own base rule's
-   specificity, .cuss-arena-health .cuss-judge-fill) and placed after it in
-   the stylesheet so these actually win the cascade instead of quietly
-   losing to the plain accent purple every bar starts from. */
-.cuss-arena-health .cuss-hud-hp-fill-you { background: oklch(0.75 0.13 150); color: oklch(0.75 0.13 150); }
-.cuss-arena-health .cuss-hud-hp-fill-opponent { background: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25); }
-/* The fixed color IS the identity here (You is always green, Opponent is
-   always red — that's the point of this layout), so the is-hp-warning/
-   is-hp-critical danger-tier overrides from the shared .cuss-arena-health
-   rules above must never repaint these two bars a third color. */
-.cuss-arena-health .cuss-hud-hp-fill-you.is-hp-warning, .cuss-arena-health .cuss-hud-hp-fill-you.is-hp-critical {
-  background: oklch(0.75 0.13 150); color: oklch(0.75 0.13 150);
-}
-.cuss-arena-health .cuss-hud-hp-fill-opponent.is-hp-warning, .cuss-arena-health .cuss-hud-hp-fill-opponent.is-hp-critical {
-  background: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25);
-}
-/* Same fixed-identity override for the numeric value text (also normally
-   danger-tinted by updateHealthDisplay() in script.js — see the classList
-   toggles there, unchanged) so "You" reads green and "Opponent" reads red
-   at every HP level, not just above the warning threshold. */
-.cuss-hud-hp-you .cuss-judge-val.is-hp-warning, .cuss-hud-hp-you .cuss-judge-val.is-hp-critical { color: oklch(0.75 0.13 150); }
-.cuss-hud-hp-opponent .cuss-judge-val.is-hp-warning, .cuss-hud-hp-opponent .cuss-judge-val.is-hp-critical { color: oklch(0.63 0.22 25); }
 @media (max-width: 640px) {
   .cuss-hud-hp { flex: 1 1 100%; }
 }
@@ -770,12 +781,15 @@ html { scroll-behavior: smooth; }
 .cuss-arena.is-open { opacity: 1; pointer-events: auto; }
 .cuss-arena-inner {
   position: relative;
-  /* Full-bleed — no centered max-width column. Header, motion, HP bars,
-     transcript and input all fill this the entire way across since none
-     of them set their own width/max-width (only the choose-your-side
-     controls further down keep a centered, narrower measure of their
-     own, deliberately, for readability of that one screen). */
-  width: 100%; height: 100%; max-height: 100vh;
+  /* Centered "Focus Block" column, not full-bleed — everything (header,
+     motion, HP bars, transcript, input) reads as one tight vertical
+     stream down the middle of the screen instead of eyes jumping between
+     edge-anchored elements. Capped at a max-width (roughly Tailwind's
+     max-w-2xl) with generous side margins on wider screens so the empty
+     space around it is what makes the glass input card read as glass,
+     not a full-bleed panel; at mobile widths max-width simply exceeds the
+     viewport and this has no effect. */
+  width: 100%; max-width: 720px; margin: 0 auto; height: 100%; max-height: 100vh;
   /* Same gap token as .cuss-arena-transcript's internal gap (see below) —
      one consistent rhythm the whole way down: head → motion → HP bars →
      transcript (→ avatar row → prompt) → legend → input. */
@@ -1195,12 +1209,27 @@ html { scroll-behavior: smooth; }
      (var(--space-4) gap above, from .cuss-arena-inner) separates the round
      content from the input now, not a ruled line or a boxed panel. The
      one exception is the arena's own #cuss-arena-input-wrap below, which
-     gets a budget-aware gradient ring via ::before — scoped to that id
-     alone so Pitch mode's own .cuss-highlight-wrap (no difficulty tier,
-     no token/turn budget to react to) stays exactly as borderless as
-     before. */
+     gets the full frosted-glass card treatment plus a budget-aware
+     gradient ring — scoped to that id alone so Pitch mode's own
+     .cuss-highlight-wrap (no difficulty tier, no token/turn budget to
+     react to) stays exactly as borderless/flat as before. */
   position: relative; flex: 1; min-height: 78px; border-radius: var(--radius-md);
   background: var(--color-bg);
+}
+/* Frosted glass card — backdrop-blur plus a translucent (not opaque) fill
+   so whatever's behind the composer (transcript, page background) shows
+   through softly, generous corner radius (sharp corners kill the glass
+   illusion), and two layered inset shadows: a bright top-edge line to
+   fake a light source from above, and a soft dark outer drop shadow for
+   real depth against the page. */
+#cuss-arena-input-wrap {
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+    0 8px 24px color-mix(in srgb, black 30%, transparent);
+  transition: box-shadow 300ms ease;
 }
 /* Budget-aware gradient border — a ::before ring (inset:-2px, drawn behind
    via z-index:-1) rather than a real `border`, so it can be a genuine
@@ -1219,7 +1248,7 @@ html { scroll-behavior: smooth; }
 #cuss-arena-input-wrap::before {
   content: "";
   position: absolute; inset: -2px; z-index: -1; border-radius: inherit;
-  transition: background 300ms ease, opacity 300ms ease;
+  transition: background 300ms ease;
   background: linear-gradient(90deg, oklch(0.72 0.15 250), color-mix(in srgb, oklch(0.72 0.15 250) 55%, transparent));
 }
 #cuss-arena-input-wrap.cuss-budget-warning::before {
@@ -1227,14 +1256,31 @@ html { scroll-behavior: smooth; }
 }
 #cuss-arena-input-wrap.cuss-budget-critical::before {
   background: linear-gradient(90deg, oklch(0.63 0.22 25), color-mix(in srgb, oklch(0.63 0.22 25) 55%, transparent));
-  animation: cuss-input-border-pulse 1.1s ease-in-out infinite;
 }
-@keyframes cuss-input-border-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+/* Critical pulse — an INSET glow pulsing on the glass card itself (layered
+   on top of its resting top-edge-highlight + drop-shadow, not replacing
+   them) rather than the outer ring fading in and out. Reads as "the glass
+   itself is warming up" from within, matching the frosted-glass material
+   metaphor better than a flat outer ring blinking would. */
+#cuss-arena-input-wrap.cuss-budget-critical {
+  animation: cuss-input-glass-pulse 1.1s ease-in-out infinite;
+}
+@keyframes cuss-input-glass-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+      0 8px 24px color-mix(in srgb, black 30%, transparent),
+      inset 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+      0 8px 24px color-mix(in srgb, black 30%, transparent),
+      inset 0 0 22px 4px color-mix(in srgb, oklch(0.63 0.22 25) 55%, transparent);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  #cuss-arena-input-wrap.cuss-budget-critical::before { animation: none; }
+  #cuss-arena-input-wrap.cuss-budget-critical { animation: none; }
 }
 
 /* Floating filler-penalty pill — post-submit only (see
@@ -1270,13 +1316,28 @@ html { scroll-behavior: smooth; }
    rather than a circular chat-app send button — reinforces that pressing
    the actual Enter key does the same thing. Solid accent purple, same
    color as .cuss-cta-xl (the Chat CTA), but far smaller/quieter. */
+/* Specular gradient (lighter top-left, darker bottom-right) rather than a
+   flat fill plus a loud outer glow — closer to how an iOS glass button
+   signals "tappable" via a faint light source across its own face than
+   how a gamer-HUD button would (a hard neon ring). The glow is kept, just
+   turned down (lower opacity, softer blur) to a supporting role instead
+   of the primary effect. */
 .cuss-send-btn {
   width: 68px; height: 42px; flex: none; border-radius: var(--radius-sm); padding: 0;
-  background: var(--color-accent); color: var(--color-bg);
+  background: linear-gradient(135deg,
+    color-mix(in srgb, white 22%, var(--color-accent)) 0%,
+    var(--color-accent) 55%,
+    color-mix(in srgb, black 15%, var(--color-accent)) 100%);
+  color: var(--color-bg);
   border: 2px dashed var(--color-bg);
-  box-shadow: 0 0 14px 2px color-mix(in srgb, var(--color-accent) 40%, transparent);
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
-.cuss-send-btn:hover { background: var(--color-accent-2); }
+.cuss-send-btn:hover {
+  background: linear-gradient(135deg,
+    color-mix(in srgb, white 22%, var(--color-accent-2)) 0%,
+    var(--color-accent-2) 55%,
+    color-mix(in srgb, black 15%, var(--color-accent-2)) 100%);
+}
 .cuss-send-btn:active { background: var(--color-accent); }
 .cuss-send-glyph { font-size: 20px; line-height: 1; }
 /* Fires when Enter is pressed on the textarea (see script.js) — the button
