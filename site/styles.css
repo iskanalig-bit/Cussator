@@ -864,14 +864,21 @@ html { scroll-behavior: smooth; }
 .cuss-arena-motion.is-expanded { white-space: normal; overflow: visible; text-overflow: clip; }
 .cuss-arena-motion:focus-visible { outline: 1px solid var(--color-accent); outline-offset: 2px; border-radius: 2px; }
 .cuss-arena-transcript {
-  /* Top-aligned with the same uniform gap used for every other row in this
-     panel (see .cuss-arena-inner) — deliberately NOT vertically centered,
-     so the HP bars → avatar row → prompt → input rhythm reads as one
-     consistent stack instead of floating in the middle of the remaining
-     space above a short transcript. */
+  /* Top-aligned once there's real content, so messages stack down from the
+     HP bars the same way a normal chat thread grows, rather than
+     recentering under every new message. */
   flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);
   padding-right: 4px; min-height: 120px; position: relative;
 }
+/* The one exception: before anything's been said (see .is-empty, toggled
+   in resetRound()/addUserBubbleAnimated()), top-aligning the single
+   "YOUR TURN" prompt line left a large dead gap between it and the input
+   below — this centers just that pre-round empty state in the available
+   space instead, so it reads as a composed, intentional screen rather
+   than content that stopped early. Real transcript content is never
+   affected: the moment the first bubble lands, .is-empty comes off and
+   this stops applying. */
+.cuss-arena-transcript.is-empty { justify-content: center; }
 /* Reads as an active prompt, not passive filler copy — the "YOUR TURN"
    badge reuses the exact .tag.tag-outline styling the "LIVE ROUND" badge
    uses, so the two read as the same visual language. */
@@ -1222,7 +1229,21 @@ html { scroll-behavior: smooth; }
    illusion), and two layered inset shadows: a bright top-edge line to
    fake a light source from above, and a soft dark outer drop shadow for
    real depth against the page. */
+/* Explicit height cap — belt-and-suspenders on top of the shared
+   .cuss-highlight-wrap's min-height:78px above. flex:1 plus
+   backdrop-filter on a flex item is a known cross-browser landmine (most
+   notably Safari/WebKit, where the two combined can make an item ignore
+   its sibling's intrinsic size and balloon to fill available cross-axis
+   space instead of sizing to content) — max-height is a hard, engine-
+   independent ceiling regardless of which flex/backdrop-filter quirk is
+   at play, so this card can grow a little for a multi-line argument but
+   can never fill the composer row's whole height. flex-shrink:0 keeps it
+   from being crushed by the Bag-insert/Send buttons on either side
+   either. Scoped to this id, not the shared .cuss-highlight-wrap class,
+   since Pitch mode deliberately wants its own composer to stretch and
+   fill its form (see .cuss-pitch-form .cuss-highlight-wrap below). */
 #cuss-arena-input-wrap {
+  max-height: 160px; flex-shrink: 0;
   border-radius: 20px;
   background: color-mix(in srgb, var(--color-bg) 55%, transparent);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
