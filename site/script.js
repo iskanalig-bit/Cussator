@@ -318,7 +318,16 @@
       var el = document.getElementById(id);
       if (el) el.textContent = '(' + count + ')';
     });
+    bagUpdateListeners.forEach(function (fn) { fn(); });
   }
+
+  // Lets initArena()'s Bag shelf (a persistent hotbar inside the round view,
+  // see renderBagShelf()) stay in sync with every existing Bag-crediting
+  // call site above without threading a callback through each one — they
+  // already all funnel through updateBagBadge() by design (see the comment
+  // on creditBagWords() below), so hooking in there is the one choke point.
+  var bagUpdateListeners = [];
+  function onBagUpdate(fn) { bagUpdateListeners.push(fn); }
 
   // Definition/CEFR for Bag words the AI's contextual check (see
   // vocab_words_used on /api/respond) discovers OUTSIDE the curated
@@ -1024,7 +1033,23 @@
     // (textarea enabled), pausing during the AI's response, the stance-select
     // screen, and after the round ends. Purely a visible pressure cue: it
     // doesn't auto-submit or penalize on timeout, just holds at 00:00.
-    var TURN_DURATION_SECONDS = 60;
+    //
+    // Sourced from a real per-difficulty config rather than one flat
+    // constant, so the HUD timer can genuinely read "ARENA_CONFIG[difficulty]
+    // .timerSeconds" instead of a hardcoded number. All three tiers get the
+    // same 60s today — difficulty has only ever changed vocabulary/phrasing
+    // density (see DIFFICULTY_STYLES in api/_common.py), never pacing or the
+    // judging rubric, and that's a deliberate design decision from Feature 2,
+    // not an oversight here. If you want Rookie/Chair to actually run
+    // different clocks, this is the one object to edit.
+    var ARENA_CONFIG = {
+      rookie: { timerSeconds: 60 },
+      delegate: { timerSeconds: 60 },
+      chair: { timerSeconds: 60 }
+    };
+    function getTurnDurationSeconds() {
+      return (ARENA_CONFIG[difficulty] && ARENA_CONFIG[difficulty].timerSeconds) || 60;
+    }
 
     // Word Economy budget — a fixed per-round pool of "tokens" (see
     // countWordTokens: 1 token = 1 word, not a real subword tokenizer).
@@ -1068,6 +1093,14 @@
     var bagInsertBtn = document.getElementById('cuss-bag-insert-btn');
     var bagInsertPopover = document.getElementById('cuss-bag-insert-popover');
     var bagInsertList = document.getElementById('cuss-bag-insert-list');
+    var bagShelfEl = document.getElementById('cuss-bag-shelf');
+    var liveScarsEl = document.getElementById('cuss-live-scars');
+    var motionEl = document.getElementById('cuss-arena-motion');
+    // Assigned inside the Insert-from-Bag block below (only when its DOM
+    // refs all exist) — declared as a plain var up here, rather than a
+    // block-scoped function declaration, so resetRound() below can call it
+    // without depending on Annex-B function-hoisting semantics.
+    var renderBagShelf = null;
     var typing = document.getElementById('cuss-arena-typing');
     var healthFill = document.getElementById('cuss-health-fill');
     var healthVal = document.getElementById('cuss-health-val');
@@ -1163,7 +1196,7 @@
     var playerSide = null;
     var difficulty = 'delegate';
     var turnTimer = null;
-    var turnSecondsLeft = TURN_DURATION_SECONDS;
+    var turnSecondsLeft = getTurnDurationSeconds();
     var tokensUsed = 0;
     var poiTimer = null;
     var poiVisible = false;
@@ -1208,7 +1241,7 @@
 
     function startTurnTimer() {
       stopTurnTimer();
-      turnSecondsLeft = TURN_DURATION_SECONDS;
+      turnSecondsLeft = getTurnDurationSeconds();
       updateTurnTimerDisplay();
       // The one point where the textarea is actually handed back to the
       // player (round start and after every AI reply) — see the WPM note
@@ -1247,12 +1280,16 @@
     function resetRound() {
       MOTION = pickMotion();
       if (motionTextEl) motionTextEl.textContent = MOTION;
+      if (motionEl) motionEl.title = 'Motion: ' + MOTION;
       if (stanceMotionText) stanceMotionText.textContent = MOTION;
 
       history = [];
       roundStats = { filler: 0, curse: 0, connective: 0, vocab: 0, words: 0, solid: 0, neutral: 0, bad: 0 };
       aiRoundStats = { filler: 0, curse: 0, connective: 0, vocab: 0 };
       roundFillerWords = {};
+      renderLiveScars();
+      if (renderBagShelf) renderBagShelf();
+      if (motionEl) motionEl.classList.remove('is-expanded');
       turnStartTime = null;
       turnLog = [];
       hpHistory = [{ turnIndex: 0, health: 100, aiHealth: 100 }];
@@ -1270,7 +1307,7 @@
       if (resultVerdict) resultVerdict.classList.remove('line-drawn');
       if (resultStats) resultStats.classList.remove('is-visible');
       stopTurnTimer();
-      turnSecondsLeft = TURN_DURATION_SECONDS;
+      turnSecondsLeft = getTurnDurationSeconds();
       updateTurnTimerDisplay();
       stopInterruptionCheck();
       hidePointOfOrder();
@@ -1330,8 +1367,8 @@
 
       playerSide = null;
       setDifficulty('delegate');
-      healthLabelEl.textContent = 'Your position';
-      aiHealthLabelEl.textContent = 'AI opponent';
+      healthLabelEl.textContent = 'You';
+      aiHealthLabelEl.textContent = 'Opponent';
       if (arenaSideEl) { arenaSideEl.hidden = true; arenaSideEl.textContent = ''; arenaSideEl.className = 'tag tag-outline cuss-arena-side'; }
       stanceAffirmBtn.disabled = false;
       stanceNegateBtn.disabled = false;
@@ -1367,8 +1404,13 @@
       stanceNegateBtn.disabled = true;
 
       var aiSide = side === 'affirm' ? 'negate' : 'affirm';
-      healthLabelEl.textContent = 'Your position — ' + (side === 'affirm' ? 'Affirm' : 'Negate');
-      aiHealthLabelEl.textContent = 'AI opponent — ' + (aiSide === 'affirm' ? 'Affirm' : 'Negate');
+      var difficultyLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+      // Kept short on purpose — the HUD bars are compact side-by-side
+      // strips, and the side (Affirm/Negate) is already shown right next
+      // to them via arenaSideEl's tag and the pre-round anchor row, so
+      // repeating it here just crowds out the label under a narrow track.
+      healthLabelEl.textContent = 'You';
+      aiHealthLabelEl.textContent = 'Opponent (' + difficultyLabel + ')';
       if (arenaSideEl) {
         arenaSideEl.hidden = false;
         arenaSideEl.textContent = side === 'affirm' ? 'AFFIRM' : 'NEGATE';
@@ -1776,6 +1818,44 @@
     textarea.addEventListener('scroll', function () {
       highlightLayer.scrollTop = textarea.scrollTop;
     });
+
+    // Motion text truncates to one line with an ellipsis by default (see
+    // .cuss-arena-motion in styles.css) — tap/click, or Enter/Space while
+    // focused, toggles the full wrapped text. The native title attribute
+    // (set alongside MOTION in resetRound()) already covers desktop hover,
+    // so this only needs to handle the tap/keyboard case.
+    if (motionEl) {
+      motionEl.addEventListener('click', function () {
+        motionEl.classList.toggle('is-expanded');
+      });
+      motionEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          motionEl.classList.toggle('is-expanded');
+        }
+      });
+    }
+
+    // Live Scars counter — same roundFillerWords tally the post-round recap
+    // already reads (see the recap-building code below), just surfaced live.
+    // Called after every submit (see the submit handler) and reset in
+    // resetRound(). Hidden entirely while the round has no filler hits yet.
+    function renderLiveScars() {
+      if (!liveScarsEl) return;
+      var words = Object.keys(roundFillerWords);
+      if (!words.length) {
+        liveScarsEl.hidden = true;
+        liveScarsEl.innerHTML = '';
+        return;
+      }
+      liveScarsEl.innerHTML = words
+        .sort(function (a, b) { return roundFillerWords[b] - roundFillerWords[a]; })
+        .map(function (w) {
+          return '<span class="cuss-live-scars-item">' + escapeHtml(w) + ' ×' + roundFillerWords[w] + '</span>';
+        })
+        .join('');
+      liveScarsEl.hidden = false;
+    }
     // Quick scale-down-and-back on the Send keycap, like a physical key
     // being pressed — .btn has no :active transform of its own, so a real
     // mouse click wouldn't otherwise show any press feedback either.
@@ -1931,8 +2011,8 @@
       var CARD_PULL_HOLD_MS = 450;
       var CARD_PULL_FLY_MS = 380;
 
-      function playCardPullAnimation(word) {
-        var originRect = bagInsertBtn.getBoundingClientRect();
+      function playCardPullAnimation(word, originEl) {
+        var originRect = (originEl || bagInsertBtn).getBoundingClientRect();
         var targetRect = textarea.getBoundingClientRect();
         var cardWidth = 108;
         var cardHeight = 140;
@@ -1987,6 +2067,46 @@
           insertWordAtCursor(word);
         }, CARD_PULL_APPEAR_MS + CARD_PULL_FLIP_MS + CARD_PULL_HOLD_MS + CARD_PULL_FLY_MS);
       }
+
+      // Chat Bag shelf — persistent hotbar alongside (not replacing) the
+      // popover above. Same loadBag() data, same insertWordAtCursor()/
+      // playCardPullAnimation() as the popover's own rows; a chip just
+      // passes itself as the animation's origin instead of bagInsertBtn.
+      // Kept in sync via onBagUpdate() (fires from updateBagBadge(), the
+      // existing single choke point every Bag-crediting call already
+      // funnels through) plus a direct call from resetRound() so it's
+      // populated the moment a round opens, not just after the next credit.
+      renderBagShelf = function () {
+        if (!bagShelfEl) return;
+        var bag = loadBag();
+        var entries = Object.keys(bag)
+          .map(function (w) { return { word: w, count: bag[w] }; })
+          .sort(function (a, b) { return b.count - a.count; });
+
+        bagShelfEl.innerHTML = '';
+        bagShelfEl.hidden = !entries.length;
+        if (!entries.length) return;
+
+        entries.forEach(function (entry) {
+          var chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'cuss-bag-shelf-chip';
+          chip.setAttribute('aria-label', 'Insert "' + entry.word + '" into your argument');
+          var wordSpan = document.createElement('span');
+          wordSpan.textContent = entry.word;
+          var countSpan = document.createElement('span');
+          countSpan.className = 'cuss-bag-shelf-chip-count';
+          countSpan.textContent = '×' + entry.count;
+          chip.appendChild(wordSpan);
+          chip.appendChild(countSpan);
+          chip.addEventListener('click', function () {
+            if (textarea.disabled) return;
+            playCardPullAnimation(entry.word, chip);
+          });
+          bagShelfEl.appendChild(chip);
+        });
+      };
+      onBagUpdate(renderBagShelf);
     }
 
     // Opens the arena WITHOUT its usual 0.2s opacity fade — the fade is
@@ -2116,6 +2236,23 @@
       var i = 0;
       function reveal() {
         if (i >= revealEls.length) {
+          // Post-submit-only filler flagging: classifyText() already ran
+          // before this bubble was built (see the submit handler), wrapping
+          // each hit in .cuss-weak — this just plays a one-time flash+shake
+          // on those already-classified spans now that the bubble has
+          // finished animating in. No new detection pass, and nothing here
+          // runs per keystroke.
+          var flagged = p.querySelectorAll('.cuss-weak');
+          Array.prototype.forEach.call(flagged, function (span) {
+            span.classList.add('is-flagged');
+          });
+          if (flagged.length) {
+            setTimeout(function () {
+              Array.prototype.forEach.call(flagged, function (span) {
+                span.classList.remove('is-flagged');
+              });
+            }, 650);
+          }
           if (onDone) onDone();
           return;
         }
@@ -2359,6 +2496,7 @@
       analysis.fillerWordsUsed.forEach(function (w) {
         roundFillerWords[w] = (roundFillerWords[w] || 0) + 1;
       });
+      renderLiveScars();
       recordFillerWords(analysis.fillerWordsUsed);
       // Bag crediting is deliberately NOT instant anymore — it used to fire
       // right here off the same exact-match list that's still used for

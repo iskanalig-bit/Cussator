@@ -241,27 +241,37 @@
         <span class="cuss-arena-brand">Cussator</span>
         <span class="cuss-live-dot"></span>
         <span class="tag tag-outline">LIVE ROUND</span>
-        <span class="tag tag-outline cuss-arena-timer" id="cuss-arena-timer">01:00</span>
       </div>
       <div class="cuss-arena-head-right">
         <span class="tag tag-outline cuss-arena-side" id="cuss-arena-side" hidden></span>
+        <span class="tag tag-outline cuss-arena-timer" id="cuss-arena-timer">01:00</span>
         <button type="button" class="btn btn-icon" id="cuss-arena-close" aria-label="Close round">✕</button>
       </div>
     </div>
-    <p class="cuss-arena-motion">Motion: &laquo;<span id="cuss-arena-motion-text">This House believes nuclear power is the fastest path to decarbonization.</span>&raquo;</p>
+    <!-- Truncates with an ellipsis at one line (see .cuss-arena-motion in
+         styles.css); tapping/clicking toggles .is-expanded to show the
+         full text wrapped, and title gives a native hover tooltip on
+         desktop — both read from the same MOTION value, kept in sync by
+         resetRound() in script.js. -->
+    <p class="cuss-arena-motion" id="cuss-arena-motion" tabindex="0" role="button" aria-label="Show full motion text">Motion: &laquo;<span id="cuss-arena-motion-text">This House believes nuclear power is the fastest path to decarbonization.</span>&raquo;</p>
 
-    <div class="cuss-arena-health">
-      <div class="cuss-judge-row">
-        <span style="width:auto;" id="cuss-health-label">Your position</span>
-        <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-health-fill" style="width:100%"></div></div>
+    <div class="cuss-arena-health cuss-hud-hp-row">
+      <div class="cuss-hud-hp cuss-hud-hp-you">
+        <span class="cuss-hud-hp-label" id="cuss-health-label">You</span>
+        <div class="cuss-judge-track"><div class="cuss-judge-fill cuss-hud-hp-fill-you" id="cuss-health-fill" style="width:100%"></div></div>
         <span class="cuss-judge-val" id="cuss-health-val">100</span>
       </div>
-      <div class="cuss-judge-row">
-        <span style="width:auto;" id="cuss-ai-health-label">AI opponent</span>
-        <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-ai-health-fill" style="width:100%"></div></div>
+      <div class="cuss-hud-hp cuss-hud-hp-opponent">
+        <span class="cuss-hud-hp-label" id="cuss-ai-health-label">AI opponent</span>
+        <div class="cuss-judge-track"><div class="cuss-judge-fill cuss-hud-hp-fill-opponent" id="cuss-ai-health-fill" style="width:100%"></div></div>
         <span class="cuss-judge-val" id="cuss-ai-health-val">100</span>
       </div>
     </div>
+
+    <!-- Live Scars counter — this round's filler tally only (resets each
+         round), surfaced from the same roundFillerWords state the
+         post-round recap already reads. Hidden entirely when empty. -->
+    <div class="cuss-live-scars" id="cuss-live-scars" hidden></div>
 
     <div class="cuss-arena-transcript" id="cuss-arena-transcript">
       <p class="cuss-arena-empty">Your turn. Make the case for the resolution — precise phrasing strengthens your position, filler words weaken it instantly.</p>
@@ -330,6 +340,13 @@
          not a reuse of Point of Order above: different trigger, different
          message, just the same general "toast above the composer" slot. -->
     <p class="cuss-paste-blocked" id="cuss-paste-blocked" hidden aria-live="polite">Type it — arguments must be typed live, pasting is disabled here.</p>
+
+    <!-- Persistent Bag shelf — always-visible alongside (not replacing) the
+         Insert-from-Bag popover above the textarea. Reuses the same
+         insertWordAtCursor()/playCardPullAnimation() as that popover; see
+         renderBagShelf() in script.js. Hidden entirely when the Bag is
+         empty rather than showing an empty shelf. -->
+    <div class="cuss-bag-shelf" id="cuss-bag-shelf" hidden aria-label="Your Bag words — tap to insert"></div>
 
     <form class="cuss-arena-form" id="cuss-arena-form">
       <div class="cuss-bag-insert-wrap">

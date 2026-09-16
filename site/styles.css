@@ -537,6 +537,89 @@ html { scroll-behavior: smooth; }
   100% { transform: scale(1); }
 }
 .cuss-arena-health .cuss-judge-val.is-flash { display: inline-block; animation: cuss-hp-val-pulse 0.5s ease-out; }
+
+/* HUD dual HP bars — same .cuss-judge-track/-fill/-val mechanics and
+   .is-flash/.is-hit pulse above (fixHealth()/updateHealthDisplay() in
+   script.js don't change at all), just laid out side by side instead of
+   stacked, and hard-pinned to green(you)/red(opponent) instead of the
+   danger-escalation tiering .cuss-arena-health normally does on its own.
+   Reuses the exact greens/reds already in the palette (.cuss-vocab's green,
+   .cuss-curse/.is-hp-critical's red) rather than introducing new colors. */
+.cuss-hud-hp-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.cuss-hud-hp { display: flex; align-items: center; gap: 8px; flex: 1 1 160px; min-width: 0; }
+.cuss-hud-hp-label {
+  font-size: 11px; flex: 0 1 auto; min-width: 0; max-width: 62%; cursor: help;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
+}
+/* Scoped under .cuss-arena-health (matching that ancestor's own base rule's
+   specificity, .cuss-arena-health .cuss-judge-fill) and placed after it in
+   the stylesheet so these actually win the cascade instead of quietly
+   losing to the plain accent purple every bar starts from. */
+.cuss-arena-health .cuss-hud-hp-fill-you { background: oklch(0.75 0.13 150); color: oklch(0.75 0.13 150); }
+.cuss-arena-health .cuss-hud-hp-fill-opponent { background: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25); }
+/* The fixed color IS the identity here (You is always green, Opponent is
+   always red — that's the point of this layout), so the is-hp-warning/
+   is-hp-critical danger-tier overrides from the shared .cuss-arena-health
+   rules above must never repaint these two bars a third color. */
+.cuss-arena-health .cuss-hud-hp-fill-you.is-hp-warning, .cuss-arena-health .cuss-hud-hp-fill-you.is-hp-critical {
+  background: oklch(0.75 0.13 150); color: oklch(0.75 0.13 150);
+}
+.cuss-arena-health .cuss-hud-hp-fill-opponent.is-hp-warning, .cuss-arena-health .cuss-hud-hp-fill-opponent.is-hp-critical {
+  background: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25);
+}
+/* Same fixed-identity override for the numeric value text (also normally
+   danger-tinted by updateHealthDisplay() in script.js — see the classList
+   toggles there, unchanged) so "You" reads green and "Opponent" reads red
+   at every HP level, not just above the warning threshold. */
+.cuss-hud-hp-you .cuss-judge-val.is-hp-warning, .cuss-hud-hp-you .cuss-judge-val.is-hp-critical { color: oklch(0.75 0.13 150); }
+.cuss-hud-hp-opponent .cuss-judge-val.is-hp-warning, .cuss-hud-hp-opponent .cuss-judge-val.is-hp-critical { color: oklch(0.63 0.22 25); }
+@media (max-width: 640px) {
+  .cuss-hud-hp { flex: 1 1 100%; }
+}
+
+/* Live Scars counter — surfaces roundFillerWords (script.js), the exact
+   per-round tally the post-round recap already reads, just live and
+   compact ("like ×3, um ×2"). Hidden while empty via [hidden] (set/cleared
+   from renderLiveScars() in script.js, called after every submit and from
+   resetRound()) rather than rendering an empty bar. */
+.cuss-live-scars {
+  display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 11px;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+}
+.cuss-live-scars-item { color: var(--color-warn); font-weight: 600; }
+.cuss-live-scars[hidden] { display: none; }
+
+/* Chat Bag shelf — persistent hotbar, distinct from (and sitting alongside)
+   the existing Insert-from-Bag popover. Chips reuse the same green Bag
+   identity color as .cuss-bag-card-word instead of a new card component,
+   per the "reference the existing one, don't rebuild it" constraint.
+   Horizontally scrollable so an overflowing word count never wraps the
+   composer taller or forces the page itself to scroll sideways. */
+.cuss-bag-shelf {
+  display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px;
+  scrollbar-width: thin;
+}
+.cuss-bag-shelf[hidden] { display: none; }
+.cuss-bag-shelf-chip {
+  flex: none; display: flex; align-items: center; gap: 5px;
+  font-family: var(--font-body, inherit); font-size: 12.5px; font-weight: 600;
+  padding: 5px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  color: oklch(0.75 0.13 150);
+  background: color-mix(in srgb, oklch(0.75 0.13 150) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, oklch(0.75 0.13 150) 35%, transparent);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.cuss-bag-shelf-chip:hover { background: color-mix(in srgb, oklch(0.75 0.13 150) 18%, var(--color-surface)); }
+.cuss-bag-shelf-chip:active { transform: scale(0.94); }
+.cuss-bag-shelf-chip-count {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.04em;
+  color: color-mix(in srgb, oklch(0.75 0.13 150) 85%, var(--color-text));
+  opacity: 0.85;
+}
+@media (max-width: 640px) {
+  .cuss-bag-shelf-chip { font-size: 12px; padding: 5px 10px; }
+}
 /* Per-metric explanations under the live Judge panel — purely informational,
    these never feed back into Credibility (that's driven only by the per-word tags
    and the AI's per-turn verdict; folding the Judge score in too would
@@ -753,7 +836,19 @@ html { scroll-behavior: smooth; }
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
   font-size: 14px; margin-right: 2px; color: var(--color-text);
 }
-.cuss-arena-motion { margin: 0; font-size: 12px; font-style: italic; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+/* Single-line ellipsis by default so a long motion never pushes the HP
+   bars/timer down or forces the header to wrap — tapping/clicking (or
+   focusing via keyboard, see tabindex+role=button in index.html) toggles
+   .is-expanded to reveal the full text wrapped onto multiple lines; the
+   native title attribute (set in resetRound(), script.js) also gives a
+   plain hover tooltip on desktop for free, no separate code path. */
+.cuss-arena-motion {
+  margin: 0; font-size: 12px; font-style: italic; cursor: pointer;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cuss-arena-motion.is-expanded { white-space: normal; overflow: visible; text-overflow: clip; }
+.cuss-arena-motion:focus-visible { outline: 1px solid var(--color-accent); outline-offset: 2px; border-radius: 2px; }
 .cuss-arena-transcript {
   /* Top-aligned with the same uniform gap used for every other row in this
      panel (see .cuss-arena-inner) — deliberately NOT vertically centered,
@@ -844,6 +939,32 @@ html { scroll-behavior: smooth; }
   content: "vocab"; position: absolute; left: 50%; top: -0.4em; transform: translateX(-50%);
   font-size: 8px; line-height: 1; letter-spacing: 0.05em; text-transform: uppercase;
   color: oklch(0.75 0.13 150); opacity: 0.8; white-space: nowrap; pointer-events: none;
+}
+/* Post-submit filler flash+shake — applied once to the .cuss-weak spans
+   already inside a just-rendered user bubble (see flagSubmittedFillers()
+   in script.js), never on a live keystroke. The rest color stays the
+   existing filler amber (.cuss-weak above) so filler and curse severity
+   stay visually distinct at rest; the transient animation itself pulses
+   through the curse red before settling back, reading as "flash red"
+   without permanently recoloring filler the same as a curse word. */
+@keyframes cuss-weak-flash {
+  0% { color: var(--color-warn); text-shadow: 0 0 8px color-mix(in srgb, var(--color-warn) 35%, transparent); }
+  30% { color: oklch(0.63 0.22 25); text-shadow: 0 0 10px color-mix(in srgb, oklch(0.63 0.22 25) 55%, transparent); }
+  100% { color: var(--color-warn); text-shadow: 0 0 8px color-mix(in srgb, var(--color-warn) 35%, transparent); }
+}
+@keyframes cuss-weak-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-2px); }
+  40% { transform: translateX(2px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+.cuss-weak.is-flagged {
+  display: inline-block;
+  animation: cuss-weak-flash 0.6s ease-out, cuss-weak-shake 0.4s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cuss-weak.is-flagged { animation: none; }
 }
 .cuss-bubble-ai { align-self: flex-start; max-width: 88%; }
 /* Flattened top-left corner, mirroring .cuss-bubble-user's top-right above
