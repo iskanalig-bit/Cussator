@@ -160,10 +160,19 @@
     'i dunno', "i don't know", 'dunno', 'okay so', 'like i said', 'as i said',
     'kind of like', 'sort of like', 'pretty much', 'whatnot', 'and whatnot', 'or anything',
     'i suppose', 'i would guess', 'technically speaking', 'in a way', 'in some way',
-    'gonna', 'wanna', 'gotta', "ain't", 'tbh', 'idk', 'imo', 'like literally', 'super literally'
+    'gonna', 'wanna', 'gotta', "ain't", 'tbh', 'idk', 'imo', 'like literally', 'super literally',
+    // 'literally' and 'well' promoted from the light tier below to match
+    // CUSSATOR_CONFIG.FILLER_WORDS (cussator-config.js), which lists both
+    // at the single, full HP_PENALTIES.filler severity rather than a
+    // lighter one — every other word already in that shared list ('like',
+    // 'basically', 'sort of', 'kind of', 'uh', 'um') was already here.
+    'literally', 'well'
   ];
   // Light filler tier — common but milder verbal habits, -5 Credibility each.
-  var FILLER_WORDS_LIGHT = ['actually', 'honestly', 'literally', 'well', 'so'];
+  // Not part of CUSSATOR_CONFIG.FILLER_WORDS, which has no "light" concept
+  // at all — this is an app-specific refinement layered on top of the
+  // shared config's baseline list, not a substitute for it.
+  var FILLER_WORDS_LIGHT = ['actually', 'honestly', 'so'];
 
   // Stronger-alternative suggestions for the post-round recap, grouped by
   // the underlying weak-speech pattern rather than written one by one —
@@ -839,12 +848,20 @@
   // more than a conduct violation (profanity), which costs more than a style
   // tic (a filler word) — and a genuinely strong turn (rubric + lexis, not
   // just "not bad") is worth more than any single word-level hit.
-  var FILLER_PENALTY = 15;
+  // Sourced from CUSSATOR_CONFIG (cussator-config.js, loaded before this
+  // file — see index.html) rather than hardcoded here. FILLER_PENALTY_LIGHT
+  // and the heal amounts have no equivalent in that shared config (it only
+  // defines one flat filler tier, no "light"/heal concept), so those stay
+  // local constants — CUSSATOR_CONFIG is the source of truth for the
+  // values it actually defines, not a reason to invent matching ones for
+  // everything it doesn't.
+  var FILLER_PENALTY = CUSSATOR_CONFIG.HP_PENALTIES.filler;
   var FILLER_PENALTY_LIGHT = 5;
-  var CURSE_PENALTY = 25;
+  var CURSE_PENALTY = CUSSATOR_CONFIG.HP_PENALTIES.curse;
   var CONNECTIVE_HEAL = 5;
   var VOCAB_HEAL = 10;
-  var BAD_ARGUMENT_PENALTY = 30;
+  var BAD_ARGUMENT_PENALTY = CUSSATOR_CONFIG.HP_PENALTIES.badArgument;
+  var FALLACY_PENALTY = CUSSATOR_CONFIG.HP_PENALTIES.fallacy;
   var STRONG_ARGUMENT_SELF_HEAL = 20;
   var STRONG_ARGUMENT_OPPONENT_DAMAGE = 20;
 
@@ -1034,29 +1051,32 @@
     // screen, and after the round ends. Purely a visible pressure cue: it
     // doesn't auto-submit or penalize on timeout, just holds at 00:00.
     //
-    // Sourced from a real per-difficulty config rather than one flat
-    // constant, so the HUD timer can genuinely read "ARENA_CONFIG[difficulty]
-    // .timerSeconds" instead of a hardcoded number. All three tiers get the
-    // same 60s today — difficulty has only ever changed vocabulary/phrasing
-    // density (see DIFFICULTY_STYLES in api/_common.py), never pacing or the
-    // judging rubric, and that's a deliberate design decision from Feature 2,
-    // not an oversight here. If you want Rookie/Chair to actually run
-    // different clocks, this is the one object to edit.
-    var ARENA_CONFIG = {
-      rookie: { timerSeconds: 60 },
-      delegate: { timerSeconds: 60 },
-      chair: { timerSeconds: 60 }
-    };
+    // Sourced from CUSSATOR_CONFIG.DIFFICULTY_TIERS (see cussator-config.js,
+    // loaded before this file) rather than a hardcoded number — this now
+    // genuinely reverses the earlier Feature 2 decision that difficulty
+    // only ever changed vocabulary/phrasing (DIFFICULTY_STYLES in
+    // api/_common.py), never pacing: Rookie/Delegate/Chair now run real
+    // different clocks, token budgets, paste rules, and Point of Order
+    // availability, per that config's DIFFICULTY_TIERS. getDifficultyTier()
+    // is the one place that resolves the current tier, falling back to
+    // delegate's if difficulty is ever somehow unset/unknown.
+    function getDifficultyTier() {
+      return CUSSATOR_CONFIG.DIFFICULTY_TIERS[difficulty] || CUSSATOR_CONFIG.DIFFICULTY_TIERS.delegate;
+    }
     function getTurnDurationSeconds() {
-      return (ARENA_CONFIG[difficulty] && ARENA_CONFIG[difficulty].timerSeconds) || 60;
+      return getDifficultyTier().timerSeconds;
     }
 
-    // Word Economy budget — a fixed per-round pool of "tokens" (see
-    // countWordTokens: 1 token = 1 word, not a real subword tokenizer).
-    // Spent cumulatively across every argument submitted this round;
-    // running out ends the round through the same Credibility-loss path
-    // as any other auto-loss (see checkTokenBudget()).
-    var TOKEN_POOL_SIZE = 300;
+    // Word Economy budget — a per-round pool of "tokens" (see
+    // countWordTokens: 1 token = 1 word, not a real subword tokenizer),
+    // now sized per difficulty tier (CUSSATOR_CONFIG.DIFFICULTY_TIERS
+    // .maxTokensAllowed) instead of one flat number. Spent cumulatively
+    // across every argument submitted this round; running out ends the
+    // round through the same Credibility-loss path as any other auto-loss
+    // (see checkTokenBudget()).
+    function getTokenPoolSize() {
+      return getDifficultyTier().maxTokensAllowed;
+    }
 
     // Interruption Mode ("Point of Order") — the architecture is strict
     // request/response with no streaming at any layer (see api/_common.py:
@@ -1257,7 +1277,7 @@
     function updateTokenDisplay(remaining) {
       if (!tokenValEl) return;
       tokenValEl.textContent = remaining;
-      if (tokenBudgetEl) tokenBudgetEl.classList.toggle('is-critical', remaining <= TOKEN_POOL_SIZE * 0.1);
+      if (tokenBudgetEl) tokenBudgetEl.classList.toggle('is-critical', remaining <= getTokenPoolSize() * 0.1);
     }
 
     // Recomputes remaining budget live — tokensUsed (already-submitted
@@ -1269,7 +1289,7 @@
     function checkTokenBudget() {
       if (roundOver) return;
       var draftCount = countWordTokens(textarea.value);
-      var remaining = TOKEN_POOL_SIZE - tokensUsed - draftCount;
+      var remaining = getTokenPoolSize() - tokensUsed - draftCount;
       updateTokenDisplay(Math.max(0, remaining));
       if (remaining <= 0) {
         setHealth(0);
@@ -1314,7 +1334,7 @@
       poiDismissedSignature = null;
       tokensUsed = 0;
       if (tokenBudgetEl) tokenBudgetEl.classList.remove('is-critical');
-      updateTokenDisplay(TOKEN_POOL_SIZE);
+      updateTokenDisplay(getTokenPoolSize());
 
       roundOver = false;
 
@@ -1392,6 +1412,17 @@
       difficultyBtns.forEach(function (btn) {
         btn.classList.toggle('is-active', btn.dataset.difficulty === level);
       });
+      // Only ever called pre-round (the difficultyBtns click handler below
+      // guards on !playerSide) or from resetRound()'s own default, so it's
+      // always safe to refresh the timer/token displays right here too —
+      // this is what makes picking a tier on the stance-select screen
+      // actually show that tier's real timer/Word Economy budget before
+      // the round even starts, per CUSSATOR_CONFIG.DIFFICULTY_TIERS.
+      turnSecondsLeft = getTurnDurationSeconds();
+      updateTurnTimerDisplay();
+      tokensUsed = 0;
+      if (tokenBudgetEl) tokenBudgetEl.classList.remove('is-critical');
+      updateTokenDisplay(getTokenPoolSize());
     }
 
     // Player picks Affirm/Negate; the AI automatically takes the opposite
@@ -1681,18 +1712,46 @@
     // effectively never moved. The verdict itself already reflects the
     // rubric (a real reason or mechanism, not just tone), so it's the
     // signal on its own now.
-    function applyVerdict(verdict, selfIsPlayer) {
+    // fallacyType is only ever passed for the player's own verdict (the AI
+    // reply's verdict call below never has one) — /api/respond only judges
+    // the player's argument for a specific named fallacy (see
+    // DEBATE_TOOL's fallacy_type in api/_common.py), not its own rebuttal.
+    // A verdict of "bad" that's specifically a named fallacy costs
+    // HP_PENALTIES.fallacy instead of HP_PENALTIES.badArgument — same
+    // value today (both 30), but tracked as its own constant per
+    // CUSSATOR_CONFIG so the two can diverge later without a code change.
+    function applyVerdict(verdict, selfIsPlayer, fallacyType) {
       var selfVal = selfIsPlayer ? health : aiHealth;
       var oppVal = selfIsPlayer ? aiHealth : health;
       var setSelf = selfIsPlayer ? setHealth : setAiHealth;
       var setOpp = selfIsPlayer ? setAiHealth : setHealth;
+      var isFallacy = verdict === 'bad' && fallacyType && fallacyType !== 'none';
 
       if (verdict === 'bad') {
-        setSelf(selfVal - BAD_ARGUMENT_PENALTY);
+        setSelf(selfVal - (isFallacy ? FALLACY_PENALTY : BAD_ARGUMENT_PENALTY));
       } else if (verdict === 'solid') {
         setSelf(selfVal + STRONG_ARGUMENT_SELF_HEAL);
         setOpp(oppVal - STRONG_ARGUMENT_OPPONENT_DAMAGE);
       }
+    }
+
+    // Named-fallacy callout — reuses the exact Point of Order component
+    // (showPointOfOrder()) rather than a new UI element, but fires AFTER
+    // the AI's verdict comes back instead of live off the draft: a fallacy
+    // can only be judged once a full argument has actually been submitted
+    // and read, unlike the filler-count check above which reads the
+    // in-progress draft. Gated on CUSSATOR_CONFIG.INTERRUPTION_THRESHOLD
+    // .fallacyTriggersInterruption.
+    var FALLACY_CALLOUTS = {
+      strawman: 'Point of order. That was a strawman, the delegate rebutted a version of the argument nobody made.',
+      ad_hominem: 'Point of order. That was an ad hominem, attacking the arguer instead of the argument.',
+      slippery_slope: 'Point of order. That was a slippery slope, one small step does not guarantee the extreme outcome.',
+      other: 'Point of order. That rested on a logical fallacy, not an actual reason.'
+    };
+    function maybeShowFallacyCallout(fallacyType) {
+      if (!fallacyType || fallacyType === 'none') return;
+      if (!CUSSATOR_CONFIG.INTERRUPTION_THRESHOLD.fallacyTriggersInterruption) return;
+      showPointOfOrder(FALLACY_CALLOUTS[fallacyType] || FALLACY_CALLOUTS.other);
     }
 
     // Forces the browser to restart a CSS animation that's already mid-run
@@ -1783,13 +1842,22 @@
     // submit, this just surfaces that a beat before the player sends it.
     function runInterruptionCheck() {
       poiTimer = null;
-      if (roundOver || !playerSide || textarea.disabled) { hidePointOfOrder(); return; }
+      // Rookie has allowPointOfOrder:false in CUSSATOR_CONFIG.DIFFICULTY_TIERS
+      // — no scaffolding-removal pressure at that tier, so this whole check
+      // is skipped rather than just never firing visibly.
+      if (roundOver || !playerSide || textarea.disabled || !getDifficultyTier().allowPointOfOrder) {
+        hidePointOfOrder();
+        return;
+      }
 
       var analysis = classifyText(textarea.value);
       var fillerHits = analysis.fillerCount + analysis.fillerLightCount;
       var signature = analysis.fillerWordsUsed.join(',') + '|' + analysis.wordCount;
 
-      if (analysis.wordCount < POINT_OF_ORDER_MIN_WORDS || fillerHits === 0) {
+      // "More than this many fillers" (CUSSATOR_CONFIG.INTERRUPTION_THRESHOLD
+      // .fillerCount) — a strictly-greater-than check, so the default
+      // threshold of 2 means 3+ filler hits in the draft trigger this.
+      if (analysis.wordCount < POINT_OF_ORDER_MIN_WORDS || fillerHits <= CUSSATOR_CONFIG.INTERRUPTION_THRESHOLD.fillerCount) {
         poiDismissedSignature = null; // the flagged draft got edited away, re-arm for next time
         hidePointOfOrder();
         return;
@@ -1890,6 +1958,10 @@
     var pasteBlockedTimer = null;
     if (pasteBlockedEl) {
       textarea.addEventListener('paste', function (e) {
+        // Rookie is the one tier where CUSSATOR_CONFIG.DIFFICULTY_TIERS
+        // allows pasting — let the browser's default paste happen there
+        // instead of blocking it.
+        if (!getDifficultyTier().pastingDisabled) return;
         e.preventDefault();
         clearTimeout(pasteBlockedTimer);
         pasteBlockedEl.hidden = false;
@@ -2305,7 +2377,7 @@
           SIMPLIFY_COST + ' tokens from your Word Economy pool.';
         simplifyBtn.addEventListener('click', function () {
           if (simplifyBtn.disabled || roundOver) return;
-          var remaining = TOKEN_POOL_SIZE - tokensUsed;
+          var remaining = getTokenPoolSize() - tokensUsed;
           if (remaining < SIMPLIFY_COST) {
             var original = simplifyBtn.textContent;
             simplifyBtn.textContent = 'Not enough tokens';
@@ -2594,7 +2666,7 @@
           if (result.data.user_argument_verdict === 'solid') roundStats.solid++;
           else if (result.data.user_argument_verdict === 'bad') roundStats.bad++;
           else roundStats.neutral++;
-          applyVerdict(result.data.user_argument_verdict, true);
+          applyVerdict(result.data.user_argument_verdict, true, result.data.fallacy_type);
           if (checkGameOver()) { finalizeTurn(0, result.data.user_argument_verdict, null); return; }
 
           var aiAnalysis = classifyText(result.data.reply);
@@ -2625,6 +2697,7 @@
           // scores are still pending, and the panel reads one exchange
           // behind until the following reveal catches up.
           revealJudge();
+          maybeShowFallacyCallout(result.data.fallacy_type);
           textarea.disabled = false;
           submitBtn.disabled = false;
           if (bagInsertBtn) bagInsertBtn.disabled = false;

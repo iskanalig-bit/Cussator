@@ -19,6 +19,8 @@ import anthropic
 from openai import OpenAI
 from supabase import create_client
 
+from _cussator_config import REBUTTAL_WORD_CAP
+
 EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_COUNT = 5
 MATCH_THRESHOLD = 0.3
@@ -41,14 +43,23 @@ DIFFICULTY_STYLES = {
     "delegate": (
         "- Difficulty: Delegate. Normal conversational range for a sharp, well-read debater — "
         "not simplified, not showing off, just how you'd actually talk. Keep this reply under "
-        "about 75 words."
+        "about {word_cap} words."
     ),
     "chair": (
         "- Difficulty: Chair. Deliberately dense, idiomatic, native-level phrasing — advanced "
         "vocabulary, compressed clauses, cultural idioms, no hand-holding. This is opt-in hard "
         "mode for a player who wants a real challenge just parsing what you're saying. Keep this "
-        "reply under about 75 words even at this density — dense, not sprawling."
+        "reply under about {word_cap} words even at this density — dense, not sprawling."
     ),
+}
+# {word_cap} above is filled in with REBUTTAL_WORD_CAP at call time (see
+# debate_reply()) rather than hardcoded per tier, so the prompted target
+# can never ask for more than the hard cap debate_reply() enforces after
+# generation — Rookie's own target (30-50 words) already sits comfortably
+# under that cap and doesn't reference it.
+DIFFICULTY_STYLES = {
+    level: (style.format(word_cap=REBUTTAL_WORD_CAP) if "{word_cap}" in style else style)
+    for level, style in DIFFICULTY_STYLES.items()
 }
 
 DEBATE_SYSTEM_PROMPT = (
@@ -160,6 +171,12 @@ DEBATE_SYSTEM_PROMPT = (
     "or mechanism, not just a sharp tone. Don't inflate either verdict. A Point of Clarification "
     'question, by nature, doesn\'t make a claim or add a reason itself — judge it "neutral" unless it '
     "is unusually sharp and well-aimed.\n\n"
+    "Fallacy naming: when the USER's argument earns \"bad\" specifically because it commits a "
+    "recognizable named fallacy (a strawman, an ad hominem, a slippery slope, or another clear "
+    "one), set fallacy_type to name it. Most \"bad\" verdicts are just vague, unsupported, or off-"
+    'topic rather than a specific named fallacy — set fallacy_type to "none" in that ordinary '
+    "case, and always when the verdict isn't \"bad\" at all. Never set it for your own rebuttal, "
+    "only the user's argument.\n\n"
     "Bag Evaluator (a separate, smaller task — this feeds the player's vocabulary collection, not "
     "their score):\n"
     "Scan the user's LATEST argument only (not earlier history) for genuinely advanced vocabulary — "
@@ -174,8 +191,8 @@ DEBATE_SYSTEM_PROMPT = (
     "For each word that does qualify, give its exact form as it appears in the text (lowercase), a "
     "concise one-sentence definition, and its own CEFR level (B2/C1/C2) — independent of the other "
     "vocabulary bank the app already tracks, so a word can qualify here even if it isn't on that list.\n\n"
-    "Call the submit_round_turn tool with your rebuttal, both verdicts, and vocab_words_used — always "
-    "use the tool, never reply in plain text."
+    "Call the submit_round_turn tool with your rebuttal, both verdicts, fallacy_type, and "
+    "vocab_words_used — always use the tool, never reply in plain text."
 )
 
 DEBATE_TOOL = {
@@ -203,6 +220,20 @@ DEBATE_TOOL = {
                 "type": "string",
                 "enum": ["solid", "neutral", "bad"],
                 "description": "Quality verdict on your own rebuttal, by the same rubric.",
+            },
+            "fallacy_type": {
+                "type": "string",
+                "enum": ["none", "strawman", "ad_hominem", "slippery_slope", "other"],
+                "description": (
+                    "Only set when user_argument_verdict is 'bad' AND the specific flaw is a "
+                    "named logical fallacy, not just vague or unsupported. 'strawman' for "
+                    "rebutting a distorted version of their claim, 'ad_hominem' for attacking the "
+                    "arguer instead of the argument, 'slippery_slope' for assuming one step "
+                    "guarantees an extreme outcome with no supporting mechanism, 'other' for a "
+                    "clear but differently-named fallacy. 'none' otherwise - that is the common, "
+                    "correct result for most 'bad' verdicts, which are just vague or unsupported "
+                    "rather than a specific named fallacy."
+                ),
             },
             "vocab_words_used": {
                 "type": "array",
@@ -373,6 +404,20 @@ def debate_reply(body):
         data = tool_use.input
         reply = str(data.get("reply") or "").strip()
 
+        # Hard backstop on top of the per-tier word target already prompted
+        # above (DIFFICULTY_STYLES) — CUSSATOR_CONFIG.REBUTTAL_WORD_CAP is
+        # enforced here, after generation, rather than trusted to the
+        # prompt alone. Word-split rather than re-tokenizing, matching how
+        # the client's own Word Economy pool already counts "1 token = 1
+        # word" (see countWordTokens() in script.js).
+        reply_words = reply.split()
+        if len(reply_words) > REBUTTAL_WORD_CAP:
+            reply = " ".join(reply_words[:REBUTTAL_WORD_CAP]).rstrip(",;:") + "…"
+
+        fallacy_type = str(data.get("fallacy_type") or "none").strip().lower()
+        if fallacy_type not in ("none", "strawman", "ad_hominem", "slippery_slope", "other"):
+            fallacy_type = "none"
+
         # Defensively rebuilt rather than passed through — never trust a
         # tool call's shape blindly. Always returns a real (possibly empty)
         # list rather than omitting the key, so the client's Array.isArray
@@ -397,6 +442,7 @@ def debate_reply(body):
             "reply": reply or "…",
             "user_argument_verdict": data.get("user_argument_verdict", "neutral"),
             "ai_reply_verdict": data.get("ai_reply_verdict", "neutral"),
+            "fallacy_type": fallacy_type,
             "vocab_words_used": vocab_words_used,
         }
     except anthropic.AuthenticationError:
