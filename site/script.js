@@ -881,8 +881,18 @@
   var VOCAB_HEAL = 10;
   var BAD_ARGUMENT_PENALTY = CUSSATOR_CONFIG.HP_PENALTIES.badArgument;
   var FALLACY_PENALTY = CUSSATOR_CONFIG.HP_PENALTIES.fallacy;
+  // Left as absolute point values, same as every penalty above — a bigger
+  // MAX_HP pool means these heal/damage the same amount but matter
+  // relatively less, which is the intended effect of a larger pool, not
+  // something to compensate for by scaling these up too.
   var STRONG_ARGUMENT_SELF_HEAL = 20;
   var STRONG_ARGUMENT_OPPONENT_DAMAGE = 20;
+
+  // Both sides' starting/max HP. Every 0-100 assumption below (bar-width
+  // percentage math, danger-tier thresholds, the clamp ceiling, the
+  // post-round chart's Y-axis, Pitch mode's placeholder hpHistory) reads
+  // off this instead of a literal 100, so it can change in one place.
+  var MAX_HP = CUSSATOR_CONFIG.STARTING_HP;
 
   // Split Battle Engine's local filter — runs client-side, no AI call,
   // before the submitted argument is ever sent to /api/respond. Its
@@ -1329,8 +1339,8 @@
     var SIMPLIFY_COST = 25;
 
     var MOTION = motionTextEl ? motionTextEl.textContent : '';
-    var health = 100;
-    var aiHealth = 100;
+    var health = MAX_HP;
+    var aiHealth = MAX_HP;
     var history = [];
     var roundStats = { filler: 0, curse: 0, connective: 0, vocab: 0, words: 0, solid: 0, neutral: 0, bad: 0 };
     // Same shape as roundStats' word-category fields, but for the AI's own
@@ -1359,7 +1369,7 @@
     // 100/100 starting point so the line has a real start, not a jump.
     var turnStartTime = null;
     var turnLog = [];
-    var hpHistory = [{ turnIndex: 0, health: 100, aiHealth: 100 }];
+    var hpHistory = [{ turnIndex: 0, health: MAX_HP, aiHealth: MAX_HP }];
     var lastRoundPlayerWon = null; // read by buildDashboardPayload() for the report's "Result" stat
     var judgeAnimTimer = null;
     var roundOver = false;
@@ -1469,7 +1479,7 @@
       if (inputWrapEl) inputWrapEl.classList.remove('cuss-budget-warning', 'cuss-budget-critical');
       turnStartTime = null;
       turnLog = [];
-      hpHistory = [{ turnIndex: 0, health: 100, aiHealth: 100 }];
+      hpHistory = [{ turnIndex: 0, health: MAX_HP, aiHealth: MAX_HP }];
       lastRoundPlayerWon = null;
       recapEl.innerHTML = '';
       trendEl.innerHTML = '';
@@ -1495,8 +1505,8 @@
 
       roundOver = false;
 
-      setHealth(100);
-      setAiHealth(100);
+      setHealth(MAX_HP);
+      setAiHealth(MAX_HP);
 
       judgePanel.classList.remove('is-visible');
       judgePanel.hidden = true;
@@ -1931,29 +1941,38 @@
     // visibly "catches up" after the real fill has already moved. A heal
     // just collapses the trail to the same value instantly — there's
     // nothing to trail on a gain.
+    // value/previous here are raw HP (0..MAX_HP), not already percentages —
+    // bar widths are always expressed as a percentage OF MAX_HP so the bar
+    // fills/empties correctly regardless of the pool size.
+    function hpPercent(v) {
+      return (v / MAX_HP) * 100;
+    }
+
     function setHpTrail(trailEl, value, previous) {
       if (!trailEl) return;
       if (value < previous) {
         trailEl.style.transition = 'none';
-        trailEl.style.width = previous + '%';
+        trailEl.style.width = hpPercent(previous) + '%';
         void trailEl.offsetWidth; // reflow so the width below doesn't just no-op
         trailEl.style.transition = '';
-        trailEl.style.width = value + '%';
+        trailEl.style.width = hpPercent(value) + '%';
       } else {
         trailEl.style.transition = 'none';
-        trailEl.style.width = value + '%';
+        trailEl.style.width = hpPercent(value) + '%';
         void trailEl.offsetWidth;
         trailEl.style.transition = '';
       }
     }
 
     function updateHealthDisplay(fillEl, valEl, trailEl, value, previous) {
-      fillEl.style.width = value + '%';
+      fillEl.style.width = hpPercent(value) + '%';
       valEl.textContent = value;
       setHpTrail(trailEl, value, previous);
 
-      var isCritical = value <= 25;
-      var isWarning = !isCritical && value <= 50;
+      // Danger tiers fire at the same relative HP fractions (25%/50% of
+      // MAX_HP) regardless of pool size, not at the old scale's flat 25/50.
+      var isCritical = value <= MAX_HP * 0.25;
+      var isWarning = !isCritical && value <= MAX_HP * 0.5;
       fillEl.classList.toggle('is-hp-critical', isCritical);
       fillEl.classList.toggle('is-hp-warning', isWarning);
       valEl.classList.toggle('is-hp-critical', isCritical);
@@ -1969,13 +1988,13 @@
     }
 
     function setHealth(v) {
-      var next = clamp(v, 0, 100);
+      var next = clamp(v, 0, MAX_HP);
       updateHealthDisplay(healthFill, healthVal, healthTrail, next, health);
       health = next;
     }
 
     function setAiHealth(v) {
-      var next = clamp(v, 0, 100);
+      var next = clamp(v, 0, MAX_HP);
       updateHealthDisplay(aiHealthFill, aiHealthVal, aiHealthTrail, next, aiHealth);
       aiHealth = next;
     }
@@ -3493,7 +3512,7 @@
         options: {
           responsive: true, maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
-          scales: baseScales({ y: { min: 0, max: 100, ticks: { stepSize: 25, color: TEXT_DIM } } }),
+          scales: baseScales({ y: { min: 0, max: CUSSATOR_CONFIG.STARTING_HP, ticks: { stepSize: CUSSATOR_CONFIG.STARTING_HP / 5, color: TEXT_DIM } } }),
           plugins: {
             legend: { display: true, position: 'top', align: 'end', labels: { color: TEXT_DIM, usePointStyle: true, boxWidth: 8, font: { size: 12 } } },
             tooltip: Object.assign(tooltipBase(), {
@@ -3636,7 +3655,7 @@
       }
 
       var turnLog = data.turnLog || [];
-      var hpHistory = (data.hpHistory && data.hpHistory.length) ? data.hpHistory : [{ turnIndex: 0, health: 100, aiHealth: 100 }];
+      var hpHistory = (data.hpHistory && data.hpHistory.length) ? data.hpHistory : [{ turnIndex: 0, health: CUSSATOR_CONFIG.STARTING_HP, aiHealth: CUSSATOR_CONFIG.STARTING_HP }];
       var totalWords = turnLog.reduce(function (sum, t) { return sum + t.userWords; }, 0);
       var avgWpm = turnLog.length ? Math.round(turnLog.reduce(function (sum, t) { return sum + t.userWpm; }, 0) / turnLog.length) : 0;
 
@@ -3910,7 +3929,7 @@
         // already renders correctly for a self-KO with no completed turns.
         goToDashboard({
           motion: MOTION, playerWon: null,
-          hpHistory: [{ turnIndex: 0, health: 100, aiHealth: 100 }],
+          hpHistory: [{ turnIndex: 0, health: CUSSATOR_CONFIG.STARTING_HP, aiHealth: CUSSATOR_CONFIG.STARTING_HP }],
           turnLog: [],
           wordCategories: { you: { filler: 0, connective: 0, vocab: 0 }, ai: { filler: 0, connective: 0, vocab: 0 } },
           scores: { logic: 0, precision: 0, delivery: 0 },
@@ -3935,7 +3954,7 @@
           var verdict = result.ok ? (result.data.argument_verdict || 'neutral') : 'neutral';
 
           var analysis = classifyText(text);
-          var health = clamp(100 + analysis.delta, 0, 100);
+          var health = clamp(CUSSATOR_CONFIG.STARTING_HP + analysis.delta, 0, CUSSATOR_CONFIG.STARTING_HP);
           var stats = {
             solid: verdict === 'solid' ? 1 : 0, neutral: verdict === 'neutral' ? 1 : 0, bad: verdict === 'bad' ? 1 : 0,
             connective: analysis.connectiveCount,
@@ -3947,10 +3966,10 @@
 
           goToDashboard({
             motion: MOTION, playerWon: null,
-            hpHistory: [{ turnIndex: 0, health: 100, aiHealth: 100 }, { turnIndex: 1, health: health, aiHealth: 100 }],
+            hpHistory: [{ turnIndex: 0, health: CUSSATOR_CONFIG.STARTING_HP, aiHealth: CUSSATOR_CONFIG.STARTING_HP }, { turnIndex: 1, health: health, aiHealth: CUSSATOR_CONFIG.STARTING_HP }],
             turnLog: [{
               index: 1, userWords: analysis.wordCount, userWpm: wpm,
-              userVerdict: verdict, aiVerdict: null, aiWords: 0, health: health, aiHealth: 100
+              userVerdict: verdict, aiVerdict: null, aiWords: 0, health: health, aiHealth: CUSSATOR_CONFIG.STARTING_HP
             }],
             wordCategories: {
               you: { filler: stats.filler, connective: stats.connective, vocab: stats.vocab },

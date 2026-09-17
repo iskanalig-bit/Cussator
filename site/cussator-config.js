@@ -16,15 +16,40 @@
 // shared build step) — api/_cussator_config.py mirrors the one value it
 // actually needs (REBUTTAL_WORD_CAP) by hand. Keep the two in sync.
 (function () {
+  // TOKEN_BUDGET_PER_SIDE replaces the old per-tier maxTokensAllowed split
+  // (rookie 500 / delegate+chair 300) with one flat pool for every tier —
+  // "PER_SIDE" (not "PER_TIER" or "DEFAULT") reads as a single universal
+  // budget, not a rookie-only cushion, so all three tiers below now
+  // reference this same constant. Difficulty still differs by timer,
+  // pasting, and Point of Order availability — just not by token budget
+  // anymore. If the rookie-gets-more-tokens cushion was meant to survive
+  // this change, that's a one-line revert (give DIFFICULTY_TIERS.rookie
+  // its own maxTokensAllowed again instead of TOKEN_BUDGET_PER_SIDE).
+  var TOKEN_BUDGET_PER_SIDE = 600; // was 300
+
   window.CUSSATOR_CONFIG = {
+    // Both sides start here (see setHealth()/setAiHealth() in script.js) —
+    // HP bars, the danger-tier thresholds (25%/50% of this, not the old
+    // flat 25/50), and the post-round dashboard's HP chart Y-axis all
+    // read off this instead of an assumed 0-100 scale.
+    STARTING_HP: 250, // was 100
+
+    TOKEN_BUDGET_PER_SIDE: TOKEN_BUDGET_PER_SIDE,
+
     HP_PENALTIES: {
-      filler: 15, // "like", "basically", "kind of", "sort of", etc.
-      curse: 25,
-      badArgument: 30, // weak/unsupported claim, structural hedge
-      fallacy: 30, // Strawman, Ad Hominem, Slippery Slope, etc. — same
-                   // severity as badArgument (see api/_common.py's
+      filler: 15, // "like", "basically", "kind of", "sort of", etc. — unchanged
+      curse: 25,        // unchanged
+      badArgument: 30,  // weak/unsupported claim, structural hedge — unchanged
+      fallacy: 30, // Strawman, Ad Hominem, Slippery Slope, etc. — unchanged,
+                   // same severity as badArgument (see api/_common.py's
                    // fallacy_type judging), tracked as its own constant so
                    // the two can diverge later without a code change.
+                   // Left as absolute point values on purpose even though
+                   // STARTING_HP tripled below — a filler hit costing 15 of
+                   // 250 (6%) instead of 15 of 100 (15%) is the actual
+                   // rebalance this config change is making, not an
+                   // oversight: more room to make mistakes before losing,
+                   // same per-word cost.
     },
 
     INTERRUPTION_THRESHOLD: {
@@ -33,9 +58,9 @@
     },
 
     DIFFICULTY_TIERS: {
-      rookie:   { timerSeconds: 90, maxTokensAllowed: 500, pastingDisabled: false, allowPointOfOrder: false },
-      delegate: { timerSeconds: 60, maxTokensAllowed: 300, pastingDisabled: true,  allowPointOfOrder: true },
-      chair:    { timerSeconds: 45, maxTokensAllowed: 300, pastingDisabled: true,  allowPointOfOrder: true },
+      rookie:   { timerSeconds: 90, maxTokensAllowed: TOKEN_BUDGET_PER_SIDE, pastingDisabled: false, allowPointOfOrder: false },
+      delegate: { timerSeconds: 60, maxTokensAllowed: TOKEN_BUDGET_PER_SIDE, pastingDisabled: true,  allowPointOfOrder: true },
+      chair:    { timerSeconds: 45, maxTokensAllowed: TOKEN_BUDGET_PER_SIDE, pastingDisabled: true,  allowPointOfOrder: true },
     },
 
     // The single-tier baseline every one of these words must detect at
