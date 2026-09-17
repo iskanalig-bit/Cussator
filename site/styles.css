@@ -243,9 +243,15 @@ textarea.input { min-height: 90px; resize: vertical; }
 .cuss-arena-timer.is-warn { border-color: var(--color-warn); color: var(--color-warn); }
 
 /* — navigation — */
+/* flex-wrap:nowrap deliberately — the old wrapping layout is exactly the
+   "nav items wrap onto multiple lines with inconsistent spacing" bug.
+   Instead .cuss-nav-links (the only flexible child) absorbs any width
+   shortfall by scrolling horizontally on its own, while the mark, brand,
+   and .cuss-nav-actions stay flex:none so they can never be the ones
+   that get squeezed or wrap. */
 .nav {
-  display: flex; align-items: center; gap: var(--space-4); row-gap: var(--space-2);
-  flex-wrap: wrap;
+  display: flex; align-items: center; gap: var(--space-4);
+  flex-wrap: nowrap;
   padding: var(--space-3) var(--space-4);
   border-bottom: none;
 }
@@ -254,10 +260,28 @@ textarea.input { min-height: 90px; resize: vertical; }
 .nav-mark { display: block; height: 34px; width: auto; flex: none; }
 .nav-brand {
   font-family: var(--font-heading); font-weight: var(--font-heading-weight);
-  font-size: 18px; margin-right: auto;
+  font-size: 18px; flex: none;
 }
 .nav a { color: inherit; text-decoration: none; font-size: 14px; }
 .nav a:hover, .nav a[aria-current='page'] { color: var(--color-accent); }
+/* The one flexible piece of the nav — takes whatever width is left after
+   the mark/brand/actions claim theirs, and scrolls horizontally instead
+   of wrapping if that's not enough (min-width:0 is required for a flex
+   child to be allowed to shrink below its content's natural width at
+   all; without it flex-basis:auto would keep this as wide as its
+   longest-possible layout and force the whole nav to overflow instead).
+   Scrollbar hidden since this is meant to read as "one row", not a
+   visibly scrollable panel — still fully scrollable by touch/drag/
+   trackpad, just without the chrome. Each link is flex:none so a link's
+   own text never wraps mid-word while scrolling past it. */
+.cuss-nav-links {
+  display: flex; align-items: center; gap: var(--space-4);
+  flex: 1 1 auto; min-width: 0;
+  overflow-x: auto; scrollbar-width: none;
+}
+.cuss-nav-links::-webkit-scrollbar { display: none; }
+.cuss-nav-links a { flex: none; padding: 12px 4px; }
+.cuss-nav-actions { display: flex; align-items: center; gap: var(--space-2); flex: none; }
 /* Small outlined nav Chat button — reuses .btn-primary as-is (purple
    border, transparent fill, accent text). Same outline recipe as the big
    hero Chat button now, just at nav scale, so it still reads as visually
@@ -331,7 +355,7 @@ html { scroll-behavior: smooth; }
     var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
-  min-height: 100vh;
+  min-height: 100vh; min-height: 100dvh;
 }
 .cuss-wrap { max-width: 1200px; margin: 0 auto; padding: 0 var(--edge); }
 
@@ -829,13 +853,35 @@ html { scroll-behavior: smooth; }
      which is tuned for spacious marketing sections and would reintroduce
      large margins on wide screens; this is a flat 20px, same on every
      viewport. */
-  width: 100%; height: 100%; max-height: 100vh;
+  width: 100%; height: 100%; max-height: 100vh; max-height: 100dvh;
   /* Same gap token as .cuss-arena-transcript's internal gap (see below) —
      one consistent rhythm the whole way down: head → motion → HP bars →
      transcript (→ avatar row → prompt) → legend → input. */
   display: flex; flex-direction: column; gap: var(--space-4);
   background: var(--color-bg); border-radius: 0; box-shadow: none;
-  padding: var(--space-4) 20px; overflow: hidden;
+  padding: var(--space-4) 20px;
+  /* overflow-y:auto (was overflow:hidden) — a short viewport (landscape
+     phone, browser chrome eating into the height) can leave less room
+     than this column's natural content height even after the
+     max-height:500px tightening below; scrolling the whole arena is the
+     fallback that guarantees the input never gets silently clipped off
+     the bottom, which overflow:hidden was doing here before. overflow-x
+     stays hidden — nothing in this column should ever need to scroll
+     sideways. */
+  overflow-x: hidden; overflow-y: auto;
+}
+/* Short-viewport tightening — landscape on a phone is much shorter than
+   any portrait width this app otherwise designs for, and the column's
+   normal vertical rhythm (gaps, the transcript's min-height floor) added
+   up to more than that height, pushing the input below the fold under
+   .cuss-arena-inner's old overflow:hidden. Targets height, not width
+   (orientation:landscape alone would also catch a landscape TABLET,
+   which has plenty of vertical room and shouldn't be squeezed). */
+@media (max-height: 500px) {
+  .cuss-arena-inner { gap: var(--space-2); padding: var(--space-2) 20px; }
+  .cuss-arena-motion { font-size: 16px; margin-bottom: 4px; }
+  .cuss-arena-transcript { min-height: 60px; gap: var(--space-2); }
+  .cuss-color-legend { padding: 0 2px 2px; }
 }
 /* Screen shake on penalty — a brief, decaying horizontal rattle when the
    player's own submitted argument lands a filler/curse hit (see
@@ -1306,14 +1352,18 @@ html { scroll-behavior: smooth; }
    All three gradients share the same shape (90deg, two stops) specifically
    so the `background` transition below actually animates smoothly between
    them in evergreen browsers, instead of hard-cutting from one gradient to
-   another. Colors reuse existing tokens already meaningful elsewhere
-   (Affirm blue, the app's own warn amber, the existing critical red) —
-   no new palette. */
+   another. Safe state uses the app's own accent purple (not the earlier
+   Affirm blue) specifically so it matches the send button and Bag-insert
+   button sitting right next to it in the same row — the mobile pass that
+   restyled the send button to a solid black/purple treatment made the
+   input's old blue safe-state read as a clashing, unrelated color right
+   beside it. Warning/critical stay the existing amber/red — no new
+   palette either way. */
 #cuss-arena-input-wrap::before {
   content: "";
   position: absolute; inset: -2px; z-index: -1; border-radius: inherit;
   transition: background 300ms ease;
-  background: linear-gradient(90deg, oklch(0.72 0.15 250), color-mix(in srgb, oklch(0.72 0.15 250) 55%, transparent));
+  background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, transparent));
 }
 #cuss-arena-input-wrap.cuss-budget-warning::before {
   background: linear-gradient(90deg, var(--color-warn), color-mix(in srgb, var(--color-warn) 55%, transparent));
@@ -1388,21 +1438,23 @@ html { scroll-behavior: smooth; }
    of the primary effect. */
 .cuss-send-btn {
   width: 68px; height: 42px; flex: none; border-radius: var(--radius-sm); padding: 0;
-  background: linear-gradient(135deg,
-    color-mix(in srgb, white 22%, var(--color-accent)) 0%,
-    var(--color-accent) 55%,
-    color-mix(in srgb, black 15%, var(--color-accent)) 100%);
-  color: var(--color-bg);
-  border: 2px dashed var(--color-bg);
+  /* Solid black fill, solid purple outline, purple glyph — a dashed
+     border and a purple-fill/black-glyph treatment both read as
+     "placeholder" or "disabled" rather than a real actionable button,
+     especially on mobile where there's no hover state to clarify intent.
+     Shared by every send/submit button in the app (round view and
+     Elevator Pitch both use .cuss-send-btn), so this is one change, not
+     two. */
+  background: var(--color-bg);
+  color: var(--color-accent);
+  border: 2px solid var(--color-accent);
   box-shadow: 0 0 10px 1px color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 .cuss-send-btn:hover {
-  background: linear-gradient(135deg,
-    color-mix(in srgb, white 22%, var(--color-accent-2)) 0%,
-    var(--color-accent-2) 55%,
-    color-mix(in srgb, black 15%, var(--color-accent-2)) 100%);
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-bg));
+  border-color: var(--color-accent-2); color: var(--color-accent-2);
 }
-.cuss-send-btn:active { background: var(--color-accent); }
+.cuss-send-btn:active { background: color-mix(in srgb, var(--color-accent) 24%, var(--color-bg)); }
 .cuss-send-glyph { font-size: 20px; line-height: 1; }
 /* Fires when Enter is pressed on the textarea (see script.js) — the button
    itself never receives that keystroke, so without this it would sit
@@ -1840,7 +1892,7 @@ html { scroll-behavior: smooth; }
 }
 .cuss-scars.is-open { opacity: 1; pointer-events: auto; }
 .cuss-scars-inner {
-  width: 100%; max-width: 720px; height: 100%; max-height: 100vh;
+  width: 100%; max-width: 720px; height: 100%; max-height: 100vh; max-height: 100dvh;
   display: flex; flex-direction: column; gap: var(--space-3);
   padding: var(--space-4) var(--edge); overflow-y: auto;
 }
@@ -1923,7 +1975,7 @@ html { scroll-behavior: smooth; }
 }
 .cuss-connector-log.is-open { opacity: 1; pointer-events: auto; }
 .cuss-connector-log-inner {
-  width: 100%; max-width: 720px; height: 100%; max-height: 100vh;
+  width: 100%; max-width: 720px; height: 100%; max-height: 100vh; max-height: 100dvh;
   display: flex; flex-direction: column; gap: var(--space-3);
   padding: var(--space-4) var(--edge); overflow-y: auto;
 }
@@ -1952,7 +2004,7 @@ html { scroll-behavior: smooth; }
 .cuss-bag.is-open { opacity: 1; pointer-events: auto; }
 .cuss-bag-inner {
   position: relative;
-  width: 100%; max-width: 720px; height: 100%; max-height: 100vh;
+  width: 100%; max-width: 720px; height: 100%; max-height: 100vh; max-height: 100dvh;
   display: flex; flex-direction: column; gap: var(--space-3);
   padding: var(--space-4) var(--edge); overflow-y: auto;
 }
@@ -2027,10 +2079,23 @@ html { scroll-behavior: smooth; }
 
 @media (max-width: 640px) {
   .cuss-arena-inner { padding: var(--space-3); }
-  .cuss-arena-form { flex-direction: column; align-items: stretch; }
+  .cuss-arena-form { flex-direction: column; align-items: stretch; gap: 6px; }
   .cuss-scars-inner { padding: var(--space-3); }
   .cuss-connector-log-inner { padding: var(--space-3); }
   .cuss-bag-inner { padding: var(--space-3); }
+  /* Legend dots (Filler/Vocab/Penalty) and the utility buttons around the
+     composer used desktop-scale gaps that read as sparse/disconnected on
+     a narrow screen — tightened here, and pinned to the left edge (no
+     centering) so they read as one aligned cluster, not floating pieces. */
+  .cuss-color-legend { gap: 10px; padding: 0 2px 4px; justify-content: flex-start; }
+  .cuss-bag-shelf { gap: 6px; }
+  /* Touch targets — every tappable control here should clear ~44x44px on
+     mobile even where the visual element stays smaller, per WCAG/mobile
+     guidance. Padding/min-size only; no visual restyle beyond size. */
+  .nav-cta { padding: 12px 10px; min-height: 44px; }
+  .cuss-send-btn { min-height: 44px; }
+  .cuss-bag-insert-btn { width: 44px; height: 44px; }
+  #cuss-arena-close { width: 44px; height: 44px; }
 }
 
 /* =========================================================================
@@ -2215,7 +2280,7 @@ html { scroll-behavior: smooth; }
 }
 .cuss-pitch.is-open { opacity: 1; pointer-events: auto; }
 .cuss-pitch-inner {
-  position: relative; width: 100%; height: 100%; max-height: 100vh;
+  position: relative; width: 100%; height: 100%; max-height: 100vh; max-height: 100dvh;
   display: flex; flex-direction: column; gap: var(--space-4);
   background: var(--color-bg); padding: var(--space-4) var(--edge); overflow: hidden;
 }

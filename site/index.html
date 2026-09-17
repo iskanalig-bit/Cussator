@@ -16,12 +16,21 @@
   <nav class="nav cuss-nav" style="padding: var(--space-3) var(--edge);">
     <img src="cussator-mark.svg" alt="" class="nav-mark" width="45" height="34">
     <span class="nav-brand">Cussator</span>
-    <a href="#how">How it works</a>
-    <a href="#features">Features</a>
-    <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
-    <a href="#" id="cuss-connector-log-link">Connector Log</a>
-    <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
-    <button type="button" class="btn btn-primary nav-cta" id="cuss-bag-nav">Bag <span id="cuss-bag-nav-count">(0)</span></button>
+    <!-- Scrolls horizontally as one row instead of wrapping onto multiple
+         lines when it doesn't fit — see .cuss-nav-links in styles.css.
+         Chat/Bag stay outside this group, in .cuss-nav-actions, so they're
+         always visible as the header's primary actions regardless of how
+         narrow the screen is. -->
+    <div class="cuss-nav-links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
+      <a href="#" id="cuss-connector-log-link">Connector Log</a>
+    </div>
+    <div class="cuss-nav-actions">
+      <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
+      <button type="button" class="btn btn-primary nav-cta" id="cuss-bag-nav">Bag <span id="cuss-bag-nav-count">(0)</span></button>
+    </div>
   </nav>
 
   <div class="cuss-wrap">
