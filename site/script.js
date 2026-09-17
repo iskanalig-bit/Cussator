@@ -1247,32 +1247,47 @@
     var aiHealthTrail = document.getElementById('cuss-ai-health-trail');
     var motionTextEl = document.getElementById('cuss-arena-motion-text');
     var judgePanel = document.getElementById('cuss-arena-judge');
+    var judgeSummaryBtn = document.getElementById('cuss-judge-summary-btn');
+    var judgePopover = document.getElementById('cuss-judge-popover');
     var judgeLogicFill = document.getElementById('cuss-judge-logic-fill');
     var judgeLogicVal = document.getElementById('cuss-judge-logic-val');
+    var judgeLogicValInline = document.getElementById('cuss-judge-logic-val-inline');
     var judgePrecisionFill = document.getElementById('cuss-judge-precision-fill');
     var judgePrecisionVal = document.getElementById('cuss-judge-precision-val');
+    var judgePrecisionValInline = document.getElementById('cuss-judge-precision-val-inline');
     var judgeDeliveryFill = document.getElementById('cuss-judge-delivery-fill');
     var judgeDeliveryVal = document.getElementById('cuss-judge-delivery-val');
+    var judgeDeliveryValInline = document.getElementById('cuss-judge-delivery-val-inline');
     var judgeCritiqueEl = document.getElementById('cuss-judge-critique');
     var judgeCritiqueSummaryEl = document.getElementById('cuss-judge-critique-summary');
     var judgeCritiqueBreakdownEl = document.getElementById('cuss-judge-critique-breakdown');
 
-    // Compact Judge panel — each metric's explanatory sentence
-    // (.cuss-judge-hint) starts hidden (see index.html) and is toggled
-    // per metric by its own "i" button, tapped or clicked (a plain click
-    // handler fires for both, so this needs no separate touch path). One
-    // delegated listener on the panel itself rather than three identical
-    // ones on each button.
-    if (judgePanel) {
-      judgePanel.addEventListener('click', function (e) {
-        var btn = e.target.closest && e.target.closest('.cuss-judge-info-btn');
-        if (!btn) return;
-        var item = btn.closest('.cuss-judge-item');
-        var hint = item && item.querySelector('.cuss-judge-hint');
-        if (!hint) return;
-        var show = hint.hidden;
-        hint.hidden = !show;
-        btn.setAttribute('aria-expanded', String(show));
+    // Judge popover — collapsed to a one-line summary (see index.html);
+    // the full bars/scores/explanations only render once this is opened.
+    // Same open/close/outside-click/Escape pattern as the Insert-from-Bag
+    // popover elsewhere in this file.
+    if (judgeSummaryBtn && judgePopover) {
+      function closeJudgePopover() {
+        judgePopover.hidden = true;
+        judgeSummaryBtn.setAttribute('aria-expanded', 'false');
+      }
+      function openJudgePopover() {
+        judgePopover.hidden = false;
+        judgeSummaryBtn.setAttribute('aria-expanded', 'true');
+      }
+      judgeSummaryBtn.addEventListener('click', function () {
+        if (judgePopover.hidden) openJudgePopover();
+        else closeJudgePopover();
+      });
+      document.addEventListener('click', function (e) {
+        if (!judgePopover.hidden
+          && !judgePopover.contains(e.target)
+          && e.target !== judgeSummaryBtn && !judgeSummaryBtn.contains(e.target)) {
+          closeJudgePopover();
+        }
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !judgePopover.hidden) closeJudgePopover();
       });
     }
     var gameoverRestartBtn = document.getElementById('cuss-gameover-restart');
@@ -1485,9 +1500,11 @@
 
       judgePanel.classList.remove('is-visible');
       judgePanel.hidden = true;
-      setJudgeBar(judgeLogicFill, judgeLogicVal, 0);
-      setJudgeBar(judgePrecisionFill, judgePrecisionVal, 0);
-      setJudgeBar(judgeDeliveryFill, judgeDeliveryVal, 0);
+      setJudgeBar(judgeLogicFill, judgeLogicVal, judgeLogicValInline, 0);
+      setJudgeBar(judgePrecisionFill, judgePrecisionVal, judgePrecisionValInline, 0);
+      setJudgeBar(judgeDeliveryFill, judgeDeliveryVal, judgeDeliveryValInline, 0);
+      if (judgePopover) judgePopover.hidden = true;
+      if (judgeSummaryBtn) judgeSummaryBtn.setAttribute('aria-expanded', 'false');
       if (judgeCritiqueEl) {
         judgeCritiqueEl.classList.remove('is-visible');
         judgeCritiqueEl.hidden = true;
@@ -2624,9 +2641,14 @@
       return computeJudgeScores(roundStats);
     }
 
-    function setJudgeBar(fillEl, valEl, v) {
+    // inlineValEl is the one-line summary's own score span (see
+    // #cuss-arena-judge in index.html) — kept in sync with the exact same
+    // number the popover's bar/value shows, just also surfaced where the
+    // player can actually see it without opening anything.
+    function setJudgeBar(fillEl, valEl, inlineValEl, v) {
       fillEl.style.width = v + '%';
       valEl.textContent = v;
+      if (inlineValEl) inlineValEl.textContent = v;
     }
 
     function revealJudge() {
@@ -2639,9 +2661,9 @@
       var step = 0;
       function tick() {
         var p = Math.min(step, n) / n;
-        setJudgeBar(judgeLogicFill, judgeLogicVal, Math.round(targets.logic * p));
-        setJudgeBar(judgePrecisionFill, judgePrecisionVal, Math.round(targets.precision * p));
-        setJudgeBar(judgeDeliveryFill, judgeDeliveryVal, Math.round(targets.delivery * p));
+        setJudgeBar(judgeLogicFill, judgeLogicVal, judgeLogicValInline, Math.round(targets.logic * p));
+        setJudgeBar(judgePrecisionFill, judgePrecisionVal, judgePrecisionValInline, Math.round(targets.precision * p));
+        setJudgeBar(judgeDeliveryFill, judgeDeliveryVal, judgeDeliveryValInline, Math.round(targets.delivery * p));
         if (step < n) {
           step++;
           judgeAnimTimer = setTimeout(tick, 40);

@@ -624,55 +624,79 @@ html { scroll-behavior: smooth; }
   background: linear-gradient(to right, transparent, var(--color-neutral-800) 4px calc(100% - 4px), transparent) no-repeat top / 100% 1px;
 }
 .cuss-judge-item:first-child { background-image: none; padding-top: 0; }
-/* Arena round screen goes fully line-free (unlike the homepage demo card
-   above, which keeps its original look) — the top rule and the fading
-   dividers between Logic/Precision/Delivery are dropped, relying on the
-   existing gap/padding alone for rhythm instead of a drawn line. */
-#cuss-arena-judge { border-top: none; }
-#cuss-arena-judge .cuss-judge-item { background-image: none; }
-/* Compact mode — the live arena panel was taking up as much room as the
-   chat transcript above it (label + full-width bar + score + an always-
-   visible explanatory sentence, three times over). Scoped to
-   #cuss-arena-judge specifically so the homepage demo widget's own
-   (simpler, hint-free) Judge display is untouched. Tighter gap between
-   metrics and near-zero per-item padding collapse the block down to
-   three snug rows; the explanatory sentence moves to .cuss-judge-hint,
-   hidden by default and toggled per metric by .cuss-judge-info-btn (see
-   the delegated click handler in script.js) instead of always rendering
-   as its own paragraph under every bar. */
-#cuss-arena-judge { gap: 0; }
-#cuss-arena-judge .cuss-judge-item, #cuss-arena-judge .cuss-judge-item:first-child { padding-top: 0; }
-#cuss-arena-judge .cuss-judge-label { margin: 0; font-size: 10px; line-height: 1.4; }
-#cuss-arena-judge .cuss-judge-row { line-height: 1.1; }
-/* Cut entirely rather than just shrunk — "Feedback only, doesn't affect
-   Credibility" isn't one of the three metrics the task requires staying
-   visible, and dropping it is most of the difference between landing at
-   the low end of the "1/3 to 1/2 of current height" target instead of
-   the high end. */
-#cuss-arena-judge .cuss-judge-note { display: none; }
 .cuss-judge-row { display: flex; align-items: center; gap: 8px; }
-/* Small circular "i" info toggle — same muted/accent-on-interaction
-   language as the rest of the app's icon buttons. Deliberately sized to
-   the row's own compact height (not the usual ~44px touch-target floor
-   elsewhere in this app) rather than padded up to it with a negative
-   margin: with zero gap between metric rows (see #cuss-arena-judge
-   above), a taller button pulled back with negative margin would bleed
-   into the row above/below it. A secondary, optional "learn more" toggle
-   inside an intentionally dense panel is a reasonable place to trade
-   tap-target size for not breaking the layout it's compacting. */
-.cuss-judge-info-btn {
-  flex: none; width: 16px; height: 16px; padding: 0;
-  border: 1px solid color-mix(in srgb, var(--color-text) 35%, transparent);
-  border-radius: 50%; background: transparent;
-  color: color-mix(in srgb, var(--color-text) 55%, transparent);
-  font-family: var(--font-heading); font-style: italic; font-weight: 700; font-size: 9px;
-  line-height: 1; cursor: pointer;
+.cuss-judge-row span:first-child { font-size: 12px; width: 64px; flex: none; cursor: help; }
+
+/* Judge, demoted and collapsed — relocated below the legend (was between
+   the transcript and the legend) and shrunk from a 3-row compact block
+   down to one summary line: label + score per metric, dot-separated, no
+   bars, no explanations, until the single "i" is tapped. The scores
+   themselves are exactly the same computeJudgeScores() output as
+   before — only where and how much space they take is different.
+   Overrides the shared .cuss-judge base rule's column layout (that rule
+   still governs the homepage demo's own #cuss-judge as-is, which never
+   collapses — this override is scoped to #cuss-arena-judge alone) since
+   this is now just a positioning wrapper around a button and its
+   popover, not a stack of metric rows itself. */
+#cuss-arena-judge {
+  display: block; padding-top: 0; border-top: none; position: relative;
 }
-.cuss-judge-info-btn:hover, .cuss-judge-info-btn[aria-expanded="true"] {
+.cuss-judge-summary {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  font: inherit; font-size: 11px; text-align: left;
+  color: color-mix(in srgb, var(--color-text) 65%, transparent);
+  background: transparent; border: none; padding: 6px 2px; margin: 0; cursor: pointer;
+  font-feature-settings: 'tnum' 1;
+}
+.cuss-judge-summary:hover, .cuss-judge-summary[aria-expanded="true"] { color: var(--color-text); }
+.cuss-judge-summary-label b { font-weight: 700; color: var(--color-text); }
+.cuss-judge-summary-dot { opacity: 0.5; }
+/* Same small circular "i" language as other info toggles in this app —
+   sized to the summary row's own compact height rather than padded up
+   to the usual ~44px touch-target floor elsewhere: the whole summary
+   button (not just this icon) is clickable and spans nearly the full
+   composer width, so the real tap target is already generous. */
+.cuss-judge-info-icon {
+  flex: none; margin-left: auto; width: 18px; height: 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--color-text) 35%, transparent); border-radius: 50%;
+  font-family: var(--font-heading); font-style: italic; font-weight: 700; font-size: 10px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.cuss-judge-summary:hover .cuss-judge-info-icon, .cuss-judge-summary[aria-expanded="true"] .cuss-judge-info-icon {
   border-color: var(--color-accent); color: var(--color-accent);
 }
-#cuss-arena-judge .cuss-judge-hint { margin: 2px 0 0 72px; }
-.cuss-judge-row span:first-child { font-size: 12px; width: 64px; flex: none; cursor: help; }
+/* Full detail — bars, scores, and the same per-metric explanations as
+   the earlier compact pass, just moved off the permanently-visible
+   screen and into an on-demand popover. Opens upward (same anchored-
+   dropdown pattern as the Insert-from-Bag popover elsewhere in this
+   file), since the summary button now sits near the very bottom of the
+   screen, right above the input. */
+.cuss-judge-popover {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); z-index: 25;
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+  padding: var(--space-3);
+  display: flex; flex-direction: column; gap: 6px;
+}
+/* Author CSS beats the browser's own [hidden]{display:none} default
+   regardless of specificity (same gotcha already caught once on
+   .cuss-hero-preview) — without this, setting judgePopover.hidden = true
+   in script.js sets the attribute correctly but the popover stays
+   visually rendered anyway, since this rule's own display:flex above
+   otherwise wins. */
+.cuss-judge-popover[hidden] { display: none; }
+.cuss-judge-popover .cuss-judge-label { margin: 0 0 2px; }
+.cuss-judge-popover .cuss-judge-item {
+  display: flex; flex-direction: column; padding-top: 6px;
+  background: linear-gradient(to right, transparent, var(--color-neutral-800) 4px calc(100% - 4px), transparent) no-repeat top / 100% 1px;
+}
+.cuss-judge-popover .cuss-judge-item:first-child { background-image: none; padding-top: 0; }
+/* Always visible inside the popover now — the per-metric "i" toggle from
+   the earlier compact pass is gone; tapping the one summary icon to open
+   this popover already is the "tap for more detail" action, so a second
+   tap per metric just to read the sentence would be redundant. */
+.cuss-judge-popover .cuss-judge-hint { margin: 2px 0 0 72px; }
 .cuss-judge-track { flex: 1; height: 6px; border-radius: 99px; background: var(--color-neutral-800); overflow: hidden; }
 .cuss-judge-fill { height: 100%; width: 0%; background: var(--color-accent); transition: width 0.1s linear; }
 .cuss-judge-fill.is-warn { background: var(--color-warn); }
@@ -1152,11 +1176,15 @@ html { scroll-behavior: smooth; }
      scrollHeight reached 2046px while flex:1 held clientHeight at a flat
      560px regardless, forcing an internal scroll on a normal-length
      rebuttal even with room to spare elsewhere on screen. max-height
-     is deliberately generous (50dvh) so only a genuinely very long
-     message ever needs that internal scroll; .cuss-color-legend below
-     picks up the leftover space instead (margin-top:auto) so a short
-     transcript doesn't leave the composer floating mid-screen. */
-  flex: 0 1 auto; max-height: 50vh; max-height: 50dvh;
+     is deliberately generous so only a genuinely very long message ever
+     needs that internal scroll; .cuss-color-legend below picks up the
+     leftover space instead (margin-top:auto) so a short transcript
+     doesn't leave the composer floating mid-screen. Bumped from 50vh to
+     55vh now that the Judge panel below is collapsed to a single line
+     instead of 3 rows — that reclaimed space goes toward the transcript
+     actually being allowed to grow bigger, not just toward a shorter
+     page overall. */
+  flex: 0 1 auto; max-height: 55vh; max-height: 55dvh;
   overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);
   padding-right: 4px; min-height: 120px; position: relative;
 }

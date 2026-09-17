@@ -335,52 +335,6 @@
       <p class="cuss-ai-label">AI opponent is responding<span class="cuss-typing-dots"><span></span><span></span><span></span></span></p>
     </div>
 
-    <!-- Compact mode: each metric is one line (label + bar + score); the
-         explanatory sentence (.cuss-judge-hint) is hidden by default and
-         only shown per-metric via its .cuss-judge-info-btn ("i"), tapped
-         or clicked — see the delegated click handler on #cuss-arena-judge
-         in script.js. The label's title attribute still gives a plain
-         hover tooltip on desktop for free, same text, no extra code path. -->
-    <div class="cuss-judge" id="cuss-arena-judge" hidden>
-      <p class="cuss-judge-label">Judge</p>
-      <p class="cuss-judge-note">Feedback only — these scores don't affect Credibility.</p>
-      <div class="cuss-judge-item">
-        <div class="cuss-judge-row">
-          <span title="Reasoning structure — earns points for logical connectors, loses them for fillers and profanity.">Logic</span>
-          <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-logic-fill"></div></div>
-          <span class="cuss-judge-val" id="cuss-judge-logic-val">0</span>
-          <button type="button" class="cuss-judge-info-btn" aria-label="What does Logic measure?" aria-expanded="false">i</button>
-        </div>
-        <p class="cuss-judge-hint" hidden>Reasoning structure — logical connectors help, fillers and profanity hurt.</p>
-      </div>
-      <div class="cuss-judge-item">
-        <div class="cuss-judge-row">
-          <span title="Specificity — earns points for advanced vocabulary, loses them for fillers and profanity.">Precision</span>
-          <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-judge-precision-fill"></div></div>
-          <span class="cuss-judge-val" id="cuss-judge-precision-val">0</span>
-          <button type="button" class="cuss-judge-info-btn" aria-label="What does Precision measure?" aria-expanded="false">i</button>
-        </div>
-        <p class="cuss-judge-hint" hidden>Specificity — advanced vocabulary helps, fillers and profanity hurt.</p>
-      </div>
-      <div class="cuss-judge-item">
-        <div class="cuss-judge-row">
-          <span title="Fluency — clean, confident phrasing; hurt by filler words and profanity.">Delivery</span>
-          <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-delivery-fill"></div></div>
-          <span class="cuss-judge-val" id="cuss-judge-delivery-val">0</span>
-          <button type="button" class="cuss-judge-info-btn" aria-label="What does Delivery measure?" aria-expanded="false">i</button>
-        </div>
-        <p class="cuss-judge-hint" hidden>Fluency — clean, confident phrasing; hurt by filler words and profanity.</p>
-      </div>
-      <!-- Written explanation for the scores above — fetched once, at round
-           end, from /api/judge-critique. The numbers themselves are never
-           touched by this: they stay the local computeJudgeScores() formula,
-           this just explains them. Hidden until that call resolves. -->
-      <div class="cuss-judge-critique" id="cuss-judge-critique" hidden>
-        <p class="cuss-judge-critique-summary" id="cuss-judge-critique-summary"></p>
-        <p class="cuss-judge-critique-breakdown" id="cuss-judge-critique-breakdown"></p>
-      </div>
-    </div>
-
     <div class="cuss-color-legend">
       <span class="cuss-legend-item"><span class="cuss-legend-dot is-filler"></span>Filler</span>
       <span class="cuss-legend-item"><span class="cuss-legend-dot is-vocab"></span>Vocab</span>
@@ -410,6 +364,63 @@
          renderBagShelf() in script.js. Hidden entirely when the Bag is
          empty rather than showing an empty shelf. -->
     <div class="cuss-bag-shelf" id="cuss-bag-shelf" hidden aria-label="Your Bag words — tap to insert"></div>
+
+    <!-- Judge, demoted: relocated below the legend (was between the
+         transcript and the legend) and collapsed to one line — label +
+         score per metric, no bars, no explanations, until the single "i"
+         is tapped. See initArena()'s revealJudge()/toggleJudgePopover()
+         in script.js. The scores themselves are unchanged (still the
+         same local computeJudgeScores() formula); this is a visibility/
+         position change only, not a feature removal — full detail (bars
+         + the same per-metric explanations as before, plus the AI
+         critique once it arrives) is one tap away in the popover below. -->
+    <div class="cuss-judge cuss-judge-collapsed" id="cuss-arena-judge" hidden>
+      <button type="button" class="cuss-judge-summary" id="cuss-judge-summary-btn" aria-haspopup="true" aria-expanded="false" aria-controls="cuss-judge-popover">
+        <span class="cuss-judge-summary-label">Logic <b id="cuss-judge-logic-val-inline">0</b></span>
+        <span class="cuss-judge-summary-dot" aria-hidden="true">&middot;</span>
+        <span class="cuss-judge-summary-label">Precision <b id="cuss-judge-precision-val-inline">0</b></span>
+        <span class="cuss-judge-summary-dot" aria-hidden="true">&middot;</span>
+        <span class="cuss-judge-summary-label">Delivery <b id="cuss-judge-delivery-val-inline">0</b></span>
+        <span class="cuss-judge-info-icon" aria-hidden="true">i</span>
+      </button>
+
+      <div class="cuss-judge-popover" id="cuss-judge-popover" hidden>
+        <p class="cuss-judge-label">Judge</p>
+        <p class="cuss-judge-note">Feedback only — these scores don't affect Credibility.</p>
+        <div class="cuss-judge-item">
+          <div class="cuss-judge-row">
+            <span title="Reasoning structure — earns points for logical connectors, loses them for fillers and profanity.">Logic</span>
+            <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-logic-fill"></div></div>
+            <span class="cuss-judge-val" id="cuss-judge-logic-val">0</span>
+          </div>
+          <p class="cuss-judge-hint">Reasoning structure — logical connectors help, fillers and profanity hurt.</p>
+        </div>
+        <div class="cuss-judge-item">
+          <div class="cuss-judge-row">
+            <span title="Specificity — earns points for advanced vocabulary, loses them for fillers and profanity.">Precision</span>
+            <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-judge-precision-fill"></div></div>
+            <span class="cuss-judge-val" id="cuss-judge-precision-val">0</span>
+          </div>
+          <p class="cuss-judge-hint">Specificity — advanced vocabulary helps, fillers and profanity hurt.</p>
+        </div>
+        <div class="cuss-judge-item">
+          <div class="cuss-judge-row">
+            <span title="Fluency — clean, confident phrasing; hurt by filler words and profanity.">Delivery</span>
+            <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-delivery-fill"></div></div>
+            <span class="cuss-judge-val" id="cuss-judge-delivery-val">0</span>
+          </div>
+          <p class="cuss-judge-hint">Fluency — clean, confident phrasing; hurt by filler words and profanity.</p>
+        </div>
+        <!-- Written explanation for the scores above — fetched once, at round
+             end, from /api/judge-critique. The numbers themselves are never
+             touched by this: they stay the local computeJudgeScores() formula,
+             this just explains them. Hidden until that call resolves. -->
+        <div class="cuss-judge-critique" id="cuss-judge-critique" hidden>
+          <p class="cuss-judge-critique-summary" id="cuss-judge-critique-summary"></p>
+          <p class="cuss-judge-critique-breakdown" id="cuss-judge-critique-breakdown"></p>
+        </div>
+      </div>
+    </div>
 
     <form class="cuss-arena-form" id="cuss-arena-form">
       <div class="cuss-bag-insert-wrap">
