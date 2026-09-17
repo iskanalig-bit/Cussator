@@ -252,7 +252,13 @@ textarea.input { min-height: 90px; resize: vertical; }
 .nav {
   display: flex; align-items: center; gap: var(--space-4);
   flex-wrap: nowrap;
-  padding: var(--space-3) var(--space-4);
+  /* Was an inline style on the <nav> tag itself (padding: var(--space-3)
+     var(--edge)) — moved here so a mobile-scoped override can actually
+     win the cascade; an inline style beats any external stylesheet rule
+     regardless of specificity, which is what made an earlier attempt at
+     tightening this at mobile silently no-op. Same --edge value as
+     before, so desktop's actual padding is unchanged by this move. */
+  padding: var(--space-3) var(--edge);
   border-bottom: none;
   position: relative; /* anchors .cuss-nav-links as a dropdown on mobile, see below */
 }
@@ -950,7 +956,11 @@ html { scroll-behavior: smooth; }
 @media (max-height: 500px) {
   .cuss-arena-inner { gap: var(--space-2); padding: var(--space-2) 20px; }
   .cuss-arena-motion { font-size: 16px; margin-bottom: 4px; }
-  .cuss-arena-transcript { min-height: 60px; gap: var(--space-2); }
+  /* Smaller cap than the 50vh default (see .cuss-arena-transcript above)
+     — on an already-short viewport (landscape phone), letting the
+     transcript claim half of it leaves too little room for the controls
+     below to fit without the whole arena needing its own outer scroll. */
+  .cuss-arena-transcript { min-height: 60px; max-height: 35vh; max-height: 35dvh; gap: var(--space-2); }
   .cuss-color-legend { padding: 0 2px 2px; }
 }
 /* Screen shake on penalty — a brief, decaying horizontal rattle when the
@@ -1035,7 +1045,20 @@ html { scroll-behavior: smooth; }
      between the HP bars and the "YOUR TURN" line — reverted so the
      transcript (empty or not) starts immediately below the HP bars with
      the same var(--space-4) rhythm as every other section here. */
-  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);
+  /* flex:0 1 auto (was flex:1) — sized to its OWN content instead of
+     "whatever's left in the column," capped at max-height instead of a
+     fixed pixel height. flex:1 was strictly capping this at the leftover
+     space after every other section's height, no matter how long a
+     message actually was — confirmed by measurement: a long AI reply's
+     scrollHeight reached 2046px while flex:1 held clientHeight at a flat
+     560px regardless, forcing an internal scroll on a normal-length
+     rebuttal even with room to spare elsewhere on screen. max-height
+     is deliberately generous (50dvh) so only a genuinely very long
+     message ever needs that internal scroll; .cuss-color-legend below
+     picks up the leftover space instead (margin-top:auto) so a short
+     transcript doesn't leave the composer floating mid-screen. */
+  flex: 0 1 auto; max-height: 50vh; max-height: 50dvh;
+  overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);
   padding-right: 4px; min-height: 120px; position: relative;
 }
 /* Reads as an active prompt, not passive filler copy — the "YOUR TURN"
@@ -1179,8 +1202,16 @@ html { scroll-behavior: smooth; }
 /* Color-legend key — visible from the start of every round (static, not
    tied to any round state) so new players learn the highlight system by
    reading it, not by losing Credibility first. Colors match the live
-   highlight classes exactly: .cuss-weak (filler), .cuss-vocab, .cuss-curse. */
-.cuss-color-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 0 2px 6px; }
+   highlight classes exactly: .cuss-weak (filler), .cuss-vocab, .cuss-curse.
+   margin-top:auto — this is the first ALWAYS-present (never [hidden])
+   sibling after .cuss-arena-transcript above, so with that transcript no
+   longer forcing itself to fill the column's leftover space (flex:0 1
+   auto instead of flex:1, see above), this is what soaks up any leftover
+   space instead — pushing the legend and everything after it (Judge when
+   visible, the Bag shelf, the input form) down to the bottom of the
+   arena as one group, rather than leaving the composer floating right
+   under a short transcript. */
+.cuss-color-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 0 2px 6px; margin-top: auto; }
 .cuss-legend-item {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11px; color: color-mix(in srgb, var(--color-text) 55%, transparent);
@@ -2232,7 +2263,13 @@ html { scroll-behavior: smooth; }
      each) — same visual language, compact footprint. min-height keeps
      the 44px touch-target floor without the desktop-scale horizontal
      padding/font-size that was making them so wide. */
-  .nav-cta { padding: 0 12px; min-height: 44px; font-size: 13px; }
+  .nav-cta { padding: 0 8px; min-height: 44px; font-size: 12.5px; }
+  /* The hamburger button added ~55px (its own width + gap) to this row
+     that the original nav-overflow fix never accounted for — closes the
+     resulting overflow at the narrowest real phone width (320px) by
+     tightening the row's own gap and horizontal padding specifically at
+     mobile, on top of the nav-cta padding/font trim above. */
+  .nav { gap: 6px; padding-left: var(--space-3); padding-right: var(--space-3); }
 }
 
 /* =========================================================================

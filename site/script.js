@@ -369,11 +369,30 @@
     }
   }
 
+  // Defensive floor under the AI's own Bag Evaluator judgment (see
+  // DEBATE_SYSTEM_PROMPT's "hold a high bar" instruction in
+  // api/_common.py) — a genuinely advanced word should never coincide
+  // with a word already on the app's own filler/curse/connective lists,
+  // so if the model ever slips and credits one anyway (a prompt-
+  // adherence miss, not a layout bug), this keeps it out of the Bag and
+  // off the Bag shelf entirely rather than shipping it to the player as
+  // a "word ×N" chip. Checked here, at the one shared choke point every
+  // Bag-crediting call site already funnels through, rather than at each
+  // call site separately.
+  function isKnownNonVocabWord(word) {
+    var w = String(word || '').trim().toLowerCase();
+    if (!w) return true;
+    return FILLER_WORDS.indexOf(w) !== -1 || FILLER_WORDS_LIGHT.indexOf(w) !== -1
+      || CURSE_WORDS.indexOf(w) !== -1 || CONNECTIVE_WORDS.indexOf(w) !== -1;
+  }
+
   // Thin wrapper so every Bag-crediting call site also refreshes the badge,
   // instead of each one remembering to call updateBagBadge() separately.
   function creditBagWords(words) {
     if (!words || !words.length) return;
-    recordBagWords(words);
+    var clean = words.filter(function (w) { return !isKnownNonVocabWord(w); });
+    if (!clean.length) return;
+    recordBagWords(clean);
     updateBagBadge();
   }
 
