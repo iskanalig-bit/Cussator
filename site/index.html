@@ -48,6 +48,39 @@
           <span>Every round keeps score.</span>
         </h1>
 
+        <!-- Mobile-only live-round preview (see .cuss-hero-preview,
+             hidden above the .cuss-hero-grid single-column breakpoint —
+             desktop already has this same idea via .cuss-demo in the
+             second column). Pure static sample content: no timer
+             actually ticks, no API call, no real game state — just a
+             miniature snapshot so a first-time mobile visitor can see
+             what a round looks like before tapping Chat. Dismissible;
+             see initHeroPreview() in script.js and the inline script
+             right after it, which hides this before first paint if the
+             visitor already dismissed it on a previous visit. -->
+        <div class="cuss-hero-preview" id="cuss-hero-preview">
+          <button type="button" class="cuss-hero-preview-close" id="cuss-hero-preview-close" aria-label="Dismiss preview">&times;</button>
+          <div class="cuss-demo-head">
+            <span class="cuss-live-dot"></span>
+            <span class="tag tag-outline">LIVE ROUND</span>
+            <span class="cuss-demo-timer">00:47</span>
+          </div>
+          <p class="cuss-demo-motion">Motion: &laquo;This House believes nuclear power is the fastest path to decarbonization.&raquo;</p>
+          <div class="cuss-ai-card is-visible">
+            <p class="cuss-ai-label">AI opponent rebuts</p>
+            <p class="cuss-ai-body">&laquo;Kind of the best&raquo; isn't a claim, it's a shrug. Name the alternative you're rejecting.</p>
+          </div>
+        </div>
+        <script>
+          (function () {
+            try {
+              if (localStorage.getItem('cussator_preview_dismissed') === 'true') {
+                document.getElementById('cuss-hero-preview').hidden = true;
+              }
+            } catch (e) {}
+          })();
+        </script>
+
         <div class="cuss-hero-actions">
           <div class="cuss-hero-cta-row">
             <button type="button" class="btn btn-primary cuss-cta-xl" id="cuss-start-hero">Chat</button>

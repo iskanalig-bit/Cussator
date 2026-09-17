@@ -3997,6 +3997,26 @@
     });
   }
 
+  // Mobile-only live-round preview card on the landing page — the
+  // inline script right after it in index.html already hides it before
+  // first paint if localStorage says it was dismissed on a previous
+  // visit; this only wires the close button for THIS visit. Purely
+  // decorative sample content — no timer, no API call, nothing here
+  // ever touches real game state.
+  function initHeroPreview() {
+    var card = document.getElementById('cuss-hero-preview');
+    var closeBtn = document.getElementById('cuss-hero-preview-close');
+    if (!card || !closeBtn) return;
+    closeBtn.addEventListener('click', function () {
+      card.classList.add('is-dismissing');
+      try { localStorage.setItem('cussator_preview_dismissed', 'true'); } catch (e) {
+        // localStorage unavailable — the card still closes for this
+        // visit via the class above, it just won't stay dismissed next time.
+      }
+      setTimeout(function () { card.hidden = true; }, 300); // matches the CSS transition duration
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initDemo();
     initArena();
@@ -4008,5 +4028,6 @@
     initHomepageStat();
     initWordOfDay();
     initNavMenu();
+    initHeroPreview();
   });
 })();

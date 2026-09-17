@@ -372,6 +372,27 @@ html { scroll-behavior: smooth; }
   font-family: var(--font-body);
   min-height: 100vh; min-height: 100dvh;
 }
+/* Desktop's ambient court-line texture (.cuss-hero-grid::before below) is
+   a single illustration sized to fill exactly the hero section's own
+   box — it doesn't tile, so it can't just be reused as-is for "extend
+   across the full scrollable page." This is a separate, small repeating
+   grid tile instead, added as its own background layer on the page
+   itself (so it naturally covers however tall the page's content makes
+   it, unlike a box-scoped background-size:100% 100% image) — same
+   opacity and line color as the desktop texture, same "faint grid"
+   character, just a repeatable pattern rather than one stretched scene.
+   Mobile-only (this breakpoint already matches .cuss-hero-grid's own
+   single-column collapse below): desktop keeps its existing hero-scoped
+   texture untouched rather than layering a second grid on top of it. */
+@media (max-width: 900px) {
+  .cuss-page {
+    background:
+      radial-gradient(1200px 720px at 82% -160px, color-mix(in srgb, var(--color-accent-900) 75%, transparent), transparent 60%),
+      radial-gradient(1100px 800px at -10% 100%, color-mix(in srgb, black 30%, transparent), transparent 55%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cpath d='M0 0H40M0 0V40' stroke='%23e9e9ed' stroke-width='1' fill='none' opacity='0.08'/%3E%3C/svg%3E") repeat,
+      var(--color-bg);
+  }
+}
 .cuss-wrap { max-width: 1200px; margin: 0 auto; padding: 0 var(--edge); }
 
 .cuss-nav a { text-decoration: none; font-size: 14px; }
@@ -456,17 +477,95 @@ html { scroll-behavior: smooth; }
   .cuss-hero-copy h1 { font-size: 24px; }
   /* Chat/Bag were two full .cuss-cta-xl buttons (26px vertical padding,
      24px text) wrapping onto their own lines under flex-wrap — read as
-     two stacked black tiles, not a button pair. Centered as a unit,
-     side by side, roughly half-width each, with padding/font-size cut
-     down to where they read as buttons again. */
+     two stacked black tiles, not a button pair. flex:1 1 0 (an earlier
+     pass) fixed the wrapping but stretched each button to fill half the
+     row edge to edge, which reads as left-aligned-and-stretched against
+     the hero text above it, not as a centered pair — flex:0 1 auto lets
+     them size to their own compact content instead, and
+     justify-content:center on the row centers that pair as a unit, with
+     equal margin on both sides. */
   .cuss-hero-actions { align-items: center; }
-  .cuss-hero-cta-row { flex-wrap: nowrap; width: 100%; }
-  .cuss-cta-xl { flex: 1 1 0; font-size: 15px; padding: 12px 8px; min-height: 44px; }
+  .cuss-hero-cta-row { flex-wrap: nowrap; justify-content: center; width: 100%; }
+  .cuss-cta-xl { flex: 0 1 auto; font-size: 15px; padding: 12px 20px; min-height: 44px; }
+}
+
+/* Mobile-only live-round preview card — hidden above the hero-grid's own
+   single-column collapse (max-width:900px, see .cuss-hero-grid below),
+   since desktop already shows this same idea via .cuss-demo in the
+   second column; showing both would be redundant. Reuses .cuss-demo's
+   own head/motion/.cuss-ai-card styling rather than inventing a new
+   look, just tightened and clamped to 2-3 lines. */
+.cuss-hero-preview { display: none; }
+@media (max-width: 900px) {
+  /* z-index:2 on the heading vs. 1 on the card below, plus the card's
+     own negative top margin, is what lets the card's top edge tuck just
+     behind the last line of the heading instead of starting with a full
+     gap under it — the heading still always wins any actual overlap. */
+  .cuss-hero-copy h1 { position: relative; z-index: 2; }
+  .cuss-hero-preview {
+    display: flex; flex-direction: column; gap: var(--space-2);
+    position: relative; z-index: 1;
+    margin: -14px 0 var(--space-4); max-height: 400px; overflow: hidden;
+    background: var(--color-surface); border: 1px solid var(--color-divider);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    padding: 26px var(--space-3) var(--space-3);
+    transition: max-height 300ms ease, opacity 200ms ease, margin 300ms ease, padding 300ms ease;
+  }
+  /* Author CSS beats the browser's own [hidden]{display:none} default
+     regardless of specificity (author always outranks the user-agent
+     origin) — without restating it explicitly here, setting
+     card.hidden = true (both the anti-flash inline script in index.html
+     and the dismiss handler in script.js) silently has no visual effect
+     once this rule's own display:flex applies. */
+  .cuss-hero-preview[hidden] { display: none; }
+  /* Clamped to keep this a genuine "2-3 lines + one short exchange"
+     preview rather than a full round view shrunk down — a longer motion
+     or AI line just gets an ellipsis instead of growing the card. */
+  .cuss-hero-preview .cuss-demo-motion {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .cuss-hero-preview .cuss-ai-card { padding: var(--space-2) var(--space-3); }
+  .cuss-hero-preview .cuss-ai-body {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    font-size: 13px;
+  }
+  /* 44x44 tappable area even though the × glyph itself is small —
+     absolutely positioned in the card's own top-right corner, inside the
+     padding reserved for it above. */
+  .cuss-hero-preview-close {
+    position: absolute; top: 0; right: 0; width: 44px; height: 44px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none;
+    color: color-mix(in srgb, var(--color-text) 55%, transparent);
+    font-size: 20px; line-height: 1; cursor: pointer;
+  }
+  .cuss-hero-preview-close:hover { color: var(--color-text); }
+  /* Dismiss animation — see initHeroPreview() in script.js, which adds
+     this class then waits for the transition above before setting
+     hidden. */
+  .cuss-hero-preview.is-dismissing {
+    max-height: 0; opacity: 0; margin-top: 0; margin-bottom: 0;
+    padding-top: 0; padding-bottom: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cuss-hero-preview { transition: none; }
 }
 
 .cuss-demo {
   background: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0;
+}
+/* Once .cuss-hero-grid collapses to one column (see max-width:900px
+   below), this would otherwise just stack below the hero copy as a
+   second, redundant "LIVE ROUND" widget under the new static
+   .cuss-hero-preview above it — hidden here in favor of that one.
+   Placed after the base rule above (equal specificity either way, so
+   source order decides) rather than inside the shared mobile media
+   query further down, which sits earlier in the file and would
+   otherwise silently lose this override to the rule above it. */
+@media (max-width: 900px) {
+  .cuss-demo { display: none; }
 }
 .cuss-demo-head { display: flex; align-items: center; gap: var(--space-2); }
 .cuss-demo-timer {
