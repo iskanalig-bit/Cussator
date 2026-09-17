@@ -506,11 +506,9 @@ html { scroll-behavior: smooth; }
      as a real health system (green/amber/red) rather than reusing the
      app's generic accent color for "full", matching is-hp-warning/
      is-hp-critical below as one continuous green->amber->red progression
-     instead of a purple->amber->red one. Both HP bars (You and Opponent)
-     share this same danger-based tiering now — see the removed
-     .cuss-hud-hp-fill-you/-opponent fixed-color overrides below; the two
-     bars are already distinguished by their labels and position, not by
-     a fixed color, so this can track actual danger instead of identity. */
+     instead of a purple->amber->red one. This is the shared base every
+     tier builds on; the HUD dual bars below layer a subtle per-side
+     identity tint on top of each tier rather than replacing this. */
   background: oklch(0.75 0.13 150); color: oklch(0.75 0.13 150);
   transition: width 0.5s cubic-bezier(.22,.61,.36,1), background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
   /* Ambient glow in whichever color the bar currently is (healthy green,
@@ -525,6 +523,47 @@ html { scroll-behavior: smooth; }
 .cuss-arena-health .cuss-judge-fill.is-warn { background: var(--color-warn); color: var(--color-warn); }
 .cuss-arena-health .cuss-judge-fill.is-hp-warning { background: oklch(0.78 0.16 80); color: oklch(0.78 0.16 80); }
 .cuss-arena-health .cuss-judge-fill.is-hp-critical { background: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25); }
+/* Per-side identity tint — distinguishes the two HUD bars by color again
+   without reintroducing the earlier fixed-color scheme: each tier
+   (healthy/warning/critical) keeps its own danger meaning, just blended
+   80/20 with that side's identity color instead of being pure danger
+   color on both bars. "You" leans toward the blue already used for the
+   Affirm avatar ring (.cuss-anchor-avatar.is-affirm); "Opponent" leans
+   toward the same red already used for the Negate ring AND for
+   is-hp-critical above — no new colors introduced for either side. Fixed
+   to You=blue-leaning/Opponent=red-leaning regardless of which stance
+   (affirm/negate) the player actually picked that round, since the HUD
+   bars are identified by role (You/Opponent), not by side. */
+.cuss-arena-health .cuss-hud-hp-you .cuss-judge-fill {
+  background: color-mix(in srgb, oklch(0.75 0.13 150) 80%, oklch(0.72 0.15 250) 20%);
+  color: color-mix(in srgb, oklch(0.75 0.13 150) 80%, oklch(0.72 0.15 250) 20%);
+}
+.cuss-arena-health .cuss-hud-hp-you .cuss-judge-fill.is-hp-warning {
+  background: color-mix(in srgb, oklch(0.78 0.16 80) 80%, oklch(0.72 0.15 250) 20%);
+  color: color-mix(in srgb, oklch(0.78 0.16 80) 80%, oklch(0.72 0.15 250) 20%);
+}
+.cuss-arena-health .cuss-hud-hp-you .cuss-judge-fill.is-hp-critical {
+  background: color-mix(in srgb, oklch(0.63 0.22 25) 80%, oklch(0.72 0.15 250) 20%);
+  color: color-mix(in srgb, oklch(0.63 0.22 25) 80%, oklch(0.72 0.15 250) 20%);
+}
+.cuss-arena-health .cuss-hud-hp-opponent .cuss-judge-fill {
+  background: color-mix(in srgb, oklch(0.75 0.13 150) 80%, oklch(0.63 0.22 25) 20%);
+  color: color-mix(in srgb, oklch(0.75 0.13 150) 80%, oklch(0.63 0.22 25) 20%);
+}
+.cuss-arena-health .cuss-hud-hp-opponent .cuss-judge-fill.is-hp-warning {
+  background: color-mix(in srgb, oklch(0.78 0.16 80) 80%, oklch(0.63 0.22 25) 20%);
+  color: color-mix(in srgb, oklch(0.78 0.16 80) 80%, oklch(0.63 0.22 25) 20%);
+}
+/* Opponent's identity red IS is-hp-critical's own red (oklch(0.63 0.22 25))
+   — blending that color with itself is a no-op — but this rule still has
+   to exist and win: the plain .cuss-hud-hp-opponent .cuss-judge-fill rule
+   above matches at every tier (nothing scopes it to "not critical") and
+   sits at equal specificity to the shared .is-hp-critical rule, so
+   without this it would silently override critical's red back to the
+   base green tint. */
+.cuss-arena-health .cuss-hud-hp-opponent .cuss-judge-fill.is-hp-critical {
+  background: oklch(0.63 0.22 25); color: oklch(0.63 0.22 25);
+}
 /* Trailing depletion streak — a second bar sitting behind the real fill
    (z-index:0 vs. the fill's 1) that snaps to the OLD width the instant HP
    drops, then eases down to the new width on a slower, slightly delayed
