@@ -3917,6 +3917,48 @@
     });
   }
 
+  // Mobile hamburger menu — collapses the secondary nav links (How it
+  // works/Features/Vocabulary Scars/Connector Log) into a dropdown below
+  // the header on narrow screens (see the max-width:640px rules on
+  // .cuss-nav-links in styles.css); at desktop widths .cuss-nav-links is
+  // just an inline row and this class never gets applied since the
+  // button that would toggle it is hidden. Same open/close/outside-
+  // click/Escape pattern as the Insert-from-Bag popover elsewhere in
+  // this file.
+  function initNavMenu() {
+    var menuBtn = document.getElementById('cuss-nav-menu-btn');
+    var navLinks = document.getElementById('cuss-nav-links');
+    if (!menuBtn || !navLinks) return;
+
+    function closeMenu() {
+      navLinks.classList.remove('is-open');
+      menuBtn.setAttribute('aria-expanded', 'false');
+    }
+    function openMenu() {
+      navLinks.classList.add('is-open');
+      menuBtn.setAttribute('aria-expanded', 'true');
+    }
+
+    menuBtn.addEventListener('click', function () {
+      if (navLinks.classList.contains('is-open')) closeMenu();
+      else openMenu();
+    });
+    // Closes as soon as a link is actually chosen, rather than leaving
+    // the dropdown open over whatever section/panel it just navigated to.
+    navLinks.addEventListener('click', function (e) {
+      if (e.target.tagName === 'A') closeMenu();
+    });
+    document.addEventListener('click', function (e) {
+      if (navLinks.classList.contains('is-open')
+        && !navLinks.contains(e.target) && e.target !== menuBtn && !menuBtn.contains(e.target)) {
+        closeMenu();
+      }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && navLinks.classList.contains('is-open')) closeMenu();
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initDemo();
     initArena();
@@ -3927,5 +3969,6 @@
     initBag();
     initHomepageStat();
     initWordOfDay();
+    initNavMenu();
   });
 })();

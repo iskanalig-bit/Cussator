@@ -254,6 +254,7 @@ textarea.input { min-height: 90px; resize: vertical; }
   flex-wrap: nowrap;
   padding: var(--space-3) var(--space-4);
   border-bottom: none;
+  position: relative; /* anchors .cuss-nav-links as a dropdown on mobile, see below */
 }
 /* Logo mark — sits immediately left of the wordmark, the nav's own
    gap (var(--space-4)) provides the spacing between the two. */
@@ -287,6 +288,14 @@ textarea.input { min-height: 90px; resize: vertical; }
    hero Chat button now, just at nav scale, so it still reads as visually
    secondary to it purely by size. */
 .nav-cta { flex: none; }
+/* Hamburger — hidden on desktop, where .cuss-nav-links is just an inline
+   row; shown only at the mobile breakpoint below, which is also where
+   .cuss-nav-links itself switches from "inline row" to "dropdown panel
+   toggled by this button" (see initNavMenu() in script.js). */
+.cuss-nav-menu-btn {
+  display: none; flex: none; color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
 
 /* — tables — */
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -432,6 +441,23 @@ html { scroll-behavior: smooth; }
 /* Bag is styled as Chat's exact twin now (same .btn-primary / .cuss-cta-xl
    classes in the HTML) — no separate Bag-specific look here anymore. */
 
+@media (max-width: 640px) {
+  /* h1 clamp()s down to a 36px floor and stops — tuned for desktop, where
+     the clamp's growth range matters; at phone width it never actually
+     reads as small. Straight override to roughly 65% of that floor so it
+     reads as a strong headline without wrapping to 3 lines and pushing
+     everything else below the fold. */
+  .cuss-hero-copy h1 { font-size: 24px; }
+  /* Chat/Bag were two full .cuss-cta-xl buttons (26px vertical padding,
+     24px text) wrapping onto their own lines under flex-wrap — read as
+     two stacked black tiles, not a button pair. Centered as a unit,
+     side by side, roughly half-width each, with padding/font-size cut
+     down to where they read as buttons again. */
+  .cuss-hero-actions { align-items: center; }
+  .cuss-hero-cta-row { flex-wrap: nowrap; width: 100%; }
+  .cuss-cta-xl { flex: 1 1 0; font-size: 15px; padding: 12px 8px; min-height: 44px; }
+}
+
 .cuss-demo {
   background: var(--color-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); min-width: 0;
@@ -550,33 +576,36 @@ html { scroll-behavior: smooth; }
 /* Per-side identity tint — distinguishes the two HUD bars by color again
    without reintroducing the earlier fixed-color scheme: each tier
    (healthy/warning/critical) keeps its own danger meaning, just blended
-   80/20 with that side's identity color instead of being pure danger
-   color on both bars. "You" leans toward the blue already used for the
-   Affirm avatar ring (.cuss-anchor-avatar.is-affirm); "Opponent" leans
-   toward the same red already used for the Negate ring AND for
-   is-hp-critical above — no new colors introduced for either side. Fixed
-   to You=blue-leaning/Opponent=red-leaning regardless of which stance
-   (affirm/negate) the player actually picked that round, since the HUD
-   bars are identified by role (You/Opponent), not by side. */
+   with that side's identity color instead of being pure danger color on
+   both bars. Bumped from an earlier 80/20 blend to 60/40 — 80/20 read as
+   basically plain green with only a faint cast, not clearly "blue-green"
+   vs "red-green" the way the avatar rings are unambiguously blue vs red.
+   "You" leans toward the blue already used for the Affirm avatar ring
+   (.cuss-anchor-avatar.is-affirm); "Opponent" leans toward the same red
+   already used for the Negate ring AND for is-hp-critical above — no new
+   colors introduced for either side. Fixed to You=blue-leaning/
+   Opponent=red-leaning regardless of which stance (affirm/negate) the
+   player actually picked that round, since the HUD bars are identified
+   by role (You/Opponent), not by side. */
 .cuss-arena-health .cuss-hud-hp-you .cuss-judge-fill {
-  background: color-mix(in srgb, oklch(0.75 0.13 150) 80%, oklch(0.72 0.15 250) 20%);
-  color: color-mix(in srgb, oklch(0.75 0.13 150) 80%, oklch(0.72 0.15 250) 20%);
+  background: color-mix(in srgb, oklch(0.75 0.13 150) 60%, oklch(0.72 0.15 250) 40%);
+  color: color-mix(in srgb, oklch(0.75 0.13 150) 60%, oklch(0.72 0.15 250) 40%);
 }
 .cuss-arena-health .cuss-hud-hp-you .cuss-judge-fill.is-hp-warning {
-  background: color-mix(in srgb, oklch(0.78 0.16 80) 80%, oklch(0.72 0.15 250) 20%);
-  color: color-mix(in srgb, oklch(0.78 0.16 80) 80%, oklch(0.72 0.15 250) 20%);
+  background: color-mix(in srgb, oklch(0.78 0.16 80) 60%, oklch(0.72 0.15 250) 40%);
+  color: color-mix(in srgb, oklch(0.78 0.16 80) 60%, oklch(0.72 0.15 250) 40%);
 }
 .cuss-arena-health .cuss-hud-hp-you .cuss-judge-fill.is-hp-critical {
-  background: color-mix(in srgb, oklch(0.63 0.22 25) 80%, oklch(0.72 0.15 250) 20%);
-  color: color-mix(in srgb, oklch(0.63 0.22 25) 80%, oklch(0.72 0.15 250) 20%);
+  background: color-mix(in srgb, oklch(0.63 0.22 25) 60%, oklch(0.72 0.15 250) 40%);
+  color: color-mix(in srgb, oklch(0.63 0.22 25) 60%, oklch(0.72 0.15 250) 40%);
 }
 .cuss-arena-health .cuss-hud-hp-opponent .cuss-judge-fill {
-  background: color-mix(in srgb, oklch(0.75 0.13 150) 80%, oklch(0.63 0.22 25) 20%);
-  color: color-mix(in srgb, oklch(0.75 0.13 150) 80%, oklch(0.63 0.22 25) 20%);
+  background: color-mix(in srgb, oklch(0.75 0.13 150) 60%, oklch(0.63 0.22 25) 40%);
+  color: color-mix(in srgb, oklch(0.75 0.13 150) 60%, oklch(0.63 0.22 25) 40%);
 }
 .cuss-arena-health .cuss-hud-hp-opponent .cuss-judge-fill.is-hp-warning {
-  background: color-mix(in srgb, oklch(0.78 0.16 80) 80%, oklch(0.63 0.22 25) 20%);
-  color: color-mix(in srgb, oklch(0.78 0.16 80) 80%, oklch(0.63 0.22 25) 20%);
+  background: color-mix(in srgb, oklch(0.78 0.16 80) 60%, oklch(0.63 0.22 25) 40%);
+  color: color-mix(in srgb, oklch(0.78 0.16 80) 60%, oklch(0.63 0.22 25) 40%);
 }
 /* Opponent's identity red IS is-hp-critical's own red (oklch(0.63 0.22 25))
    — blending that color with itself is a no-op — but this rule still has
@@ -1331,45 +1360,55 @@ html { scroll-behavior: smooth; }
    either. Scoped to this id, not the shared .cuss-highlight-wrap class,
    since Pitch mode deliberately wants its own composer to stretch and
    fill its form (see .cuss-pitch-form .cuss-highlight-wrap below). */
+/* Budget-aware gradient border via the standard double-background
+   technique — a transparent real `border` reserves the ring's width,
+   and two background layers clip to different boxes: the top layer
+   (solid black) clips to padding-box (i.e. stops at the inner edge of
+   the border), the bottom layer (the gradient) clips to border-box
+   (fills all the way to the outer edge) — so the gradient only shows
+   through in the actual border strip the top layer doesn't cover.
+   Replaces an earlier ::before pseudo-element with position:absolute;
+   inset:-2px; z-index:-1 — that approach silently broke the moment
+   backdrop-filter was added just below: backdrop-filter forces this
+   element to establish its own stacking context, and a negative-
+   z-index child of a stacking context still paints ABOVE that
+   context's own root background (CSS's painting order puts negative-
+   z-index descendants right after the root's background, not before
+   it) — so the "hidden behind an opaque body" assumption never actually
+   held once backdrop-filter was in the mix, and the full-size gradient
+   (inset:-2px covers essentially the whole card, not just a thin edge)
+   was visibly bleeding through as what looked like a solid tinted fill.
+   The double-background technique has no stacking context to fight —
+   it's one element's own background layers, ordered by CSS's well-
+   defined (unambiguous) background-layer painting rules instead.
+   Driven by updateInputBorderState() in script.js, called on every timer
+   tick and Word Economy change — tracks whichever of tokens-remaining /
+   time-remaining is more depleted (the "worse of the two", since running
+   out of either ends the turn). Safe state uses the app's own accent
+   purple (not the earlier Affirm blue) so it matches the send button and
+   Bag-insert button sitting right next to it; warning/critical stay the
+   existing amber/red — no new palette either way. */
 #cuss-arena-input-wrap {
   max-height: 160px; flex-shrink: 0;
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+  border-radius: 20px; border: 2px solid transparent;
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, transparent)) border-box;
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
     0 8px 24px color-mix(in srgb, black 30%, transparent);
-  transition: box-shadow 300ms ease;
+  transition: background 300ms ease, box-shadow 300ms ease;
 }
-/* Budget-aware gradient border — a ::before ring (inset:-2px, drawn behind
-   via z-index:-1) rather than a real `border`, so it can be a genuine
-   two-tone gradient with the container's own border-radius intact (a
-   plain `border-image` gradient ignores border-radius and would square
-   off these already-rounded corners). Driven by updateInputBorderState()
-   in script.js, called on every timer tick and Word Economy change —
-   tracks whichever of tokens-remaining / time-remaining is more depleted
-   (the "worse of the two", since running out of either ends the turn).
-   All three gradients share the same shape (90deg, two stops) specifically
-   so the `background` transition below actually animates smoothly between
-   them in evergreen browsers, instead of hard-cutting from one gradient to
-   another. Safe state uses the app's own accent purple (not the earlier
-   Affirm blue) specifically so it matches the send button and Bag-insert
-   button sitting right next to it in the same row — the mobile pass that
-   restyled the send button to a solid black/purple treatment made the
-   input's old blue safe-state read as a clashing, unrelated color right
-   beside it. Warning/critical stay the existing amber/red — no new
-   palette either way. */
-#cuss-arena-input-wrap::before {
-  content: "";
-  position: absolute; inset: -2px; z-index: -1; border-radius: inherit;
-  transition: background 300ms ease;
-  background: linear-gradient(90deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 55%, transparent));
+#cuss-arena-input-wrap.cuss-budget-warning {
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(90deg, var(--color-warn), color-mix(in srgb, var(--color-warn) 55%, transparent)) border-box;
 }
-#cuss-arena-input-wrap.cuss-budget-warning::before {
-  background: linear-gradient(90deg, var(--color-warn), color-mix(in srgb, var(--color-warn) 55%, transparent));
-}
-#cuss-arena-input-wrap.cuss-budget-critical::before {
-  background: linear-gradient(90deg, oklch(0.63 0.22 25), color-mix(in srgb, oklch(0.63 0.22 25) 55%, transparent));
+#cuss-arena-input-wrap.cuss-budget-critical {
+  background:
+    linear-gradient(var(--color-bg), var(--color-bg)) padding-box,
+    linear-gradient(90deg, oklch(0.63 0.22 25), color-mix(in srgb, oklch(0.63 0.22 25) 55%, transparent)) border-box;
 }
 /* Critical pulse — an INSET glow pulsing on the glass card itself (layered
    on top of its resting top-edge-highlight + drop-shadow, not replacing
@@ -2078,8 +2117,14 @@ html { scroll-behavior: smooth; }
 .cuss-trend-flat { color: color-mix(in srgb, var(--color-text) 60%, transparent); }
 
 @media (max-width: 640px) {
-  .cuss-arena-inner { padding: var(--space-3); }
-  .cuss-arena-form { flex-direction: column; align-items: stretch; gap: 6px; }
+  .cuss-arena-inner { padding: var(--space-3); gap: var(--space-2); }
+  /* Grid, not the earlier column-stack — keeps the Bag-insert button,
+     the input card, and the send button all on ONE row (standard chat-
+     input pattern: icon | flexible text field | send docked at the end)
+     instead of three separate full-width rows. The input card is the
+     only flexible column; the two icon buttons keep their own fixed
+     size on either side of it. */
+  .cuss-arena-form { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 6px; }
   .cuss-scars-inner { padding: var(--space-3); }
   .cuss-connector-log-inner { padding: var(--space-3); }
   .cuss-bag-inner { padding: var(--space-3); }
@@ -2092,10 +2137,61 @@ html { scroll-behavior: smooth; }
   /* Touch targets — every tappable control here should clear ~44x44px on
      mobile even where the visual element stays smaller, per WCAG/mobile
      guidance. Padding/min-size only; no visual restyle beyond size. */
-  .nav-cta { padding: 12px 10px; min-height: 44px; }
-  .cuss-send-btn { min-height: 44px; }
   .cuss-bag-insert-btn { width: 44px; height: 44px; }
   #cuss-arena-close { width: 44px; height: 44px; }
+  /* Send button becomes a compact square icon button on mobile instead
+     of the wider rectangular keycap — closer to a standard mobile
+     send-icon control, docked at the end of the input row above. Still
+     clears the 44px touch-target floor. */
+  .cuss-send-btn { width: 46px; height: 46px; min-height: 46px; }
+
+  /* General mobile scale-down — headings, badges, and the HP bar section
+     were all reusing desktop-scale type/spacing transplanted onto a
+     phone screen. Motion gets its own, smaller mobile size (the earlier
+     20px "headline" size was tuned for desktop, where there's room for
+     it — at mobile width the same size wrapped to 3-4 lines and
+     dominated the screen); everything else here is a straight reduction
+     of the same rule used at desktop. */
+  .cuss-arena-motion { font-size: 15px; line-height: 1.3; margin-bottom: 4px; }
+  .cuss-hud-hp-label { font-size: 10px; }
+  .cuss-arena-health .cuss-judge-val { font-size: 12px; }
+  .cuss-arena-health .cuss-judge-track { height: 8px; }
+  .cuss-hud-hp-row { gap: 8px; }
+  .tag { font-size: 10px; padding: 2px 8px; }
+  .cuss-arena-head-info, .cuss-arena-head-right { gap: 6px; }
+}
+
+/* ── Mobile nav: hamburger dropdown ──────────────────────────────────
+   .cuss-nav-links switches from "inline scrollable row" (desktop) to
+   "hidden by default, toggled open as a dropdown panel below the header"
+   — fixes "How it works" clipping mid-word, which happened because the
+   scrollable-row approach still rendered each link at full desktop
+   width/font-size with no room to show more than a fragment of the
+   first one. Chat/Bag (.cuss-nav-actions) are untouched by any of this —
+   they stay inline in the header at every width. */
+@media (max-width: 640px) {
+  .cuss-nav-menu-btn { display: inline-flex; width: 44px; height: 44px; }
+  .cuss-nav-links {
+    display: none;
+    position: absolute; top: 100%; left: 20px; right: 20px; z-index: 30;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    background: var(--color-surface); border: 1px solid var(--color-divider);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+    margin-top: 6px; padding: var(--space-2);
+    overflow-x: visible; /* override the desktop row's horizontal scroll */
+  }
+  .cuss-nav-links.is-open { display: flex; }
+  .cuss-nav-links a {
+    padding: 12px 10px; border-radius: var(--radius-sm);
+    white-space: normal; /* full label on its own row, nothing to clip */
+  }
+  .cuss-nav-links a:hover { background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
+  /* Item 2 of the mobile scale-down pass: Chat/Bag read as oversized
+     rounded-rect buttons at mobile scale (~a third of the screen width
+     each) — same visual language, compact footprint. min-height keeps
+     the 44px touch-target floor without the desktop-scale horizontal
+     padding/font-size that was making them so wide. */
+  .nav-cta { padding: 0 12px; min-height: 44px; font-size: 13px; }
 }
 
 /* =========================================================================

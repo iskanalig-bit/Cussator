@@ -16,17 +16,23 @@
   <nav class="nav cuss-nav" style="padding: var(--space-3) var(--edge);">
     <img src="cussator-mark.svg" alt="" class="nav-mark" width="45" height="34">
     <span class="nav-brand">Cussator</span>
-    <!-- Scrolls horizontally as one row instead of wrapping onto multiple
-         lines when it doesn't fit — see .cuss-nav-links in styles.css.
-         Chat/Bag stay outside this group, in .cuss-nav-actions, so they're
-         always visible as the header's primary actions regardless of how
-         narrow the screen is. -->
-    <div class="cuss-nav-links">
+    <!-- Desktop: a plain inline row (scrolls horizontally as a fallback if
+         it ever doesn't fit). Mobile (see the max-width:640px rules in
+         styles.css): hidden by default and repositioned into a dropdown
+         panel below the header, toggled open by .cuss-nav-menu-btn below
+         — a hamburger menu instead of trying to fit 4 labels inline,
+         which was clipping "How it works" mid-word. Chat/Bag stay outside
+         this group entirely, in .cuss-nav-actions, so they're always
+         visible as the header's primary actions either way. -->
+    <div class="cuss-nav-links" id="cuss-nav-links">
       <a href="#how">How it works</a>
       <a href="#features">Features</a>
       <a href="#" id="cuss-scars-link">Vocabulary Scars</a>
       <a href="#" id="cuss-connector-log-link">Connector Log</a>
     </div>
+    <button type="button" class="btn btn-icon cuss-nav-menu-btn" id="cuss-nav-menu-btn" aria-label="Open menu" aria-expanded="false" aria-controls="cuss-nav-links">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
     <div class="cuss-nav-actions">
       <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
       <button type="button" class="btn btn-primary nav-cta" id="cuss-bag-nav">Bag <span id="cuss-bag-nav-count">(0)</span></button>
