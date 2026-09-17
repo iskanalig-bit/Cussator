@@ -302,6 +302,12 @@
       <p class="cuss-ai-label">AI opponent is responding<span class="cuss-typing-dots"><span></span><span></span><span></span></span></p>
     </div>
 
+    <!-- Compact mode: each metric is one line (label + bar + score); the
+         explanatory sentence (.cuss-judge-hint) is hidden by default and
+         only shown per-metric via its .cuss-judge-info-btn ("i"), tapped
+         or clicked — see the delegated click handler on #cuss-arena-judge
+         in script.js. The label's title attribute still gives a plain
+         hover tooltip on desktop for free, same text, no extra code path. -->
     <div class="cuss-judge" id="cuss-arena-judge" hidden>
       <p class="cuss-judge-label">Judge</p>
       <p class="cuss-judge-note">Feedback only — these scores don't affect Credibility.</p>
@@ -310,24 +316,27 @@
           <span title="Reasoning structure — earns points for logical connectors, loses them for fillers and profanity.">Logic</span>
           <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-logic-fill"></div></div>
           <span class="cuss-judge-val" id="cuss-judge-logic-val">0</span>
+          <button type="button" class="cuss-judge-info-btn" aria-label="What does Logic measure?" aria-expanded="false">i</button>
         </div>
-        <p class="cuss-judge-hint">Reasoning structure — logical connectors help, fillers and profanity hurt.</p>
+        <p class="cuss-judge-hint" hidden>Reasoning structure — logical connectors help, fillers and profanity hurt.</p>
       </div>
       <div class="cuss-judge-item">
         <div class="cuss-judge-row">
           <span title="Specificity — earns points for advanced vocabulary, loses them for fillers and profanity.">Precision</span>
           <div class="cuss-judge-track"><div class="cuss-judge-fill is-warn" id="cuss-judge-precision-fill"></div></div>
           <span class="cuss-judge-val" id="cuss-judge-precision-val">0</span>
+          <button type="button" class="cuss-judge-info-btn" aria-label="What does Precision measure?" aria-expanded="false">i</button>
         </div>
-        <p class="cuss-judge-hint">Specificity — advanced vocabulary helps, fillers and profanity hurt.</p>
+        <p class="cuss-judge-hint" hidden>Specificity — advanced vocabulary helps, fillers and profanity hurt.</p>
       </div>
       <div class="cuss-judge-item">
         <div class="cuss-judge-row">
           <span title="Fluency — clean, confident phrasing; hurt by filler words and profanity.">Delivery</span>
           <div class="cuss-judge-track"><div class="cuss-judge-fill" id="cuss-judge-delivery-fill"></div></div>
           <span class="cuss-judge-val" id="cuss-judge-delivery-val">0</span>
+          <button type="button" class="cuss-judge-info-btn" aria-label="What does Delivery measure?" aria-expanded="false">i</button>
         </div>
-        <p class="cuss-judge-hint">Fluency — clean, confident phrasing; hurt by filler words and profanity.</p>
+        <p class="cuss-judge-hint" hidden>Fluency — clean, confident phrasing; hurt by filler words and profanity.</p>
       </div>
       <!-- Written explanation for the scores above — fetched once, at round
            end, from /api/judge-critique. The numbers themselves are never

@@ -525,7 +525,48 @@ html { scroll-behavior: smooth; }
    existing gap/padding alone for rhythm instead of a drawn line. */
 #cuss-arena-judge { border-top: none; }
 #cuss-arena-judge .cuss-judge-item { background-image: none; }
+/* Compact mode — the live arena panel was taking up as much room as the
+   chat transcript above it (label + full-width bar + score + an always-
+   visible explanatory sentence, three times over). Scoped to
+   #cuss-arena-judge specifically so the homepage demo widget's own
+   (simpler, hint-free) Judge display is untouched. Tighter gap between
+   metrics and near-zero per-item padding collapse the block down to
+   three snug rows; the explanatory sentence moves to .cuss-judge-hint,
+   hidden by default and toggled per metric by .cuss-judge-info-btn (see
+   the delegated click handler in script.js) instead of always rendering
+   as its own paragraph under every bar. */
+#cuss-arena-judge { gap: 0; }
+#cuss-arena-judge .cuss-judge-item, #cuss-arena-judge .cuss-judge-item:first-child { padding-top: 0; }
+#cuss-arena-judge .cuss-judge-label { margin: 0; font-size: 10px; line-height: 1.4; }
+#cuss-arena-judge .cuss-judge-row { line-height: 1.1; }
+/* Cut entirely rather than just shrunk — "Feedback only, doesn't affect
+   Credibility" isn't one of the three metrics the task requires staying
+   visible, and dropping it is most of the difference between landing at
+   the low end of the "1/3 to 1/2 of current height" target instead of
+   the high end. */
+#cuss-arena-judge .cuss-judge-note { display: none; }
 .cuss-judge-row { display: flex; align-items: center; gap: 8px; }
+/* Small circular "i" info toggle — same muted/accent-on-interaction
+   language as the rest of the app's icon buttons. Deliberately sized to
+   the row's own compact height (not the usual ~44px touch-target floor
+   elsewhere in this app) rather than padded up to it with a negative
+   margin: with zero gap between metric rows (see #cuss-arena-judge
+   above), a taller button pulled back with negative margin would bleed
+   into the row above/below it. A secondary, optional "learn more" toggle
+   inside an intentionally dense panel is a reasonable place to trade
+   tap-target size for not breaking the layout it's compacting. */
+.cuss-judge-info-btn {
+  flex: none; width: 16px; height: 16px; padding: 0;
+  border: 1px solid color-mix(in srgb, var(--color-text) 35%, transparent);
+  border-radius: 50%; background: transparent;
+  color: color-mix(in srgb, var(--color-text) 55%, transparent);
+  font-family: var(--font-heading); font-style: italic; font-weight: 700; font-size: 9px;
+  line-height: 1; cursor: pointer;
+}
+.cuss-judge-info-btn:hover, .cuss-judge-info-btn[aria-expanded="true"] {
+  border-color: var(--color-accent); color: var(--color-accent);
+}
+#cuss-arena-judge .cuss-judge-hint { margin: 2px 0 0 72px; }
 .cuss-judge-row span:first-child { font-size: 12px; width: 64px; flex: none; cursor: help; }
 .cuss-judge-track { flex: 1; height: 6px; border-radius: 99px; background: var(--color-neutral-800); overflow: hidden; }
 .cuss-judge-fill { height: 100%; width: 0%; background: var(--color-accent); transition: width 0.1s linear; }

@@ -1237,6 +1237,25 @@
     var judgeCritiqueEl = document.getElementById('cuss-judge-critique');
     var judgeCritiqueSummaryEl = document.getElementById('cuss-judge-critique-summary');
     var judgeCritiqueBreakdownEl = document.getElementById('cuss-judge-critique-breakdown');
+
+    // Compact Judge panel — each metric's explanatory sentence
+    // (.cuss-judge-hint) starts hidden (see index.html) and is toggled
+    // per metric by its own "i" button, tapped or clicked (a plain click
+    // handler fires for both, so this needs no separate touch path). One
+    // delegated listener on the panel itself rather than three identical
+    // ones on each button.
+    if (judgePanel) {
+      judgePanel.addEventListener('click', function (e) {
+        var btn = e.target.closest && e.target.closest('.cuss-judge-info-btn');
+        if (!btn) return;
+        var item = btn.closest('.cuss-judge-item');
+        var hint = item && item.querySelector('.cuss-judge-hint');
+        if (!hint) return;
+        var show = hint.hidden;
+        hint.hidden = !show;
+        btn.setAttribute('aria-expanded', String(show));
+      });
+    }
     var gameoverRestartBtn = document.getElementById('cuss-gameover-restart');
     var gameoverReportBtn = document.getElementById('cuss-gameover-report');
     var resultOverlay = document.getElementById('cuss-result-transition');
