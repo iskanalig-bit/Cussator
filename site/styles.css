@@ -781,21 +781,22 @@ html { scroll-behavior: smooth; }
 .cuss-arena.is-open { opacity: 1; pointer-events: auto; }
 .cuss-arena-inner {
   position: relative;
-  /* Centered "Focus Block" column, not full-bleed — everything (header,
-     motion, HP bars, transcript, input) reads as one tight vertical
-     stream down the middle of the screen instead of eyes jumping between
-     edge-anchored elements. Capped at a max-width (roughly Tailwind's
-     max-w-2xl) with generous side margins on wider screens so the empty
-     space around it is what makes the glass input card read as glass,
-     not a full-bleed panel; at mobile widths max-width simply exceeds the
-     viewport and this has no effect. */
-  width: 100%; max-width: 720px; margin: 0 auto; height: 100%; max-height: 100vh;
+  /* Full-width again, not the centered "Focus Block" column from the
+     glass redesign pass — that capped column read as too much empty
+     margin on wider screens for a dense in-round UI. Every section
+     (header, motion, HP bars, transcript, input) now shares the same
+     small, fixed side inset instead of a scaling/wide one — deliberately
+     NOT the marketing page's --edge token (clamp(20px, 5vw, 72px)),
+     which is tuned for spacious marketing sections and would reintroduce
+     large margins on wide screens; this is a flat 20px, same on every
+     viewport. */
+  width: 100%; height: 100%; max-height: 100vh;
   /* Same gap token as .cuss-arena-transcript's internal gap (see below) —
      one consistent rhythm the whole way down: head → motion → HP bars →
      transcript (→ avatar row → prompt) → legend → input. */
   display: flex; flex-direction: column; gap: var(--space-4);
   background: var(--color-bg); border-radius: 0; box-shadow: none;
-  padding: var(--space-4) var(--edge); overflow: hidden;
+  padding: var(--space-4) 20px; overflow: hidden;
 }
 /* Screen shake on penalty — a brief, decaying horizontal rattle when the
    player's own submitted argument lands a filler/curse hit (see
@@ -871,21 +872,17 @@ html { scroll-behavior: smooth; }
 }
 .cuss-arena-motion:focus-visible { outline: 1px solid var(--color-accent); outline-offset: 2px; border-radius: 2px; }
 .cuss-arena-transcript {
-  /* Top-aligned once there's real content, so messages stack down from the
-     HP bars the same way a normal chat thread grows, rather than
-     recentering under every new message. */
+  /* Top-aligned, always — including the pre-round empty state (see
+     .is-empty, toggled in resetRound()/addUserBubbleAnimated()). A
+     previous pass centered .is-empty's content in the available flex:1
+     space to avoid it reading as "stopped early," but that just moved the
+     dead air from below the prompt to above it, opening a visible gap
+     between the HP bars and the "YOUR TURN" line — reverted so the
+     transcript (empty or not) starts immediately below the HP bars with
+     the same var(--space-4) rhythm as every other section here. */
   flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-4);
   padding-right: 4px; min-height: 120px; position: relative;
 }
-/* The one exception: before anything's been said (see .is-empty, toggled
-   in resetRound()/addUserBubbleAnimated()), top-aligning the single
-   "YOUR TURN" prompt line left a large dead gap between it and the input
-   below — this centers just that pre-round empty state in the available
-   space instead, so it reads as a composed, intentional screen rather
-   than content that stopped early. Real transcript content is never
-   affected: the moment the first bubble lands, .is-empty comes off and
-   this stops applying. */
-.cuss-arena-transcript.is-empty { justify-content: center; }
 /* Reads as an active prompt, not passive filler copy — the "YOUR TURN"
    badge reuses the exact .tag.tag-outline styling the "LIVE ROUND" badge
    uses, so the two read as the same visual language. */
