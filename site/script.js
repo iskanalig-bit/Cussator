@@ -386,12 +386,21 @@
       || CURSE_WORDS.indexOf(w) !== -1 || CONNECTIVE_WORDS.indexOf(w) !== -1;
   }
 
+  // Words credited to the Bag during the current round, in first-seen order.
+  // Only feeds the guest sign-in card on the result screen (see
+  // renderGuestBagPrompt()); cleared by resetRound(). Purely a display list —
+  // it has no effect on scoring or on what gets saved to the Bag.
+  var roundVocabWords = [];
+
   // Thin wrapper so every Bag-crediting call site also refreshes the badge,
   // instead of each one remembering to call updateBagBadge() separately.
   function creditBagWords(words) {
     if (!words || !words.length) return;
     var clean = words.filter(function (w) { return !isKnownNonVocabWord(w); });
     if (!clean.length) return;
+    clean.forEach(function (w) {
+      if (roundVocabWords.indexOf(w) === -1) roundVocabWords.push(w);
+    });
     recordBagWords(clean);
     updateBagBadge();
   }
@@ -651,6 +660,16 @@
       .then(function () { pullInFlight = false; });
   }
 
+  // Guest sign-in UI (initSignInUI() below) — module-level so initBag() and the
+  // round-result code can reach it. Set by initAuth()/initSignInUI().
+  var startGoogleSignIn = function () {};
+  var signInDialogApi = null;
+
+  function isGuestWithSignIn() {
+    var c = document.body.classList;
+    return c.contains('auth-enabled') && !c.contains('signed-in');
+  }
+
   function initAuth() {
     var cfg = window.CUSSATOR_SUPABASE || {};
     var signInBtn = document.getElementById('cuss-signin-btn');
@@ -697,6 +716,10 @@
     signInBtn.hidden = false;
 
     function renderUser(user) {
+      // Drives the guest-only UI (lock icons, landing note, sign-in card) in
+      // CSS/JS; auth-enabled only appears once the first auth state is known.
+      document.body.classList.add('auth-enabled');
+      document.body.classList.toggle('signed-in', !!user);
       var meta = (user && user.user_metadata) || {};
       var label = meta.full_name || meta.name || (user && user.email) || '';
       signInBtn.hidden = !!user;
@@ -713,13 +736,20 @@
       }
     }
 
-    signInBtn.addEventListener('click', function () {
+    startGoogleSignIn = function () {
       // origin (not a hardcoded URL) so the same build works on cussator.com
       // and cussator.vercel.app; both must be in Supabase's Redirect URLs.
       sbClient.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: window.location.origin + window.location.pathname }
       });
+    };
+
+    // The nav button opens the sign-in dialog (whose Google button calls
+    // startGoogleSignIn()); without the dialog it goes straight to Google.
+    signInBtn.addEventListener('click', function () {
+      if (signInDialogApi) signInDialogApi.open();
+      else startGoogleSignIn();
     });
 
     signOutBtn.addEventListener('click', function () {
@@ -1756,6 +1786,9 @@
       if (stanceMotionText) stanceMotionText.textContent = MOTION;
 
       history = [];
+      roundVocabWords = [];
+      var bagPromptEl = document.getElementById('cuss-bag-prompt');
+      if (bagPromptEl) bagPromptEl.hidden = true;
       roundStats = { filler: 0, curse: 0, connective: 0, vocab: 0, words: 0, solid: 0, neutral: 0, bad: 0 };
       aiRoundStats = { filler: 0, curse: 0, connective: 0, vocab: 0 };
       roundFillerWords = {};
@@ -2059,6 +2092,9 @@
       // final "forwards" keyframe) until resetRound() (Rematch, or closing
       // and reopening the arena) clears it.
       resultStatsTimer = setTimeout(function () {
+        // Rendered here, not in endRound(): a self-KO credits its Bag words
+        // just after endRound() returns, and this runs well after that.
+        renderGuestBagPrompt();
         if (resultStats) resultStats.classList.add('is-visible');
       }, RESULT_STATS_REVEAL_DELAY);
     }
@@ -3601,7 +3637,13 @@
     }
 
     bagLinks.forEach(function (btn) {
-      if (btn) btn.addEventListener('click', function (e) { e.preventDefault(); openBag(); });
+      if (btn) btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        // Guests see a lock on Bag: open the sign-in dialog instead. Their
+        // words are still collected locally and merge in once they sign in.
+        if (isGuestWithSignIn() && signInDialogApi) { signInDialogApi.open(); return; }
+        openBag();
+      });
     });
     if (bagCloseBtn) bagCloseBtn.addEventListener('click', closeBag);
     bagEl.addEventListener('click', function (e) { if (e.target === bagEl) closeBag(); });
@@ -4380,6 +4422,98 @@
     });
   }
 
+  // Round-report card for guests: "N strong words from this round" with the
+  // words credited to the Bag this round. At most once per browser session
+  // (sessionStorage, with an in-memory fallback if storage is blocked), never
+  // for signed-in users, and only if there's at least one word to show.
+  var BAG_PROMPT_SEEN_KEY = 'cussatorBagPromptShown';
+  var bagPromptShownInMemory = false;
+
+  function renderGuestBagPrompt() {
+    var card = document.getElementById('cuss-bag-prompt');
+    var titleEl = document.getElementById('cuss-bag-prompt-title');
+    var wordsEl = document.getElementById('cuss-bag-prompt-words');
+    if (!card || !titleEl || !wordsEl) return;
+    card.hidden = true;
+    if (!isGuestWithSignIn() || !roundVocabWords.length || bagPromptShownInMemory) return;
+    try {
+      if (sessionStorage.getItem(BAG_PROMPT_SEEN_KEY)) return;
+      sessionStorage.setItem(BAG_PROMPT_SEEN_KEY, '1');
+    } catch (e) { /* storage blocked — the in-memory flag below still limits it to once per page load */ }
+    bagPromptShownInMemory = true;
+
+    var n = roundVocabWords.length;
+    titleEl.textContent = n + (n === 1 ? ' strong word' : ' strong words') + ' from this round';
+    wordsEl.innerHTML = '';
+    roundVocabWords.forEach(function (w) {
+      var chip = document.createElement('span');
+      chip.className = 'cuss-bag-prompt-word';
+      chip.textContent = w;
+      wordsEl.appendChild(chip);
+    });
+    card.hidden = false;
+  }
+
+  // Sign-in dialog + the round-report card's buttons. The Google buttons call
+  // startGoogleSignIn() (defined in initAuth()), so the OAuth call lives in
+  // one place. Closes with the X, Escape, a backdrop click or "Continue as guest".
+  function initSignInUI() {
+    var dialog = document.getElementById('cuss-signin-dialog');
+    if (!dialog) return;
+    var closeBtn = document.getElementById('cuss-signin-close');
+    var googleBtn = document.getElementById('cuss-signin-google');
+    var guestBtn = document.getElementById('cuss-signin-guest');
+    var promptSignIn = document.getElementById('cuss-bag-prompt-signin');
+    var promptLater = document.getElementById('cuss-bag-prompt-later');
+    var lastFocus = null;
+    var prevOverflow = '';
+
+    function isOpen() { return dialog.classList.contains('is-open'); }
+
+    function open() {
+      if (isOpen()) return;
+      lastFocus = document.activeElement;
+      prevOverflow = document.body.style.overflow;
+      dialog.classList.add('is-open');
+      dialog.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      if (googleBtn) googleBtn.focus();
+    }
+
+    function close() {
+      if (!isOpen()) return;
+      dialog.classList.remove('is-open');
+      dialog.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = prevOverflow;
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    signInDialogApi = { open: open, close: close };
+
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (guestBtn) guestBtn.addEventListener('click', close);
+    if (googleBtn) googleBtn.addEventListener('click', function () { startGoogleSignIn(); });
+    dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
+
+    document.addEventListener('keydown', function (e) {
+      if (!isOpen()) return;
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key !== 'Tab') return;
+      // Keep Tab inside the dialog while it's open.
+      var focusable = dialog.querySelectorAll('button, a[href]');
+      if (!focusable.length) return;
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+
+    if (promptSignIn) promptSignIn.addEventListener('click', function () { startGoogleSignIn(); });
+    if (promptLater) promptLater.addEventListener('click', function () {
+      var card = document.getElementById('cuss-bag-prompt');
+      if (card) card.hidden = true;
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     initDemo();
     initArena();
@@ -4392,6 +4526,7 @@
     initWordOfDay();
     initNavMenu();
     initHeroPreview();
+    initSignInUI();
     initAuth();
   });
 })();
