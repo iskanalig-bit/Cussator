@@ -480,6 +480,234 @@
     }
   }
 
+  // Optional Google sign-in (Supabase Auth) + cloud sync of the five
+  // localStorage stores above. Guests are unaffected: if the supabase-js CDN
+  // script or the config didn't load (or has no url/key yet), initAuth()
+  // bails out and the sign-in button stays hidden. Only the public anon key
+  // is ever used here; row level security on user_progress is what limits a
+  // user to their own row.
+  var sbClient = null;
+  var sbUser = null;
+
+  function readLocalProgress() {
+    return {
+      bag: loadBag(),
+      scars: loadVocabScars(),
+      connector_log: loadConnectorLog(),
+      bag_word_info: loadBagWordInfo(),
+      round_history: loadRoundHistory()
+    };
+  }
+
+  function writeLocalProgress(p) {
+    try {
+      localStorage.setItem(BAG_KEY, JSON.stringify(p.bag));
+      localStorage.setItem(VOCAB_SCARS_KEY, JSON.stringify(p.scars));
+      localStorage.setItem(CONNECTOR_LOG_KEY, JSON.stringify(p.connector_log));
+      localStorage.setItem(BAG_WORD_INFO_KEY, JSON.stringify(p.bag_word_info));
+      localStorage.setItem(ROUND_HISTORY_KEY, JSON.stringify(p.round_history));
+    } catch (e) {
+      // localStorage unavailable — the cloud copy is still saved below.
+    }
+  }
+
+  function clearLocalProgress() {
+    try {
+      [BAG_KEY, VOCAB_SCARS_KEY, CONNECTOR_LOG_KEY, BAG_WORD_INFO_KEY, ROUND_HISTORY_KEY]
+        .forEach(function (k) { localStorage.removeItem(k); });
+    } catch (e) { /* nothing to clear */ }
+  }
+
+  function asObject(v) {
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  }
+
+  // Union of words, higher count wins.
+  function mergeCounts(a, b) {
+    a = asObject(a); b = asObject(b);
+    var out = {};
+    [a, b].forEach(function (src) {
+      Object.keys(src).forEach(function (w) {
+        var n = Number(src[w]);
+        if (!isFinite(n)) return;
+        out[w] = Math.max(out[w] || 0, n);
+      });
+    });
+    return out;
+  }
+
+  // Union of words; on a clash the local entry wins.
+  function mergeWordInfo(remote, local) {
+    return Object.assign({}, asObject(remote), asObject(local));
+  }
+
+  // Round history is an ordered list of per-round totals with no ids, so it
+  // can't be unioned exactly. Identical -> keep; one is the tail of the
+  // other -> keep the longer; otherwise treat them as two devices' rounds and
+  // concatenate (cloud first), capped at ROUND_HISTORY_MAX.
+  function mergeHistory(remote, local) {
+    var r = Array.isArray(remote) ? remote.filter(isFinite) : [];
+    var l = Array.isArray(local) ? local : [];
+    var long = r.length >= l.length ? r : l;
+    var short = long === r ? l : r;
+    var tail = long.slice(long.length - short.length);
+    var merged = JSON.stringify(tail) === JSON.stringify(short) ? long : r.concat(l);
+    return merged.length > ROUND_HISTORY_MAX ? merged.slice(merged.length - ROUND_HISTORY_MAX) : merged;
+  }
+
+  function pushProgress(p) {
+    if (!sbClient || !sbUser) return Promise.resolve();
+    return sbClient.from('user_progress').upsert({
+      user_id: sbUser.id,
+      bag: p.bag,
+      scars: p.scars,
+      connector_log: p.connector_log,
+      bag_word_info: p.bag_word_info,
+      round_history: p.round_history,
+      updated_at: new Date().toISOString()
+    }).then(function (res) {
+      if (res && res.error) console.warn('Cussator: progress sync failed', res.error.message);
+    }, function (err) {
+      console.warn('Cussator: progress sync failed', err);
+    });
+  }
+
+  // Called after every finished round. No-op for guests.
+  function syncProgress() {
+    if (!sbClient || !sbUser) return Promise.resolve();
+    return pushProgress(readLocalProgress());
+  }
+
+  function loginMerge(user) {
+    return sbClient.from('user_progress').select('*').eq('user_id', user.id).maybeSingle()
+      .then(function (res) {
+        if (res.error) throw res.error;
+        var remote = res.data || {};
+        var local = readLocalProgress();
+        var merged = {
+          bag: mergeCounts(remote.bag, local.bag),
+          scars: mergeCounts(remote.scars, local.scars),
+          connector_log: mergeCounts(remote.connector_log, local.connector_log),
+          bag_word_info: mergeWordInfo(remote.bag_word_info, local.bag_word_info),
+          round_history: mergeHistory(remote.round_history, local.round_history)
+        };
+        writeLocalProgress(merged);
+        updateBagBadge();
+        initHomepageStat();
+        return pushProgress(merged);
+      })
+      .catch(function (err) {
+        // Leave local data untouched; the next finished round retries via syncProgress().
+        console.warn('Cussator: could not load saved progress', err && err.message ? err.message : err);
+      });
+  }
+
+  function initAuth() {
+    var cfg = window.CUSSATOR_SUPABASE || {};
+    var signInBtn = document.getElementById('cuss-signin-btn');
+    var chip = document.getElementById('cuss-user-chip');
+    if (!signInBtn || !chip) return;
+    if (!window.supabase || !window.supabase.createClient || !cfg.url || !cfg.anonKey) return;
+
+    try {
+      sbClient = window.supabase.createClient(cfg.url, cfg.anonKey);
+    } catch (e) {
+      sbClient = null;
+      return;
+    }
+
+    // TEMPORARY test hook: run cussatorSyncNow() in the browser console to
+    // push local progress to Supabase immediately and log what came back.
+    // Remove once sign-in sync is verified.
+    window.cussatorSyncNow = function () {
+      if (!sbUser) {
+        console.warn('[cussatorSyncNow] not signed in — nothing to sync');
+        return Promise.resolve(null);
+      }
+      var p = readLocalProgress();
+      console.log('[cussatorSyncNow] pushing for', sbUser.id, p);
+      return sbClient.from('user_progress').upsert({
+        user_id: sbUser.id,
+        bag: p.bag,
+        scars: p.scars,
+        connector_log: p.connector_log,
+        bag_word_info: p.bag_word_info,
+        round_history: p.round_history,
+        updated_at: new Date().toISOString()
+      }).select().then(function (res) {
+        if (res.error) console.error('[cussatorSyncNow] FAILED', res.error);
+        else console.log('[cussatorSyncNow] OK — row now in Supabase:', res.data && res.data[0]);
+        return res;
+      });
+    };
+
+    var avatarEl = document.getElementById('cuss-user-avatar');
+    var nameEl = document.getElementById('cuss-user-name');
+    var signOutBtn = document.getElementById('cuss-signout-btn');
+
+    signInBtn.hidden = false;
+
+    function renderUser(user) {
+      var meta = (user && user.user_metadata) || {};
+      var label = meta.full_name || meta.name || (user && user.email) || '';
+      signInBtn.hidden = !!user;
+      chip.hidden = !user;
+      if (!user) return;
+      nameEl.textContent = label;
+      nameEl.title = user.email || label;
+      if (meta.avatar_url) {
+        avatarEl.style.backgroundImage = 'url("' + String(meta.avatar_url).replace(/["\\\n\r]/g, '') + '")';
+        avatarEl.textContent = '';
+      } else {
+        avatarEl.style.backgroundImage = '';
+        avatarEl.textContent = (label.charAt(0) || '?').toUpperCase();
+      }
+    }
+
+    signInBtn.addEventListener('click', function () {
+      // origin (not a hardcoded URL) so the same build works on cussator.com
+      // and cussator.vercel.app; both must be in Supabase's Redirect URLs.
+      sbClient.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
+    });
+
+    signOutBtn.addEventListener('click', function () {
+      // Push the latest local state first so clearing it below can't lose anything.
+      signOutBtn.disabled = true;
+      syncProgress().then(function () { return sbClient.auth.signOut(); })
+        .then(function () { signOutBtn.disabled = false; });
+    });
+
+    sbClient.auth.onAuthStateChange(function (event, session) {
+      var user = session && session.user ? session.user : null;
+      if (user) {
+        renderUser(user);
+        // Supabase also fires SIGNED_IN on tab refocus — only merge for a new user.
+        if (!sbUser || sbUser.id !== user.id) {
+          sbUser = user;
+          // Deferred: supabase-js docs advise against awaiting other supabase
+          // calls inside this callback.
+          setTimeout(function () { loginMerge(user); }, 0);
+        } else {
+          sbUser = user;
+        }
+      } else if (event === 'SIGNED_OUT') {
+        var wasSignedIn = !!sbUser;
+        sbUser = null;
+        renderUser(null);
+        if (wasSignedIn) {
+          clearLocalProgress();
+          updateBagBadge();
+          initHomepageStat();
+        }
+      } else {
+        renderUser(null);
+      }
+    });
+  }
+
   // Curse / profanity — general-purpose swearing only, no slurs. -25 Credibility each.
   var CURSE_WORDS = [
     'damn', 'hell', 'crap', 'ass', 'asshole', 'bastard', 'bitch', 'bullshit', 'shit',
@@ -1694,6 +1922,7 @@
       recordRoundFillerCount(totalFillerThisRound);
       renderRoundTrend(totalFillerThisRound, priorHistory);
       renderFillerRecap();
+      syncProgress();
 
       playRoundResultTransition(playerWon);
       fetchJudgeCritique();
@@ -2782,6 +3011,39 @@
         hpHistory.push({ turnIndex: turnLog.length, health: health, aiHealth: aiHealth });
       }
 
+      // Everything this submit mutates before the AI has answered, captured
+      // so a failed request (see rollbackTurn() below) can undo the turn
+      // completely instead of charging the player for a reply they never got.
+      var turnSnapshot = {
+        health: health,
+        tokensUsed: tokensUsed,
+        historyLength: history.length,
+        roundStats: Object.assign({}, roundStats),
+        roundFillerWords: Object.assign({}, roundFillerWords),
+        scars: loadVocabScars(),
+        connectorLog: loadConnectorLog()
+      };
+
+      function rollbackTurn() {
+        setHealth(turnSnapshot.health);
+        tokensUsed = turnSnapshot.tokensUsed;
+        history.length = turnSnapshot.historyLength;
+        Object.keys(roundStats).forEach(function (k) { roundStats[k] = turnSnapshot.roundStats[k]; });
+        roundFillerWords = turnSnapshot.roundFillerWords;
+        try {
+          localStorage.setItem(VOCAB_SCARS_KEY, JSON.stringify(turnSnapshot.scars));
+          localStorage.setItem(CONNECTOR_LOG_KEY, JSON.stringify(turnSnapshot.connectorLog));
+        } catch (err) { /* localStorage unavailable — nothing was persisted to undo */ }
+        renderLiveScars();
+        // Hand the argument back so it can be resent as-is, and drop the
+        // bubble so a resend doesn't show it twice.
+        var bubbles = transcript.querySelectorAll('.cuss-bubble-user');
+        if (bubbles.length) bubbles[bubbles.length - 1].remove();
+        textarea.value = text;
+        renderHighlight();
+        checkTokenBudget();
+      }
+
       setHealth(health + analysis.delta);
       // Reserved for an actual interruption-level hit (the same
       // CUSSATOR_CONFIG.INTERRUPTION_THRESHOLD.fillerCount threshold
@@ -2865,16 +3127,17 @@
           typing.hidden = true;
           typing.classList.remove('is-visible');
           if (!result.ok) {
-            addError(result.data.error || 'Failed to get a response from the AI opponent.');
+            // No reply came back, so this turn never happened: HP, tokens,
+            // tallies and history are restored and the text is put back in
+            // the box. No Bag credit either — the resend will earn it.
+            rollbackTurn();
+            addError((result.data.error || 'Failed to get a response from the AI opponent.') +
+              " Your turn wasn't counted.");
             textarea.disabled = false;
             submitBtn.disabled = false;
             if (bagInsertBtn) bagInsertBtn.disabled = false;
             textarea.focus();
             startTurnTimer();
-            // The request failed outright, so there's no contextual read
-            // coming for this turn either — same fallback as the self-KO
-            // path above, rather than losing the credit to a network blip.
-            creditBagWords(analysis.vocabWordsUsed);
             return;
           }
 
@@ -4070,5 +4333,6 @@
     initWordOfDay();
     initNavMenu();
     initHeroPreview();
+    initAuth();
   });
 })();

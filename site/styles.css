@@ -294,6 +294,22 @@ textarea.input { min-height: 90px; resize: vertical; }
    hero Chat button now, just at nav scale, so it still reads as visually
    secondary to it purely by size. */
 .nav-cta { flex: none; }
+/* Optional Google sign-in (see initAuth() in script.js). [hidden] must win
+   over the display values below, hence the explicit rules. */
+.cuss-signin-btn[hidden], .cuss-user-chip[hidden] { display: none; }
+.cuss-user-chip { display: flex; align-items: center; gap: 6px; flex: none; min-width: 0; }
+.cuss-user-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent) center / cover no-repeat;
+  font-size: 13px; font-weight: 600;
+}
+.cuss-user-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.cuss-signout-btn {
+  background: none; border: 0; padding: 12px 4px; cursor: pointer;
+  color: inherit; font: inherit; font-size: 12.5px; opacity: .7; text-decoration: underline;
+}
+.cuss-signout-btn:hover { opacity: 1; }
 /* Hamburger — hidden on desktop, where .cuss-nav-links is just an inline
    row; shown only at the mobile breakpoint below, which is also where
    .cuss-nav-links itself switches from "inline row" to "dropdown panel
@@ -2391,6 +2407,8 @@ html { scroll-behavior: smooth; }
      the 44px touch-target floor without the desktop-scale horizontal
      padding/font-size that was making them so wide. */
   .nav-cta { padding: 0 8px; min-height: 44px; font-size: 12.5px; }
+  /* Signed-in chip: avatar + Sign out only, the name won't fit at 320px. */
+  .cuss-user-name { display: none; }
   /* The hamburger button added ~55px (its own width + gap) to this row
      that the original nav-overflow fix never accounted for — closes the
      resulting overflow at the narrowest real phone width (320px) by

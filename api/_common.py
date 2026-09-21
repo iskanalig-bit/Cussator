@@ -14,12 +14,53 @@ site/.env before this module is used.
 
 import os
 import random
+import time
 
 import anthropic
 from openai import OpenAI
 from supabase import create_client
 
 from _cussator_config import REBUTTAL_WORD_CAP
+
+
+# Overloaded (529) retries: three retries after the first attempt, waiting
+# 1s, 2s, then 4s. The SDK's own retrying is switched off (max_retries=0) so
+# the two don't stack. Note this adds up to 7s of sleeping to the request, so
+# the serverless function's max duration must comfortably exceed that plus
+# one model call.
+CLAUDE_OVERLOAD_RETRY_DELAYS = (1, 2, 4)
+BUSY_MESSAGE = "The opponent is busy, try again."
+
+
+def _is_overloaded(e):
+    return e.status_code == 529 or (
+        isinstance(e, anthropic.InternalServerError) and "overloaded" in str(e.message).lower()
+    )
+
+
+def _client():
+    client = anthropic.Anthropic(max_retries=0)
+    create = client.messages.create
+
+    def create_with_retry(*args, **kwargs):
+        for delay in CLAUDE_OVERLOAD_RETRY_DELAYS:
+            try:
+                return create(*args, **kwargs)
+            except anthropic.APIStatusError as e:
+                if not _is_overloaded(e):
+                    raise
+                time.sleep(delay)
+        return create(*args, **kwargs)  # final attempt: let any error propagate
+
+    client.messages.create = create_with_retry
+    return client
+
+
+def _api_status_error(e):
+    """Map an APIStatusError (raised only after retries are exhausted) to a response."""
+    if _is_overloaded(e):
+        return 503, {"error": BUSY_MESSAGE, "busy": True}
+    return 500, {"error": f"Claude API error: {e.message}"}
 
 EMBEDDING_MODEL = "text-embedding-3-small"
 MATCH_COUNT = 5
@@ -426,7 +467,7 @@ def debate_reply(body):
                 interruption_phrase = max(candidates, key=len)
 
     try:
-        client = anthropic.Anthropic()
+        client = _client()
         response = client.messages.create(
             model="claude-opus-5",
             max_tokens=400,
@@ -491,7 +532,7 @@ def debate_reply(body):
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
     except anthropic.APIStatusError as e:
-        return 500, {"error": f"Claude API error: {e.message}"}
+        return _api_status_error(e)
     except Exception as e:
         return 500, {"error": f"Server error: {e}"}
 
@@ -514,7 +555,7 @@ def simplify_reply(body):
         return 500, {"error": "ANTHROPIC_API_KEY is not set."}
 
     try:
-        client = anthropic.Anthropic()
+        client = _client()
         response = client.messages.create(
             model="claude-opus-5",
             max_tokens=300,
@@ -527,7 +568,7 @@ def simplify_reply(body):
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
     except anthropic.APIStatusError as e:
-        return 500, {"error": f"Claude API error: {e.message}"}
+        return _api_status_error(e)
     except Exception as e:
         return 500, {"error": f"Server error: {e}"}
 
@@ -594,7 +635,7 @@ def pitch_review(body):
     user_stance = "FOR the motion (Prop)" if side == "affirm" else "AGAINST the motion (Opp)"
 
     try:
-        client = anthropic.Anthropic()
+        client = _client()
         response = client.messages.create(
             model="claude-opus-5",
             max_tokens=250,
@@ -617,7 +658,7 @@ def pitch_review(body):
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
     except anthropic.APIStatusError as e:
-        return 500, {"error": f"Claude API error: {e.message}"}
+        return _api_status_error(e)
     except Exception as e:
         return 500, {"error": f"Server error: {e}"}
 
@@ -692,7 +733,7 @@ def judge_critique(body):
     transcript = "\n".join("Turn %d: %s" % (i + 1, t) for i, t in enumerate(turn_texts))
 
     try:
-        client = anthropic.Anthropic()
+        client = _client()
         response = client.messages.create(
             model="claude-opus-5",
             max_tokens=400,
@@ -714,7 +755,7 @@ def judge_critique(body):
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
     except anthropic.APIStatusError as e:
-        return 500, {"error": f"Claude API error: {e.message}"}
+        return _api_status_error(e)
     except Exception as e:
         return 500, {"error": f"Server error: {e}"}
 
@@ -764,7 +805,7 @@ def support_reply(body):
         messages = _history_messages(body.get("history", []))
         messages.append({"role": "user", "content": user_turn})
 
-        client = anthropic.Anthropic()
+        client = _client()
         response = client.messages.create(
             model="claude-opus-5",
             max_tokens=500,
@@ -778,6 +819,6 @@ def support_reply(body):
     except anthropic.AuthenticationError:
         return 500, {"error": "Invalid ANTHROPIC_API_KEY."}
     except anthropic.APIStatusError as e:
-        return 500, {"error": f"Claude API error: {e.message}"}
+        return _api_status_error(e)
     except Exception as e:
         return 500, {"error": f"Server error: {e}"}
