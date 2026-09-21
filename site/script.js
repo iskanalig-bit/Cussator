@@ -572,17 +572,62 @@
     });
   }
 
-  // Called after every finished round. No-op for guests.
+  // Plain push of local state (no pull). Used where merging first isn't wanted:
+  // the sign-out flush and the console test hook.
   function syncProgress() {
     if (!sbClient || !sbUser) return Promise.resolve();
     return pushProgress(readLocalProgress());
   }
 
-  function loginMerge(user) {
+  // Set by initArena() once it exists; true from the moment a side is picked
+  // until the round ends. Pulls never touch local data or the UI in between.
+  var arenaRoundActive = function () { return false; };
+
+  var PULL_MIN_INTERVAL_MS = 30000; // focus-triggered pulls: at most once per 30s
+  var pullInFlight = false;
+  var pendingPull = false;
+  var lastPullAt = 0;
+
+  // Key-order-insensitive: Postgres jsonb doesn't preserve object key order.
+  function deepEqual(a, b) {
+    if (a === b) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    var ka = Object.keys(a), kb = Object.keys(b);
+    if (ka.length !== kb.length) return false;
+    return ka.every(function (k) { return deepEqual(a[k], b[k]); });
+  }
+
+  // The one place progress is pulled from Supabase: read the row, merge with
+  // local (same merge as sign-in), save locally, and push back only if the
+  // merged result differs from what the cloud already had. reason is one of
+  // 'login' (session found / signed in), 'focus', 'round-end'. No-op for guests.
+  function pullAndMerge(reason) {
+    if (!sbClient || !sbUser) return Promise.resolve();
+    if (arenaRoundActive()) { pendingPull = true; return Promise.resolve(); }
+    if (pullInFlight) return Promise.resolve();
+    if (reason === 'focus' && !pendingPull && Date.now() - lastPullAt < PULL_MIN_INTERVAL_MS) {
+      return Promise.resolve();
+    }
+    pullInFlight = true;
+    pendingPull = false;
+    lastPullAt = Date.now();
+    var user = sbUser;
     return sbClient.from('user_progress').select('*').eq('user_id', user.id).maybeSingle()
       .then(function (res) {
         if (res.error) throw res.error;
-        var remote = res.data || {};
+        // Signed out, switched user, or a round started while we waited:
+        // drop the result rather than writing/re-rendering under them.
+        if (!sbUser || sbUser.id !== user.id) return;
+        if (arenaRoundActive()) { pendingPull = true; return; }
+        var row = res.data || {};
+        var remote = {
+          bag: asObject(row.bag),
+          scars: asObject(row.scars),
+          connector_log: asObject(row.connector_log),
+          bag_word_info: asObject(row.bag_word_info),
+          round_history: Array.isArray(row.round_history) ? row.round_history : []
+        };
         var local = readLocalProgress();
         var merged = {
           bag: mergeCounts(remote.bag, local.bag),
@@ -591,15 +636,19 @@
           bag_word_info: mergeWordInfo(remote.bag_word_info, local.bag_word_info),
           round_history: mergeHistory(remote.round_history, local.round_history)
         };
-        writeLocalProgress(merged);
-        updateBagBadge();
-        initHomepageStat();
-        return pushProgress(merged);
+        if (!deepEqual(merged, local)) {
+          writeLocalProgress(merged);
+          updateBagBadge();
+          initHomepageStat();
+        }
+        if (!res.data || !deepEqual(merged, remote)) return pushProgress(merged);
       })
       .catch(function (err) {
-        // Leave local data untouched; the next finished round retries via syncProgress().
         console.warn('Cussator: could not load saved progress', err && err.message ? err.message : err);
-      });
+        // A finished round's data must still reach the cloud if the pull failed.
+        if (reason === 'round-end') return pushProgress(readLocalProgress());
+      })
+      .then(function () { pullInFlight = false; });
   }
 
   function initAuth() {
@@ -680,6 +729,15 @@
         .then(function () { signOutBtn.disabled = false; });
     });
 
+    // Pick up progress saved from another device/domain when the tab comes
+    // back into view (throttled inside pullAndMerge).
+    function onWake() {
+      if (document.visibilityState === 'hidden') return;
+      pullAndMerge('focus');
+    }
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+
     sbClient.auth.onAuthStateChange(function (event, session) {
       var user = session && session.user ? session.user : null;
       if (user) {
@@ -689,7 +747,7 @@
           sbUser = user;
           // Deferred: supabase-js docs advise against awaiting other supabase
           // calls inside this callback.
-          setTimeout(function () { loginMerge(user); }, 0);
+          setTimeout(function () { pullAndMerge('login'); }, 0);
         } else {
           sbUser = user;
         }
@@ -1605,6 +1663,7 @@
     var resultLineTimer = null;
     var resultStatsTimer = null;
     var playerSide = null;
+    arenaRoundActive = function () { return !!playerSide && !roundOver; };
     var difficulty = 'delegate';
     var turnTimer = null;
     var turnSecondsLeft = getTurnDurationSeconds();
@@ -1922,7 +1981,7 @@
       recordRoundFillerCount(totalFillerThisRound);
       renderRoundTrend(totalFillerThisRound, priorHistory);
       renderFillerRecap();
-      syncProgress();
+      pullAndMerge('round-end');
 
       playRoundResultTransition(playerWon);
       fetchJudgeCritique();
