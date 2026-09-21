@@ -24,35 +24,39 @@
   <div class="cuss-wrap">
     <section class="cuss-legal">
       <h1>Privacy Policy</h1>
-      <p class="cuss-legal-updated">Last updated: August 29, 2026</p>
+      <p class="cuss-legal-updated">Last updated: September 21, 2026</p>
 
       <p>This page explains what information Cussator actually collects and how it's used. Cussator is a small, independently built project — this is meant to be a plain, accurate description of what happens, not a generic template.</p>
 
-      <h2>No accounts, no sign-up</h2>
-      <p>You don't need to create an account, sign in, or provide your name or email to use Cussator.</p>
+      <h2>Accounts are optional</h2>
+      <p>You don't need an account to use Cussator. You can play every round as a guest, without signing in or giving us your name or email. If you'd like your progress to follow you between devices, you can optionally sign in with Google — see "Optional Google sign-in" below.</p>
 
       <h2>What gets sent to run a round</h2>
       <p>When you submit an argument during a round, the text you typed, the debate motion, and the recent conversation history for that round are sent to Anthropic — the provider of the AI model Cussator uses — in order to generate the AI opponent's reply and judge your turn. This happens each time you submit an argument. We don't store this text on our own servers; it's used only to generate that round's response, and Anthropic processes it under its own privacy and data-use terms.</p>
 
       <h2>What's stored in your browser</h2>
-      <p>Two small pieces of data are saved locally in your browser using localStorage, so they persist between rounds and visits:</p>
+      <p>Some small pieces of data are saved locally in your browser using localStorage, so they persist between rounds and visits:</p>
       <ul>
         <li><strong>Vocabulary Scars</strong> — a running tally of filler words you've used across rounds, so repeated ones get called out.</li>
+        <li><strong>Bag</strong> — a tally of the strong vocabulary you've landed in an argument, plus the definitions of any words the AI found.</li>
+        <li><strong>Connector Log</strong> — a tally of the logical connectors you've used.</li>
         <li><strong>Round history</strong> — the filler-word count from your last several rounds, used to show your own trend and the homepage's "improvement" stat.</li>
       </ul>
-      <p>Along with your Bag and Connector Log tallies, this data lives in your own browser. If you play as a guest, it isn't sent to us, isn't tied to any account, and disappears if you clear your browser's site data for Cussator. We don't have access to it.</p>
+      <p>If you play as a guest, this data stays in your own browser. It isn't sent to us, isn't tied to any account, and disappears if you clear your browser's site data for Cussator. We don't have access to it.</p>
 
       <h2>Optional Google sign-in</h2>
-      <p>You can optionally sign in with Google. Signing in is never required to play. If you do, Cussator (through Supabase, our authentication and database provider) receives your Google account's name, email address and profile picture, and stores your Bag, Vocabulary Scars, Connector Log and round history against your account, so your progress follows you between devices. Only you can read or change that stored progress. Signing out removes this data from the browser you signed out on; your saved copy stays in your account.</p>
+      <p>Signing in with Google is entirely optional. If you choose to, Cussator uses Supabase, our authentication and database provider, to sign you in. Supabase receives the name, email address and profile picture from your Google account.</p>
+      <p>While you're signed in, your Bag, Vocabulary Scars and Connector Log (together with the word definitions and round history that go with them) are saved to Supabase and linked to your account, so your progress follows you between devices. Only you can read or change your saved progress. When you sign in, it's merged with whatever is already in your browser, and it's saved again after each round. Signing out removes this data from the browser you signed out on; your saved copy stays in your account.</p>
+      <p><strong>Deleting your data:</strong> email <a href="mailto:cussator.app@gmail.com">cussator.app@gmail.com</a> from the address on your account and we'll delete your account and everything saved to it.</p>
 
       <h2>Standard hosting logs</h2>
       <p>Cussator is hosted on Vercel. Like most web hosts, Vercel's infrastructure may automatically log basic technical information (such as IP address and request timestamps) as part of normal operation. We don't use this for tracking, profiling, or analytics.</p>
 
       <h2>No cookies, no analytics, no ads</h2>
-      <p>Cussator does not use cookies, analytics scripts, advertising, or third-party trackers.</p>
+      <p>Cussator does not use cookies, analytics scripts, advertising, or third-party trackers. If you sign in, your sign-in session is kept in your browser's localStorage so you stay signed in; it's removed when you sign out.</p>
 
       <h2>No selling or sharing data</h2>
-      <p>We don't sell your data, and we don't share it with third parties for marketing. The only third party involved in running the app is Anthropic, for the reason described above.</p>
+      <p>We don't sell your data, and we don't share it with third parties for marketing. The third parties involved in running the app are Anthropic (to generate the AI's replies, as described above) and, only if you choose to sign in, Google (to sign you in) and Supabase (to store your account and progress).</p>
 
       <h2>Children's privacy</h2>
       <p>Cussator is not directed at children under 13, and we don't knowingly collect personal information from children.</p>
