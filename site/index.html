@@ -41,9 +41,15 @@
         Sign in
       </button>
       <div class="cuss-user-chip" id="cuss-user-chip" hidden>
-        <span class="cuss-user-avatar" id="cuss-user-avatar" aria-hidden="true"></span>
-        <span class="cuss-user-name" id="cuss-user-name"></span>
-        <button type="button" class="cuss-signout-btn" id="cuss-signout-btn">Sign out</button>
+        <button type="button" class="cuss-user-trigger" id="cuss-user-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="cuss-user-menu">
+          <span class="cuss-user-avatar" id="cuss-user-avatar" aria-hidden="true"></span>
+          <span class="cuss-user-name" id="cuss-user-name"></span>
+          <svg class="cuss-user-caret" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="cuss-user-menu" id="cuss-user-menu" role="menu" hidden>
+          <button type="button" class="cuss-user-menu-item" id="cuss-nick-change-btn" role="menuitem">Set nickname</button>
+          <button type="button" class="cuss-user-menu-item" id="cuss-signout-btn" role="menuitem">Sign out</button>
+        </div>
       </div>
       <button type="button" class="btn btn-primary nav-cta" id="cuss-start-nav">Chat</button>
       <button type="button" class="btn btn-primary nav-cta" id="cuss-bag-nav"><svg class="cuss-lock" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Bag <span id="cuss-bag-nav-count">(0)</span></button>
@@ -704,6 +710,22 @@
     <div class="cuss-signin-or"><span>or</span></div>
     <button type="button" class="btn btn-secondary cuss-signin-guest" id="cuss-signin-guest">Continue as guest</button>
     <p class="cuss-signin-foot">Guests can play every round. Your Bag needs an account.<br><a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a></p>
+  </div>
+</div>
+
+<!-- Nickname dialog: shown after sign-in when the user has no profile yet
+     (skippable), and from the user menu's "Change nickname". See
+     initNicknameUI() in script.js. -->
+<div class="cuss-signin-dialog" id="cuss-nick-dialog" role="dialog" aria-modal="true" aria-labelledby="cuss-nick-title" aria-hidden="true">
+  <div class="cuss-signin-card">
+    <button type="button" class="btn btn-icon cuss-signin-close" id="cuss-nick-close" aria-label="Close">✕</button>
+    <span class="cuss-signin-logo"><img src="cussator-mark.svg" alt="" width="30" height="23"></span>
+    <h2 class="cuss-signin-title" id="cuss-nick-title">Choose your nickname</h2>
+    <label class="cuss-nick-label" for="cuss-nick-input">Nickname</label>
+    <input type="text" class="cuss-nick-input" id="cuss-nick-input" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="cuss-nick-status cuss-nick-hint">
+    <p class="cuss-nick-status" id="cuss-nick-status" aria-live="polite"></p>
+    <p class="cuss-nick-hint" id="cuss-nick-hint">Pick a name that isn't your real name. 3–16 letters, numbers or underscores.</p>
+    <button type="button" class="btn cuss-nick-save" id="cuss-nick-save" disabled>Save</button>
   </div>
 </div>
 

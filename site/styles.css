@@ -305,18 +305,58 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-size: 13px; font-weight: 600;
 }
 .cuss-user-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.cuss-signout-btn {
-  background: none; border: 0; padding: 12px 4px; cursor: pointer;
-  color: inherit; font: inherit; font-size: 12.5px; opacity: .7; text-decoration: underline;
+/* User chip = a menu trigger (avatar + nickname) with a small dropdown:
+   Set/Change nickname and Sign out. See initNicknameUI() in script.js. */
+.cuss-user-chip { position: relative; }
+.cuss-user-trigger {
+  display: flex; align-items: center; gap: 6px; min-width: 0;
+  background: none; border: 0; padding: 4px 6px; border-radius: var(--radius-md);
+  color: inherit; font: inherit; cursor: pointer;
 }
-.cuss-signout-btn:hover { opacity: 1; }
+.cuss-user-trigger:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.cuss-user-caret { flex: none; opacity: 0.6; }
+.cuss-user-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 200; min-width: 180px;
+  display: flex; flex-direction: column; padding: 4px;
+  background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.cuss-user-menu[hidden] { display: none; }
+.cuss-user-menu-item {
+  background: none; border: 0; text-align: left; cursor: pointer;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  color: inherit; font: inherit; font-size: 14px;
+}
+.cuss-user-menu-item:hover { background: color-mix(in srgb, var(--color-text) 9%, transparent); }
+.cuss-user-menu-item:disabled { opacity: 0.5; cursor: default; }
+
+/* Nickname dialog fields (the dialog itself reuses .cuss-signin-dialog/-card). */
+.cuss-nick-label { font-size: 13px; color: color-mix(in srgb, var(--color-text) 65%, transparent); margin-bottom: calc(-1 * var(--space-2)); }
+.cuss-nick-input {
+  box-sizing: border-box; width: 100%; padding: 12px 14px;
+  background: transparent; color: var(--color-text);
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+  font: inherit; font-size: 16px; /* 16px stops iOS zooming on focus */
+}
+.cuss-nick-input:focus { outline: none; border-color: var(--color-accent); }
+.cuss-nick-status { margin: 0; min-height: 20px; font-size: 13.5px; color: color-mix(in srgb, var(--color-text) 60%, transparent); }
+.cuss-nick-status.is-ok { color: oklch(0.75 0.13 150); }
+.cuss-nick-status.is-bad { color: var(--color-warn); }
+.cuss-nick-hint { margin: 0; font-size: 13px; line-height: 1.5; color: color-mix(in srgb, var(--color-text) 55%, transparent); }
+.cuss-nick-save {
+  width: 100%; padding: 14px 20px; font-size: 15px;
+  background: var(--color-accent); color: var(--color-bg); border-color: transparent;
+}
+.cuss-nick-save:hover:not(:disabled) { background: var(--color-accent-2); }
 
 /* ---- Guest sign-in prompts ------------------------------------------------
    Everything below is shown only to guests once auth state is known:
    initAuth() sets body.auth-enabled (Supabase configured + first auth event
    received) and body.signed-in. Without auth-enabled none of this appears, so
    the site looks exactly as it did before sign-in existed. */
-.cuss-lock, .cuss-guest-note { display: none; }
+/* .btn .cuss-lock: must outrank `.btn svg { display: block }` above, or the
+   lock would also show for signed-in users. */
+.cuss-lock, .btn .cuss-lock, .cuss-guest-note { display: none; }
 body.auth-enabled:not(.signed-in) .cuss-lock { display: inline-block; flex: none; opacity: 0.85; }
 body.auth-enabled:not(.signed-in) #cuss-bag-nav-count,
 body.auth-enabled:not(.signed-in) #cuss-bag-hero-count { display: none; }
@@ -342,9 +382,12 @@ body.auth-enabled:not(.signed-in) .cuss-guest-note {
   display: flex; align-items: center; justify-content: center; padding: var(--space-6);
   background: color-mix(in srgb, var(--color-bg) 82%, transparent);
   opacity: 0; visibility: hidden; pointer-events: none;
-  transition: opacity 0.2s ease, visibility 0.2s ease;
+  /* On close, visibility flips after the fade-out finishes. */
+  transition: opacity 0.2s ease, visibility 0s linear 0.2s;
 }
-.cuss-signin-dialog.is-open { opacity: 1; visibility: visible; pointer-events: auto; }
+/* On open, visibility flips immediately (0s) — otherwise the dialog is still
+   "hidden" when script calls focus() and the field can't take focus. */
+.cuss-signin-dialog.is-open { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.2s ease, visibility 0s; }
 .cuss-signin-card {
   position: relative; box-sizing: border-box; width: 100%; max-width: 420px;
   max-height: calc(100dvh - 2 * var(--space-6)); overflow-y: auto;

@@ -670,6 +670,214 @@
     return c.contains('auth-enabled') && !c.contains('signed-in');
   }
 
+  // ---- Nicknames (public.profiles) -----------------------------------------
+  // Fail-safe by design: if the profiles table can't be read or written for any
+  // reason, nothing is shown or blocked — the nav chip just says "Player" and
+  // the user keeps playing. Independent of the progress-sync code above.
+  var sbProfile = { loaded: false, nickname: null, exists: false };
+  var nicknameApi = null;              // set by initNicknameUI()
+  var refreshUserChip = function () {}; // set by initAuth()
+
+  var NICK_RESERVED = ['admin', 'cussator', 'chair', 'judge']; // mirrored by a DB check
+  // Basic filter only (the database can't enforce this one): strong roots are
+  // matched anywhere in the name; short words only as whole "_"-separated parts
+  // so ordinary names ("class", "Dickens") aren't caught.
+  var NICK_BLOCKED_ROOTS = ['fuck', 'shit', 'bitch', 'cunt', 'whore', 'slut', 'nigg', 'fagg', 'retard', 'rapist', 'nazi', 'hitler', 'pussy', 'asshole', 'bastard'];
+  var NICK_BLOCKED_WORDS = ['ass', 'dick', 'cock', 'cum', 'tits', 'fag', 'rape', 'sex', 'porn'];
+
+  function validateNickname(name) {
+    if (!name) return { ok: false, silent: true };
+    if (!/^[A-Za-z0-9_]+$/.test(name)) return { ok: false, msg: 'Use letters, numbers and underscores only.' };
+    if (name.length < 3) return { ok: false, msg: 'At least 3 characters.' };
+    var lower = name.toLowerCase();
+    if (NICK_RESERVED.indexOf(lower) !== -1) return { ok: false, msg: 'That name is reserved.' };
+    var leet = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't' };
+    var plain = lower.replace(/[013457]/g, function (c) { return leet[c]; });
+    var squashed = plain.replace(/_/g, '');
+    var parts = plain.split('_');
+    var bad = NICK_BLOCKED_ROOTS.some(function (r) { return squashed.indexOf(r) !== -1; }) ||
+      NICK_BLOCKED_WORDS.some(function (w) { return parts.indexOf(w) !== -1; });
+    if (bad) return { ok: false, msg: 'Please choose a different name.' };
+    return { ok: true };
+  }
+
+  function loadProfile(user) {
+    sbProfile = { loaded: false, nickname: null, exists: false };
+    var settled = false;
+    function settle(nickname, exists, promptable) {
+      if (settled) return;
+      settled = true;
+      if (!sbUser || sbUser.id !== user.id) return; // signed out / switched user meanwhile
+      sbProfile = { loaded: true, nickname: nickname, exists: exists };
+      refreshUserChip();
+      if (promptable && !exists) maybePromptNickname();
+    }
+    // If the request hangs, still resolve the chip to "Player".
+    setTimeout(function () { settle(null, false, false); }, 4000);
+    try {
+      sbClient.from('profiles').select('nickname').eq('user_id', user.id).maybeSingle()
+        .then(function (res) {
+          if (res.error) settle(null, false, false); // e.g. table missing: no dialog, just "Player"
+          else settle(res.data ? res.data.nickname : null, !!res.data, true);
+        }, function () { settle(null, false, false); });
+    } catch (e) { settle(null, false, false); }
+  }
+
+  var NICK_PROMPT_KEY = 'cussatorNickPrompted';
+  var nickPromptedInMemory = false;
+
+  // Auto-open for a signed-in user with no profile — once per browser session,
+  // so skipping it doesn't nag, but it returns at the next sign-in/session.
+  function maybePromptNickname() {
+    if (!nicknameApi || nickPromptedInMemory) return;
+    try {
+      if (sessionStorage.getItem(NICK_PROMPT_KEY)) return;
+      sessionStorage.setItem(NICK_PROMPT_KEY, '1');
+    } catch (e) { /* storage blocked — the in-memory flag still limits it to once per page load */ }
+    nickPromptedInMemory = true;
+    nicknameApi.open();
+  }
+
+  function initNicknameUI() {
+    var dialog = document.getElementById('cuss-nick-dialog');
+    var trigger = document.getElementById('cuss-user-trigger');
+    var menu = document.getElementById('cuss-user-menu');
+    var changeBtn = document.getElementById('cuss-nick-change-btn');
+    var signOutItem = document.getElementById('cuss-signout-btn');
+    var chip = document.getElementById('cuss-user-chip');
+    if (!dialog || !trigger || !menu || !changeBtn || !chip) return;
+    var titleEl = document.getElementById('cuss-nick-title');
+    var input = document.getElementById('cuss-nick-input');
+    var statusEl = document.getElementById('cuss-nick-status');
+    var saveBtn = document.getElementById('cuss-nick-save');
+    var closeBtn = document.getElementById('cuss-nick-close');
+
+    // ---- user menu ----
+    function setMenu(open) {
+      menu.hidden = !open;
+      trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    trigger.addEventListener('click', function () { setMenu(menu.hidden); });
+    document.addEventListener('click', function (e) { if (!menu.hidden && !chip.contains(e.target)) setMenu(false); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !menu.hidden) { setMenu(false); trigger.focus(); }
+    });
+    if (signOutItem) signOutItem.addEventListener('click', function () { setMenu(false); });
+    changeBtn.addEventListener('click', function () { setMenu(false); open(); });
+
+    // ---- dialog ----
+    var lastFocus = null, prevOverflow = '', checkTimer = null, checkToken = 0;
+    var canSave = false;
+
+    function isOpen() { return dialog.classList.contains('is-open'); }
+
+    function setStatus(text, kind) {
+      statusEl.textContent = text || '';
+      statusEl.className = 'cuss-nick-status' + (kind ? ' is-' + kind : '');
+    }
+    function setCanSave(v) { canSave = v; saveBtn.disabled = !v; }
+
+    function open() {
+      if (isOpen() || !sbUser) return;
+      lastFocus = document.activeElement;
+      prevOverflow = document.body.style.overflow;
+      titleEl.textContent = sbProfile.exists ? 'Change your nickname' : 'Choose your nickname';
+      input.value = sbProfile.nickname || '';
+      setStatus('', '');
+      setCanSave(false);
+      dialog.classList.add('is-open');
+      dialog.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      input.focus();
+      input.select();
+    }
+
+    function close() {
+      if (!isOpen()) return;
+      clearTimeout(checkTimer);
+      checkToken++;
+      dialog.classList.remove('is-open');
+      dialog.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = prevOverflow;
+      if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    nicknameApi = { open: open, close: close };
+
+    function onInput() {
+      clearTimeout(checkTimer);
+      var token = ++checkToken;
+      var name = input.value.trim();
+      var v = validateNickname(name);
+      setCanSave(false);
+      if (!v.ok) { setStatus(v.silent ? '' : v.msg, v.silent ? '' : 'bad'); return; }
+      if (sbProfile.nickname && name === sbProfile.nickname) { setStatus('This is already your nickname.', ''); return; }
+      setStatus('Checking…', '');
+      checkTimer = setTimeout(function () {
+        // "_" is a single-character wildcard in ILIKE, so escape it for an exact
+        // case-insensitive match. Any failure here is silent: leave Save enabled
+        // and let the database's unique index have the final say.
+        var pattern = name.replace(/_/g, '\\_');
+        var done = function (taken) {
+          if (token !== checkToken || !isOpen()) return;
+          if (taken) { setStatus('That name is taken.', 'bad'); setCanSave(false); }
+          else { setStatus(taken === false ? 'Available' : '', taken === false ? 'ok' : ''); setCanSave(true); }
+        };
+        try {
+          sbClient.from('profiles').select('user_id').ilike('nickname', pattern).limit(1)
+            .then(function (res) {
+              if (res.error || !res.data) return done(null);
+              var others = res.data.filter(function (r) { return sbUser && r.user_id !== sbUser.id; });
+              done(others.length > 0);
+            }, function () { done(null); });
+        } catch (e) { done(null); }
+      }, 350);
+    }
+    input.addEventListener('input', onInput);
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && canSave) { e.preventDefault(); save(); } });
+
+    function save() {
+      var name = input.value.trim();
+      if (!canSave || !sbUser || !validateNickname(name).ok) return;
+      setCanSave(false);
+      var user = sbUser;
+      var req = sbProfile.exists
+        ? sbClient.from('profiles').update({ nickname: name }).eq('user_id', user.id)
+        : sbClient.from('profiles').insert({ user_id: user.id, nickname: name });
+      var failQuietly = function () { close(); }; // any other failure: no error UI, chip stays as it was
+      try {
+        req.then(function (res) {
+          if (res.error) {
+            if (res.error.code === '23505') { // someone took it a moment ago
+              setStatus('That name was just taken.', 'bad');
+              return;
+            }
+            return failQuietly();
+          }
+          if (sbUser && sbUser.id === user.id) {
+            sbProfile = { loaded: true, nickname: name, exists: true };
+            refreshUserChip();
+          }
+          close();
+        }, failQuietly);
+      } catch (e) { failQuietly(); }
+    }
+    saveBtn.addEventListener('click', save);
+
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
+    document.addEventListener('keydown', function (e) {
+      if (!isOpen()) return;
+      if (e.key === 'Escape') { close(); return; }
+      if (e.key !== 'Tab') return;
+      var focusable = Array.prototype.filter.call(dialog.querySelectorAll('button, input'), function (el) { return !el.disabled; });
+      if (!focusable.length) return;
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+  }
+
   function initAuth() {
     var cfg = window.CUSSATOR_SUPABASE || {};
     var signInBtn = document.getElementById('cuss-signin-btn');
@@ -712,6 +920,7 @@
     var avatarEl = document.getElementById('cuss-user-avatar');
     var nameEl = document.getElementById('cuss-user-name');
     var signOutBtn = document.getElementById('cuss-signout-btn');
+    var changeNickBtn = document.getElementById('cuss-nick-change-btn');
 
     signInBtn.hidden = false;
 
@@ -721,20 +930,25 @@
       document.body.classList.add('auth-enabled');
       document.body.classList.toggle('signed-in', !!user);
       var meta = (user && user.user_metadata) || {};
-      var label = meta.full_name || meta.name || (user && user.email) || '';
+      var googleLabel = meta.full_name || meta.name || (user && user.email) || '';
       signInBtn.hidden = !!user;
       chip.hidden = !user;
       if (!user) return;
+      // The chip shows the public nickname, never the Google name: "Player"
+      // until one is set (blank only while the profile is still loading).
+      var label = sbProfile.loaded ? (sbProfile.nickname || 'Player') : '';
       nameEl.textContent = label;
-      nameEl.title = user.email || label;
+      nameEl.title = label;
+      if (changeNickBtn) changeNickBtn.textContent = sbProfile.nickname ? 'Change nickname' : 'Set nickname';
       if (meta.avatar_url) {
         avatarEl.style.backgroundImage = 'url("' + String(meta.avatar_url).replace(/["\\\n\r]/g, '') + '")';
         avatarEl.textContent = '';
       } else {
         avatarEl.style.backgroundImage = '';
-        avatarEl.textContent = (label.charAt(0) || '?').toUpperCase();
+        avatarEl.textContent = ((label || googleLabel).charAt(0) || '?').toUpperCase();
       }
     }
+    refreshUserChip = function () { if (sbUser) renderUser(sbUser); };
 
     startGoogleSignIn = function () {
       // origin (not a hardcoded URL) so the same build works on cussator.com
@@ -778,12 +992,15 @@
           // Deferred: supabase-js docs advise against awaiting other supabase
           // calls inside this callback.
           setTimeout(function () { pullAndMerge('login'); }, 0);
+          setTimeout(function () { loadProfile(user); }, 0);
         } else {
           sbUser = user;
         }
       } else if (event === 'SIGNED_OUT') {
         var wasSignedIn = !!sbUser;
         sbUser = null;
+        sbProfile = { loaded: false, nickname: null, exists: false };
+        if (nicknameApi) nicknameApi.close();
         renderUser(null);
         if (wasSignedIn) {
           clearLocalProgress();
@@ -4527,6 +4744,7 @@
     initNavMenu();
     initHeroPreview();
     initSignInUI();
+    initNicknameUI();
     initAuth();
   });
 })();
