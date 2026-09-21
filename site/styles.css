@@ -330,6 +330,21 @@ textarea.input { min-height: 90px; resize: vertical; }
 .cuss-user-menu-item:hover { background: color-mix(in srgb, var(--color-text) 9%, transparent); }
 .cuss-user-menu-item:disabled { opacity: 0.5; cursor: default; }
 
+/* Sign in / Create account tabs inside the sign-in dialog. */
+.cuss-tabs {
+  display: flex; gap: 4px; padding: 4px;
+  border: 1px solid var(--color-divider); border-radius: var(--radius-md);
+}
+.cuss-tab {
+  flex: 1; padding: 10px 12px; background: none; border: 0; border-radius: var(--radius-sm);
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.cuss-tab:hover { color: var(--color-text); }
+.cuss-tab.is-active { background: color-mix(in srgb, var(--color-text) 10%, transparent); color: var(--color-text); }
+.cuss-panel { display: flex; flex-direction: column; gap: var(--space-4); }
+.cuss-panel[hidden] { display: none; }
+
 /* Nickname dialog fields (the dialog itself reuses .cuss-signin-dialog/-card). */
 .cuss-nick-label { font-size: 13px; color: color-mix(in srgb, var(--color-text) 65%, transparent); margin-bottom: calc(-1 * var(--space-2)); }
 .cuss-nick-input {
@@ -348,6 +363,9 @@ textarea.input { min-height: 90px; resize: vertical; }
   background: var(--color-accent); color: var(--color-bg); border-color: transparent;
 }
 .cuss-nick-save:hover:not(:disabled) { background: var(--color-accent-2); }
+.cuss-nick-cancel { width: 100%; padding: 12px 20px; font-size: 14px; }
+/* .btn sets display, which would override the [hidden] attribute. */
+.cuss-nick-cancel[hidden], .cuss-signin-close[hidden] { display: none; }
 
 /* ---- Guest sign-in prompts ------------------------------------------------
    Everything below is shown only to guests once auth state is known:
@@ -417,30 +435,43 @@ body.auth-enabled:not(.signed-in) .cuss-guest-note {
 .cuss-signin-foot a { color: inherit; text-decoration: underline; }
 .cuss-signin-foot a:hover { color: var(--color-accent); }
 
-/* Round-report card for guests (see renderGuestBagPrompt() in script.js). */
+/* Round-report card for guests (see renderGuestBagPrompt() in script.js).
+   Proportions follow the "After a round" design (roomy card, 22px title, 16px
+   chips and body, 54px white Google button), in the site's own colors. */
 .cuss-bag-prompt {
-  box-sizing: border-box; width: 100%; max-width: 440px; margin-top: var(--space-6);
-  display: flex; flex-direction: column; gap: var(--space-4); text-align: left;
-  padding: var(--space-6);
+  box-sizing: border-box; width: 100%; max-width: 500px; margin-top: var(--space-6);
+  display: flex; flex-direction: column; gap: 18px; text-align: left;
+  padding: 28px;
   background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));
-  border: 1px solid var(--color-divider); border-radius: var(--radius-lg);
+  border: 1px solid var(--color-divider); border-radius: 22px;
   color: var(--color-text);
 }
 .cuss-bag-prompt[hidden] { display: none; }
 .cuss-bag-prompt-title {
-  display: flex; align-items: center; gap: var(--space-3); margin: 0;
-  font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 18px;
+  display: flex; align-items: center; gap: 12px; margin: 0;
+  font-family: var(--font-heading); font-weight: var(--font-heading-weight); font-size: 22px; line-height: 1.25;
 }
-.cuss-lock-static { flex: none; color: var(--color-accent); }
-.cuss-bag-prompt-words { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.cuss-lock-static { flex: none; width: 20px; height: 20px; color: var(--color-accent); }
+.cuss-bag-prompt-words { display: flex; flex-wrap: wrap; gap: 10px; }
 .cuss-bag-prompt-word {
-  padding: 6px 12px; border-radius: var(--radius-md); font-size: 14px; font-weight: 600;
+  padding: 8px 16px; border-radius: 10px; font-size: 16px; font-weight: 600;
   color: oklch(0.75 0.13 150);
   background: color-mix(in srgb, oklch(0.75 0.13 150) 14%, transparent);
 }
-.cuss-bag-prompt-text { margin: 0; font-size: 14px; line-height: 1.5; color: color-mix(in srgb, var(--color-text) 70%, transparent); }
-.cuss-bag-prompt-later { align-self: center; font-weight: 500; color: color-mix(in srgb, var(--color-text) 65%, transparent); }
+.cuss-bag-prompt-text { margin: 0; font-size: 16px; line-height: 1.55; color: color-mix(in srgb, var(--color-text) 72%, transparent); }
+.cuss-bag-prompt .cuss-google-btn { height: 54px; padding: 0 20px; gap: 12px; border-radius: 14px; font-size: 16px; font-weight: 600; }
+.cuss-bag-prompt .cuss-g-logo { width: 20px; height: 20px; }
+.cuss-bag-prompt-later {
+  align-self: center; height: 46px; padding: 0 20px; font-size: 15px; font-weight: 600;
+  color: color-mix(in srgb, var(--color-text) 62%, transparent);
+}
 .cuss-bag-prompt-later:hover { color: var(--color-text); }
+@media (max-width: 640px) {
+  .cuss-bag-prompt { padding: 20px; gap: 14px; border-radius: 18px; }
+  .cuss-bag-prompt-title { font-size: 19px; }
+  .cuss-bag-prompt-word { padding: 6px 12px; font-size: 15px; }
+  .cuss-bag-prompt-text { font-size: 15px; }
+}
 /* Hamburger — hidden on desktop, where .cuss-nav-links is just an inline
    row; shown only at the mobile breakpoint below, which is also where
    .cuss-nav-links itself switches from "inline row" to "dropdown panel

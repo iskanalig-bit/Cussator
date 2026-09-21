@@ -612,7 +612,8 @@
   // merged result differs from what the cloud already had. reason is one of
   // 'login' (session found / signed in), 'focus', 'round-end'. No-op for guests.
   function pullAndMerge(reason) {
-    if (!sbClient || !sbUser) return Promise.resolve();
+    // Also wait out the profile check, and never touch an account whose nickname step is unfinished.
+    if (!sbClient || !sbUser || nicknamePending || !sbProfile.loaded) return Promise.resolve();
     if (arenaRoundActive()) { pendingPull = true; return Promise.resolve(); }
     if (pullInFlight) return Promise.resolve();
     if (reason === 'focus' && !pendingPull && Date.now() - lastPullAt < PULL_MIN_INTERVAL_MS) {
@@ -675,8 +676,25 @@
   // reason, nothing is shown or blocked — the nav chip just says "Player" and
   // the user keeps playing. Independent of the progress-sync code above.
   var sbProfile = { loaded: false, nickname: null, exists: false };
+  // Supabase errors as readable text: "message (code) hint" — plain objects show
+  // up as just "Object" in some consoles.
+  function errText(err) {
+    if (!err) return 'unknown error';
+    var t = err.message || String(err);
+    if (err.code) t += ' (' + err.code + ')';
+    if (err.hint) t += ' — hint: ' + err.hint;
+    if (err.details) t += ' — details: ' + err.details;
+    return t;
+  }
   var nicknameApi = null;              // set by initNicknameUI()
   var refreshUserChip = function () {}; // set by initAuth()
+  var onPlayerLabelChange = function () {}; // set by initArena(): refreshes the debate screen's player name
+
+  // What the debate screen calls the player: their nickname when signed in with
+  // one, otherwise "You" (guests, and while the profile is still loading).
+  function playerLabel() {
+    return (sbUser && sbProfile.loaded && sbProfile.nickname) ? sbProfile.nickname : 'You';
+  }
 
   var NICK_RESERVED = ['admin', 'cussator', 'chair', 'judge']; // mirrored by a DB check
   // Basic filter only (the database can't enforce this one): strong roots are
@@ -701,41 +719,174 @@
     return { ok: true };
   }
 
+  // Resolves true (available), false (taken) or null (couldn't tell) and never
+  // rejects. Uses the public.nickname_available(nick) database function, which
+  // works for guests too; it only knows about taken names, so validateNickname()
+  // (reserved words, profanity) must run first.
+  function checkNicknameAvailable(name) {
+    if (!sbClient) return Promise.resolve(null);
+    var fail = function (err) {
+      console.warn('[nickname] availability check failed: ' + errText(err), err);
+      return null;
+    };
+    try {
+      return Promise.resolve(sbClient.rpc('nickname_available', { nick: name })).then(function (res) {
+        if (res.error || typeof res.data !== 'boolean') return fail(res.error || 'unexpected response');
+        return res.data;
+      }, fail);
+    } catch (e) { return Promise.resolve(fail(e)); }
+  }
+
+  // One live-checked nickname input, used by both the Create account tab and the
+  // nickname dialog: validation + debounced availability, status text in
+  // statusEl, and onState(ok) telling the owner whether the name can be used.
+  // opts.ownName() is the signed-in user's current nickname, if any.
+  function makeNicknameField(input, statusEl, onState, opts) {
+    var timer = null, token = 0;
+    function setStatus(text, kind) {
+      statusEl.textContent = text || '';
+      statusEl.className = 'cuss-nick-status' + (kind ? ' is-' + kind : '');
+    }
+    function evaluate() {
+      clearTimeout(timer);
+      var t = ++token;
+      var name = input.value.trim();
+      var v = validateNickname(name);
+      onState(false);
+      if (!v.ok) { setStatus(v.silent ? '' : v.msg, v.silent ? '' : 'bad'); return; }
+      var own = opts && opts.ownName && opts.ownName();
+      if (own && name.toLowerCase() === own.toLowerCase()) {
+        // Their own name: unchanged, or a case-only change (fine: unique index is on lower()).
+        if (name === own) { setStatus('This is already your nickname.', ''); return; }
+        setStatus('Available', 'ok'); onState(true); return;
+      }
+      setStatus('Checking…', '');
+      timer = setTimeout(function () {
+        checkNicknameAvailable(name).then(function (available) {
+          if (t !== token) return; // superseded by newer input, or cancelled
+          if (available === false) { setStatus('That name is taken.', 'bad'); onState(false); }
+          else if (available === true) { setStatus('Available', 'ok'); onState(true); }
+          else { setStatus("Couldn't check right now — we'll confirm it when saving.", ''); onState(true); }
+        });
+      }, 350);
+    }
+    input.addEventListener('input', evaluate);
+    return {
+      evaluate: evaluate,
+      setStatus: setStatus,
+      cancel: function () { clearTimeout(timer); token++; },
+      reset: function () { clearTimeout(timer); token++; setStatus('', ''); onState(false); }
+    };
+  }
+
+  // Nickname chosen on the Create account tab, held in localStorage across the
+  // Google redirect and turned into a profile when the user returns signed in.
+  var PENDING_NICK_KEY = 'cussatorPendingNickname';
+  var PENDING_NICK_TTL_MS = 60 * 60 * 1000;
+  function setPendingNickname(name) {
+    try { localStorage.setItem(PENDING_NICK_KEY, JSON.stringify({ name: name, ts: Date.now() })); } catch (e) { /* storage blocked: the fallback dialog will ask after sign-in */ }
+  }
+  function clearPendingNickname() {
+    try { localStorage.removeItem(PENDING_NICK_KEY); } catch (e) { /* nothing to clear */ }
+  }
+  function readPendingNickname() {
+    try {
+      var raw = localStorage.getItem(PENDING_NICK_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || typeof o.name !== 'string' || !(Date.now() - o.ts < PENDING_NICK_TTL_MS) || !validateNickname(o.name).ok) {
+        clearPendingNickname();
+        return null;
+      }
+      return o.name;
+    } catch (e) { return null; }
+  }
+
+  // Signed back in with a pending nickname and no profile yet: create it now.
+  // Taken meanwhile (or any other failure) -> the required dialog, prefilled,
+  // with the reason. Merging stays paused (nicknamePending) until this is done.
+  function createProfileFromPending(user, name) {
+    var failed = function (err) {
+      clearPendingNickname();
+      console.warn('[nickname] creating profile from pending nickname failed: ' + errText(err), err);
+      if (!sbUser || sbUser.id !== user.id) return;
+      var taken = err && err.code === '23505';
+      if (nicknameApi) {
+        nicknameApi.open({
+          required: true, prefill: name, kind: 'bad',
+          message: taken ? 'That name was taken while you were signing in. Please choose another.' : errText(err)
+        });
+      } else {
+        nicknamePending = false;
+        pullAndMerge('login');
+      }
+    };
+    try {
+      Promise.resolve(sbClient.from('profiles').insert({ user_id: user.id, nickname: name })).then(function (res) {
+        if (res.error) return failed(res.error);
+        clearPendingNickname();
+        if (!sbUser || sbUser.id !== user.id) return;
+        sbProfile = { loaded: true, nickname: name, exists: true };
+        nicknamePending = false;
+        refreshUserChip();
+        pullAndMerge('login'); // account creation is complete: first progress merge
+      }, failed);
+    } catch (e) { failed(e); }
+  }
+
+  // True while a signed-in user's profile read succeeded but found no row: the
+  // account isn't complete until they pick a nickname (Cancel signs them out).
+  // While set, nothing is merged or uploaded for them (see pullAndMerge()).
+  var nicknamePending = false;
+  // Set by the nickname dialog's Cancel so the resulting sign-out keeps the
+  // guest's local progress (a normal sign-out clears it).
+  var keepLocalOnSignOut = false;
+
+  // Runs once per sign-in. Three outcomes:
+  //  - row found            -> chip shows the nickname, progress merge starts
+  //  - read OK, no row      -> required "Choose your nickname" step (no skipping)
+  //  - read failed / hung   -> fail-open: chip shows "Player", merge starts, no
+  //                            dialog, nobody is blocked by a broken profiles table
   function loadProfile(user) {
     sbProfile = { loaded: false, nickname: null, exists: false };
+    nicknamePending = false;
     var settled = false;
-    function settle(nickname, exists, promptable) {
+    function settle(nickname, exists, readOk) {
       if (settled) return;
       settled = true;
       if (!sbUser || sbUser.id !== user.id) return; // signed out / switched user meanwhile
       sbProfile = { loaded: true, nickname: nickname, exists: exists };
       refreshUserChip();
-      if (promptable && !exists) maybePromptNickname();
+      if (exists) clearPendingNickname(); // they already had a profile: discard any pending name
+      if (readOk && !exists) {
+        var pending = readPendingNickname();
+        if (pending) {
+          nicknamePending = true;
+          createProfileFromPending(user, pending);
+          return; // the first merge happens once the profile exists
+        }
+        if (nicknameApi) {
+          // Signed in via the Sign in tab with no profile: required fallback dialog.
+          nicknamePending = true;
+          nicknameApi.open({ required: true });
+          return; // the first merge happens after a nickname is saved
+        }
+      }
+      pullAndMerge('login');
     }
     // If the request hangs, still resolve the chip to "Player".
     setTimeout(function () { settle(null, false, false); }, 4000);
     try {
       sbClient.from('profiles').select('nickname').eq('user_id', user.id).maybeSingle()
         .then(function (res) {
-          if (res.error) settle(null, false, false); // e.g. table missing: no dialog, just "Player"
-          else settle(res.data ? res.data.nickname : null, !!res.data, true);
-        }, function () { settle(null, false, false); });
-    } catch (e) { settle(null, false, false); }
-  }
-
-  var NICK_PROMPT_KEY = 'cussatorNickPrompted';
-  var nickPromptedInMemory = false;
-
-  // Auto-open for a signed-in user with no profile — once per browser session,
-  // so skipping it doesn't nag, but it returns at the next sign-in/session.
-  function maybePromptNickname() {
-    if (!nicknameApi || nickPromptedInMemory) return;
-    try {
-      if (sessionStorage.getItem(NICK_PROMPT_KEY)) return;
-      sessionStorage.setItem(NICK_PROMPT_KEY, '1');
-    } catch (e) { /* storage blocked — the in-memory flag still limits it to once per page load */ }
-    nickPromptedInMemory = true;
-    nicknameApi.open();
+          if (res.error) {
+            console.warn('[nickname] profile read failed: ' + errText(res.error), res.error);
+            settle(null, false, false);
+          } else {
+            settle(res.data ? res.data.nickname : null, !!res.data, true);
+          }
+        }, function (err) { console.warn('[nickname] profile read failed: ' + errText(err), err); settle(null, false, false); });
+    } catch (e) { console.warn('[nickname] profile read failed: ' + errText(e), e); settle(null, false, false); }
   }
 
   function initNicknameUI() {
@@ -751,6 +902,8 @@
     var statusEl = document.getElementById('cuss-nick-status');
     var saveBtn = document.getElementById('cuss-nick-save');
     var closeBtn = document.getElementById('cuss-nick-close');
+    var cancelBtn = document.getElementById('cuss-nick-cancel');
+    var subEl = document.getElementById('cuss-nick-sub');
 
     // ---- user menu ----
     function setMenu(open) {
@@ -766,8 +919,9 @@
     changeBtn.addEventListener('click', function () { setMenu(false); open(); });
 
     // ---- dialog ----
-    var lastFocus = null, prevOverflow = '', checkTimer = null, checkToken = 0;
+    var lastFocus = null, prevOverflow = '';
     var canSave = false;
+    var required = false; // account-creation step: no ✕/Escape/backdrop, only Save or Cancel (sign out)
 
     function isOpen() { return dialog.classList.contains('is-open'); }
 
@@ -776,15 +930,20 @@
       statusEl.className = 'cuss-nick-status' + (kind ? ' is-' + kind : '');
     }
     function setCanSave(v) { canSave = v; saveBtn.disabled = !v; }
+    var field = makeNicknameField(input, statusEl, setCanSave, { ownName: function () { return sbProfile.nickname; } });
 
-    function open() {
+    function open(opts) {
       if (isOpen() || !sbUser) return;
+      required = !!(opts && opts.required);
+      if (closeBtn) closeBtn.hidden = required;
+      if (cancelBtn) cancelBtn.hidden = !required;
+      if (subEl) subEl.hidden = !required;
       lastFocus = document.activeElement;
       prevOverflow = document.body.style.overflow;
       titleEl.textContent = sbProfile.exists ? 'Change your nickname' : 'Choose your nickname';
-      input.value = sbProfile.nickname || '';
-      setStatus('', '');
-      setCanSave(false);
+      input.value = (opts && opts.prefill) || sbProfile.nickname || '';
+      field.reset();
+      if (opts && opts.message) setStatus(opts.message, opts.kind || 'bad');
       dialog.classList.add('is-open');
       dialog.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
@@ -792,10 +951,12 @@
       input.select();
     }
 
-    function close() {
+    // A required dialog only closes via Save, Cancel, or force (sign-out).
+    function close(force) {
       if (!isOpen()) return;
-      clearTimeout(checkTimer);
-      checkToken++;
+      if (required && force !== true) return;
+      required = false;
+      field.cancel();
       dialog.classList.remove('is-open');
       dialog.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = prevOverflow;
@@ -804,73 +965,65 @@
 
     nicknameApi = { open: open, close: close };
 
-    function onInput() {
-      clearTimeout(checkTimer);
-      var token = ++checkToken;
-      var name = input.value.trim();
-      var v = validateNickname(name);
-      setCanSave(false);
-      if (!v.ok) { setStatus(v.silent ? '' : v.msg, v.silent ? '' : 'bad'); return; }
-      if (sbProfile.nickname && name === sbProfile.nickname) { setStatus('This is already your nickname.', ''); return; }
-      setStatus('Checking…', '');
-      checkTimer = setTimeout(function () {
-        // "_" is a single-character wildcard in ILIKE, so escape it for an exact
-        // case-insensitive match. Any failure here is silent: leave Save enabled
-        // and let the database's unique index have the final say.
-        var pattern = name.replace(/_/g, '\\_');
-        var done = function (taken) {
-          if (token !== checkToken || !isOpen()) return;
-          if (taken) { setStatus('That name is taken.', 'bad'); setCanSave(false); }
-          else { setStatus(taken === false ? 'Available' : '', taken === false ? 'ok' : ''); setCanSave(true); }
-        };
-        try {
-          sbClient.from('profiles').select('user_id').ilike('nickname', pattern).limit(1)
-            .then(function (res) {
-              if (res.error || !res.data) return done(null);
-              var others = res.data.filter(function (r) { return sbUser && r.user_id !== sbUser.id; });
-              done(others.length > 0);
-            }, function () { done(null); });
-        } catch (e) { done(null); }
-      }, 350);
-    }
-    input.addEventListener('input', onInput);
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && canSave) { e.preventDefault(); save(); } });
+
+    function saveFailed(err) {
+      // Log the raw Supabase error and show its text so a failure is diagnosable.
+      console.error('[nickname] save failed: ' + errText(err), err);
+      setStatus(errText(err), 'bad');
+      setCanSave(true); // allow a retry
+    }
 
     function save() {
       var name = input.value.trim();
       if (!canSave || !sbUser || !validateNickname(name).ok) return;
       setCanSave(false);
       var user = sbUser;
+      var wasRequired = required;
       var req = sbProfile.exists
         ? sbClient.from('profiles').update({ nickname: name }).eq('user_id', user.id)
         : sbClient.from('profiles').insert({ user_id: user.id, nickname: name });
-      var failQuietly = function () { close(); }; // any other failure: no error UI, chip stays as it was
       try {
         req.then(function (res) {
           if (res.error) {
             if (res.error.code === '23505') { // someone took it a moment ago
+              console.warn('[nickname] name just taken', res.error);
               setStatus('That name was just taken.', 'bad');
               return;
             }
-            return failQuietly();
+            return saveFailed(res.error);
           }
-          if (sbUser && sbUser.id === user.id) {
-            sbProfile = { loaded: true, nickname: name, exists: true };
-            refreshUserChip();
-          }
-          close();
-        }, failQuietly);
-      } catch (e) { failQuietly(); }
+          if (!sbUser || sbUser.id !== user.id) return;
+          sbProfile = { loaded: true, nickname: name, exists: true };
+          nicknamePending = false;
+          refreshUserChip();
+          close(true);
+          // Account creation is now complete: start the first progress merge.
+          if (wasRequired) pullAndMerge('login');
+        }, saveFailed);
+      } catch (e) { saveFailed(e); }
     }
     saveBtn.addEventListener('click', save);
 
-    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (closeBtn) closeBtn.addEventListener('click', function () { close(); });
     dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
+    // Cancel on the required step: back to guest mode. The guest's local
+    // progress is kept, and nothing was uploaded for this account.
+    if (cancelBtn) cancelBtn.addEventListener('click', function () {
+      if (!required) return;
+      nicknamePending = false;
+      keepLocalOnSignOut = true;
+      close(true);
+      Promise.resolve(sbClient.auth.signOut()).catch(function (err) {
+        keepLocalOnSignOut = false;
+        console.warn('[nickname] sign-out after cancel failed', err);
+      });
+    });
     document.addEventListener('keydown', function (e) {
       if (!isOpen()) return;
       if (e.key === 'Escape') { close(); return; }
       if (e.key !== 'Tab') return;
-      var focusable = Array.prototype.filter.call(dialog.querySelectorAll('button, input'), function (el) { return !el.disabled; });
+      var focusable = Array.prototype.filter.call(dialog.querySelectorAll('button, input'), function (el) { return !el.disabled && !el.hidden; });
       if (!focusable.length) return;
       var first = focusable[0], last = focusable[focusable.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -929,26 +1082,20 @@
       // CSS/JS; auth-enabled only appears once the first auth state is known.
       document.body.classList.add('auth-enabled');
       document.body.classList.toggle('signed-in', !!user);
-      var meta = (user && user.user_metadata) || {};
-      var googleLabel = meta.full_name || meta.name || (user && user.email) || '';
       signInBtn.hidden = !!user;
       chip.hidden = !user;
       if (!user) return;
-      // The chip shows the public nickname, never the Google name: "Player"
-      // until one is set (blank only while the profile is still loading).
+      // The chip only ever shows the public nickname — never the Google name or
+      // photo: "Player" until one is set (blank only while the profile loads).
+      // The avatar is the nickname's first letter.
       var label = sbProfile.loaded ? (sbProfile.nickname || 'Player') : '';
       nameEl.textContent = label;
       nameEl.title = label;
       if (changeNickBtn) changeNickBtn.textContent = sbProfile.nickname ? 'Change nickname' : 'Set nickname';
-      if (meta.avatar_url) {
-        avatarEl.style.backgroundImage = 'url("' + String(meta.avatar_url).replace(/["\\\n\r]/g, '') + '")';
-        avatarEl.textContent = '';
-      } else {
-        avatarEl.style.backgroundImage = '';
-        avatarEl.textContent = ((label || googleLabel).charAt(0) || '?').toUpperCase();
-      }
+      avatarEl.style.backgroundImage = '';
+      avatarEl.textContent = label ? label.charAt(0).toUpperCase() : '';
     }
-    refreshUserChip = function () { if (sbUser) renderUser(sbUser); };
+    refreshUserChip = function () { if (sbUser) renderUser(sbUser); onPlayerLabelChange(); };
 
     startGoogleSignIn = function () {
       // origin (not a hardcoded URL) so the same build works on cussator.com
@@ -991,7 +1138,7 @@
           sbUser = user;
           // Deferred: supabase-js docs advise against awaiting other supabase
           // calls inside this callback.
-          setTimeout(function () { pullAndMerge('login'); }, 0);
+          // loadProfile() starts the login merge itself once the profile check is done.
           setTimeout(function () { loadProfile(user); }, 0);
         } else {
           sbUser = user;
@@ -1000,10 +1147,14 @@
         var wasSignedIn = !!sbUser;
         sbUser = null;
         sbProfile = { loaded: false, nickname: null, exists: false };
-        if (nicknameApi) nicknameApi.close();
+        nicknamePending = false;
+        if (nicknameApi) nicknameApi.close(true);
         renderUser(null);
+        onPlayerLabelChange();
         if (wasSignedIn) {
-          clearLocalProgress();
+          // A cancelled nickname step returns to guest mode with the guest's own data.
+          if (!keepLocalOnSignOut) clearLocalProgress();
+          keepLocalOnSignOut = false;
           updateBagBadge();
           initHomepageStat();
         }
@@ -2079,6 +2230,8 @@
           '<span class="tag tag-outline cuss-arena-prompt-badge">YOUR TURN</span>' +
           'Make the case for the resolution — precise phrasing strengthens your position, filler words weaken it instantly.' +
         '</p>';
+      var anchorYouLabel = document.getElementById('cuss-anchor-you-label');
+      if (anchorYouLabel) anchorYouLabel.textContent = playerLabel();
       typing.hidden = true;
       typing.classList.remove('is-visible');
 
@@ -2093,7 +2246,7 @@
 
       playerSide = null;
       setDifficulty('delegate');
-      healthLabelEl.textContent = 'You';
+      healthLabelEl.textContent = playerLabel();
       aiHealthLabelEl.textContent = 'Opponent';
       if (arenaSideEl) { arenaSideEl.hidden = true; arenaSideEl.textContent = ''; arenaSideEl.className = 'tag tag-outline cuss-arena-side'; }
       stanceAffirmBtn.disabled = false;
@@ -2131,6 +2284,15 @@
       updateTokenDisplay(getTokenPoolSize());
     }
 
+    // Keeps the player's name current if the nickname finishes loading (or is
+    // changed / signed out) while the debate screen is open. Text only.
+    onPlayerLabelChange = function () {
+      healthLabelEl.textContent = playerLabel();
+      var youLabel = document.getElementById('cuss-anchor-you-label');
+      if (youLabel) youLabel.textContent = playerLabel() + (playerSide ? ' · ' + (playerSide === 'affirm' ? 'Affirm' : 'Negate') : '');
+      if (playerSide && stanceConfirmYouEl.textContent) stanceConfirmYouEl.textContent = playerLabel() + ': ' + playerSide.toUpperCase();
+    };
+
     // Player picks Affirm/Negate; the AI automatically takes the opposite
     // side. Briefly shows both choices as a confirmation beat, then reveals
     // the round with the player speaking first — no AI message before that.
@@ -2146,7 +2308,7 @@
       // strips, and the side (Affirm/Negate) is already shown right next
       // to them via arenaSideEl's tag and the pre-round anchor row, so
       // repeating it here just crowds out the label under a narrow track.
-      healthLabelEl.textContent = 'You';
+      healthLabelEl.textContent = playerLabel();
       aiHealthLabelEl.textContent = 'Opponent (' + difficultyLabel + ')';
       if (arenaSideEl) {
         arenaSideEl.hidden = false;
@@ -2169,14 +2331,14 @@
         youAvatar.textContent = side === 'affirm' ? 'A' : 'N';
         youAvatar.className = 'cuss-anchor-avatar is-' + side;
       }
-      if (youLabel) youLabel.textContent = 'You · ' + (side === 'affirm' ? 'Affirm' : 'Negate');
+      if (youLabel) youLabel.textContent = playerLabel() + ' · ' + (side === 'affirm' ? 'Affirm' : 'Negate');
       if (aiAvatar) {
         aiAvatar.textContent = aiSide === 'affirm' ? 'A' : 'N';
         aiAvatar.className = 'cuss-anchor-avatar is-' + aiSide;
       }
       if (aiLabel) aiLabel.textContent = 'AI opponent · ' + (aiSide === 'affirm' ? 'Affirm' : 'Negate');
 
-      stanceConfirmYouEl.textContent = 'You: ' + side.toUpperCase();
+      stanceConfirmYouEl.textContent = playerLabel() + ': ' + side.toUpperCase();
       stanceConfirmYouEl.className = 'cuss-stance-confirm-row cuss-text-' + side;
       stanceConfirmAiEl.textContent = 'AI opponent: ' + aiSide.toUpperCase();
       stanceConfirmAiEl.className = 'cuss-stance-confirm-row cuss-text-' + aiSide;
@@ -3858,7 +4020,7 @@
         e.preventDefault();
         // Guests see a lock on Bag: open the sign-in dialog instead. Their
         // words are still collected locally and merge in once they sign in.
-        if (isGuestWithSignIn() && signInDialogApi) { signInDialogApi.open(); return; }
+        if (isGuestWithSignIn() && signInDialogApi) { signInDialogApi.open({ tab: 'create' }); return; }
         openBag();
       });
     });
@@ -4671,34 +4833,65 @@
     card.hidden = false;
   }
 
-  // Sign-in dialog + the round-report card's buttons. The Google buttons call
-  // startGoogleSignIn() (defined in initAuth()), so the OAuth call lives in
-  // one place. Closes with the X, Escape, a backdrop click or "Continue as guest".
+  // Sign-in dialog (Sign in / Create account tabs) + the round-report card's
+  // button. Sign in tab: straight to Google. Create account tab: the nickname is
+  // chosen first (live availability check), saved as "pending", and turned into a
+  // profile after Google returns (see loadProfile()). All Google buttons call
+  // startGoogleSignIn() (defined in initAuth()), so the OAuth call lives in one
+  // place. Closes with the X, Escape, a backdrop click or "Continue as guest".
   function initSignInUI() {
     var dialog = document.getElementById('cuss-signin-dialog');
     if (!dialog) return;
     var closeBtn = document.getElementById('cuss-signin-close');
     var googleBtn = document.getElementById('cuss-signin-google');
     var guestBtn = document.getElementById('cuss-signin-guest');
+    var tabSignIn = document.getElementById('cuss-tab-signin');
+    var tabCreate = document.getElementById('cuss-tab-create');
+    var panelSignIn = document.getElementById('cuss-panel-signin');
+    var panelCreate = document.getElementById('cuss-panel-create');
+    var createInput = document.getElementById('cuss-create-nick');
+    var createStatus = document.getElementById('cuss-create-status');
+    var createGoogleBtn = document.getElementById('cuss-create-google');
     var promptSignIn = document.getElementById('cuss-bag-prompt-signin');
     var promptLater = document.getElementById('cuss-bag-prompt-later');
     var lastFocus = null;
     var prevOverflow = '';
+    var createOk = false;
+
+    var field = makeNicknameField(createInput, createStatus, function (ok) {
+      createOk = ok;
+      createGoogleBtn.disabled = !ok;
+    }, null);
 
     function isOpen() { return dialog.classList.contains('is-open'); }
 
-    function open() {
+    function setTab(name, focus) {
+      var create = name === 'create';
+      tabSignIn.classList.toggle('is-active', !create);
+      tabCreate.classList.toggle('is-active', create);
+      tabSignIn.setAttribute('aria-selected', create ? 'false' : 'true');
+      tabCreate.setAttribute('aria-selected', create ? 'true' : 'false');
+      tabSignIn.tabIndex = create ? -1 : 0;
+      tabCreate.tabIndex = create ? 0 : -1;
+      panelSignIn.hidden = create;
+      panelCreate.hidden = !create;
+      if (create && createInput.value.trim()) field.evaluate();
+      if (focus) (create ? createInput : googleBtn).focus();
+    }
+
+    function open(opts) {
       if (isOpen()) return;
       lastFocus = document.activeElement;
       prevOverflow = document.body.style.overflow;
       dialog.classList.add('is-open');
       dialog.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
-      if (googleBtn) googleBtn.focus();
+      setTab(opts && opts.tab === 'create' ? 'create' : 'signin', true);
     }
 
     function close() {
       if (!isOpen()) return;
+      field.cancel();
       dialog.classList.remove('is-open');
       dialog.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = prevOverflow;
@@ -4707,24 +4900,58 @@
 
     signInDialogApi = { open: open, close: close };
 
+    tabSignIn.addEventListener('click', function () { setTab('signin', true); });
+    tabCreate.addEventListener('click', function () { setTab('create', true); });
+    [tabSignIn, tabCreate].forEach(function (tab) {
+      tab.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        var toCreate = tab === tabSignIn; // only two tabs: either arrow moves to the other
+        setTab(toCreate ? 'create' : 'signin', false);
+        (toCreate ? tabCreate : tabSignIn).focus();
+      });
+    });
+
     if (closeBtn) closeBtn.addEventListener('click', close);
     if (guestBtn) guestBtn.addEventListener('click', close);
-    if (googleBtn) googleBtn.addEventListener('click', function () { startGoogleSignIn(); });
     dialog.addEventListener('click', function (e) { if (e.target === dialog) close(); });
+
+    // Sign in tab: an existing account. Drop any stale pending nickname so it
+    // can't be applied to this sign-in.
+    if (googleBtn) googleBtn.addEventListener('click', function () {
+      clearPendingNickname();
+      startGoogleSignIn();
+    });
+
+    // Create account tab: remember the nickname across the Google redirect.
+    function continueCreate() {
+      var name = createInput.value.trim();
+      if (!createOk || !validateNickname(name).ok) return;
+      setPendingNickname(name);
+      startGoogleSignIn();
+    }
+    createGoogleBtn.addEventListener('click', continueCreate);
+    createInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); continueCreate(); }
+    });
 
     document.addEventListener('keydown', function (e) {
       if (!isOpen()) return;
       if (e.key === 'Escape') { close(); return; }
       if (e.key !== 'Tab') return;
-      // Keep Tab inside the dialog while it's open.
-      var focusable = dialog.querySelectorAll('button, a[href]');
+      // Keep Tab inside the dialog while it's open (visible, enabled controls only).
+      var focusable = Array.prototype.filter.call(dialog.querySelectorAll('button, input, a[href]'), function (el) {
+        return !el.disabled && !el.closest('[hidden]') && el.tabIndex !== -1;
+      });
       if (!focusable.length) return;
       var first = focusable[0], last = focusable[focusable.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     });
 
-    if (promptSignIn) promptSignIn.addEventListener('click', function () { startGoogleSignIn(); });
+    // Report card: opens the dialog on the Create account tab (guests seeing it
+    // are mostly new; the tabs let anyone switch).
+    if (promptSignIn) promptSignIn.addEventListener('click', function () { open({ tab: 'create' }); });
     if (promptLater) promptLater.addEventListener('click', function () {
       var card = document.getElementById('cuss-bag-prompt');
       if (card) card.hidden = true;
